@@ -1,14 +1,17 @@
 /**
  * Session-wide produced-file derivation from a finalized ConversationSnapshot.
- * Client-only and model-free: the vocabulary is the mutation tools' own
- * follow-along `locations` and diff views, never the closing prose. This is
- * the sidebar-tab analogue of dsh-file-review's turn-deliverables.ts: instead
- * of a ConversationNodeDefinition accumulating one turn's data for the
- * turn-tail slot, it derives EVERY in-window turn's changes from the session
- * snapshot's finalized nodes, attributing each tool result to its owning
- * turn through `turnEnds` (completed turns) or the live turn counters.
+ *
+ * dsh 0.1.5 removed the pre-rendered `callView` from `ToolResultNode`; the
+ * mutation facts now live in the call head (`call.name` + `call.argsRaw`) and
+ * the tool-private result metadata (`meta.diffs`). This module folds those
+ * into per-turn file changes for the sidebar tab, walking the settled tool
+ * nodes and, recursively, their Code Mode (`run_code`) sub-calls. Turn
+ * attribution still rides the Chat snapshot's `turnEnds` / live counters.
+ *
+ * Client-only and model-free: the vocabulary is the mutation tools' own call
+ * arguments and result metadata, never the closing prose.
  */
-import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
+import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { ProducedFileDiff, RecordedMutation } from '../change-types.ts';
 /** One changed file inside one turn, hunks appended in settlement order. */
 export interface SessionFileChange {
@@ -24,28 +27,21 @@ export interface TurnFileChanges {
     readonly live: boolean;
     readonly files: readonly SessionFileChange[];
 }
-/**
- * Paths a call view reports having created or changed, by render intent
- * rather than tool name: a diff card, or a generic card whose kind is `edit`.
- * Mirrors dsh-file-review's producedPaths exactly (unknown-safe).
- */
-export declare function producedPaths(view: unknown): readonly string[];
-/** Validate diff hunks crossing the Host/browser transport (unknown-safe). */
-export declare function producedDiffs(view: unknown): readonly ProducedFileDiff[];
 /** Derive per-turn produced-file changes for one session snapshot. */
 export declare function deriveSessionChanges(snapshot: ConversationSnapshot | null): TurnFileChanges[];
 /**
  * One Code Mode (`run_code`) root visible in the snapshot, with the turn it
- * settles into. Children (`subCalls`) carry no reusable views, so the reset of
- * their review data arrives asynchronously from the Host recorder; these roots
- * are the join keys (the `run_code` `callId` is the dispatch `rootCallId`).
+ * settles into. The snapshot now carries settled `subCalls` with their own
+ * call heads and result metadata, so those are the primary source; this root
+ * list only feeds the Host recorder fallback for roots whose nested facts did
+ * not survive into the snapshot.
  */
 export interface SessionRoot {
     readonly turn: number;
     readonly live: boolean;
     readonly rootCallId: string;
 }
-/** Every `run_code` tool-result node in the window, in node order. */
+/** Every `run_code` tool-result node whose nested changes are not in the snapshot. */
 export declare function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[];
 /**
  * Merge Host-recorded Code Mode mutations into the snapshot-derived turns:

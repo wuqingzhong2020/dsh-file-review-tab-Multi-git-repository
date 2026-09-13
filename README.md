@@ -27,7 +27,9 @@ dsh plugin --profile web add dsh-file-review-tab
 dsh plugin --profile web add github:Lzh3070/dsh-file-review-tab
 ```
 
-前置依赖：DeepSeek Harness web（≥ 0.1.0-rc.5，兼容 0.1.2-alpha 系列）+ [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥ 0.12.0）。
+前置依赖：DeepSeek Harness web（**0.1.5-rc.1+**，已在 0.1.5-rc.1 / 0.1.5-rc.2 上真机验证）+ [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥ 0.19.1）。
+
+> **版本对应**：`dsh-file-review-tab@0.5.x` 只支持 DSH 0.1.5 及更新的侧边栏 API；仍停留在 DSH 0.1.2 / 0.1.1 的用户请继续使用 `dsh-file-review-tab@0.4.1`。
 
 安装后**重启 dsh web**，在 better-sidebar 侧边栏「+」菜单打开「文件审查」即可。
 
@@ -50,4 +52,4 @@ dsh plugin --profile web add github:Lzh3070/dsh-file-review-tab
 - Session-isolated, pause-when-hidden, CSS-Module scoped styling (no conflicts with the chat area or other plugins).
 - Narrow-pane adaptive: in half-width splits and floated free windows the turn header wraps and secondary content yields so undo and file names never clip.
 
-Requires DeepSeek Harness web (≥ 0.1.0-rc.5, compatible with the 0.1.2-alpha line) and dsh-better-sidebar (≥ 0.12.0). Restart `dsh web` after installing, then open the "File Review" tab from the sidebar's "+" menu.
+Requires DeepSeek Harness web (0.1.5-rc.1+, verified on 0.1.5-rc.1 / 0.1.5-rc.2) and dsh-better-sidebar (≥ 0.19.1). `dsh-file-review-tab@0.5.x` targets only the DSH 0.1.5 client API; users on DSH 0.1.2 / 0.1.1 should stay on 0.4.1. Restart `dsh web` after installing, then open the "File Review" tab from the sidebar's "+" menu.

@@ -16,13 +16,17 @@
  * disposal (HMR / plugin disable) unregisters cleanly.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-client-runtime/client'
-import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from 'dsh-better-sidebar/client/service'
-import type { ConversationSnapshot, ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatFileMentions } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ChatFileMentions } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { TabDescriptor } from 'dsh-better-sidebar/client/service'
 import type { FileReviewRequest, FileReviewResult } from '../change-types.ts'
@@ -31,6 +35,7 @@ import { FileReviewTab } from './FileReviewTab.tsx'
 import { ProducedFiles } from './ProducedFiles.tsx'
 import { normalizeSnapshot } from './snapshot-compat.ts'
 import { attachLocale, en, LOCALE_NS, t, zh } from './locales.ts'
+import { publishFileReviewSeed } from './deep-link.ts'
 import {
   en as chatEn, NS as CHAT_NS, zh as chatZh, type DeliverablesKey,
 } from './chat-locales.ts'
@@ -61,6 +66,7 @@ export const inject = [
   'locale',
   'remote',
   'slots',
+  'uiConversation',
 ]
 
 /** The tab icon: a modest line-diff glyph drawn at the host-given size. */
@@ -107,12 +113,23 @@ function snapshotFingerprint(snapshot: ConversationSnapshot | null): string {
   return `${view.nodes.length}:${view.turnEnds.size}:${lastEnd}`
 }
 
+/** The slice of `ctx.uiConversation` the badge needs. */
+interface BadgeConversationFace {
+  binding(id: SessionId): { readonly snapshot: { getSnapshot(): ConversationSnapshot } }
+}
+
 function badgeCount(ctx: Context, sessionId: string): number | null {
-  // Host and browser sessions services share one Cordis key (see
-  // dsh-file-review): narrow to the browser ISessions at this boundary.
-  const sessions = (ctx as unknown as { readonly sessions: ISessions }).sessions
-  const session = sessions.binding(sessionId as SessionId)?.session
-  const snapshot = session?.getSnapshot() ?? null
+  // dsh 0.1.5: the Conversation projection lives on the uiConversation
+  // binding, not on the Session face (whose snapshot is session lifecycle).
+  const uiConversation = (ctx as unknown as { get(name: string): unknown })
+    .get('uiConversation') as BadgeConversationFace | undefined
+  let snapshot: ConversationSnapshot | null = null
+  try {
+    snapshot = uiConversation?.binding(sessionId as SessionId).snapshot.getSnapshot() ?? null
+  } catch {
+    // No binding yet: no badge rather than a thrown tab-bar render.
+    return null
+  }
   const fingerprint = snapshotFingerprint(snapshot)
   const hit = badgeMemo.get(sessionId)
   if (hit !== undefined && hit.fingerprint === fingerprint) return hit.count
@@ -123,40 +140,6 @@ function badgeCount(ctx: Context, sessionId: string): number | null {
   const value = count === 0 ? null : count
   badgeMemo.set(sessionId, { fingerprint, count: value })
   return value
-}
-
-/**
- * The conversation Definition registry face this plugin needs: just the
- * per-turn deliverables registration. Same shape on every dsh release — only
- * the service path to reach it moved.
- */
-interface ConversationDefinitionRegistry {
-  register(definition: typeof deliverablesDefinition): () => void
-}
-
-/**
- * Resolve the conversation Definition registry without statically injecting
- * it. dsh 0.1.2-alpha.1+ folds the old `conversationEvents` /
- * `conversationViews` pair into a single `uiConversation` service (the
- * registry is its `.events` property); dsh 0.1.1 and earlier expose it as the
- * standalone root `conversationEvents` service. Returns undefined when the
- * running dsh provides neither — the caller degrades instead of blocking.
- */
-function resolveConversationEvents(ctx: Context): ConversationDefinitionRegistry | undefined {
-  const lookup = (name: string): unknown => {
-    // ctx.get() exists on newer cordis; ctx.reflect.get() is the documented
-    // "read a service without the inject requirement" escape hatch on both.
-    const anyCtx = ctx as unknown as { get?: (name: string) => unknown }
-    if (typeof anyCtx.get === 'function') return anyCtx.get(name)
-    return ctx.reflect.get(name)
-  }
-  const uiConversation = lookup('uiConversation') as
-    | { readonly events?: ConversationDefinitionRegistry | null }
-    | undefined
-  if (uiConversation?.events !== undefined && uiConversation.events !== null) return uiConversation.events
-  const conversationEvents = lookup('conversationEvents') as ConversationDefinitionRegistry | undefined
-  if (conversationEvents !== undefined && conversationEvents !== null) return conversationEvents
-  return undefined
 }
 
 /**
@@ -194,26 +177,14 @@ export function apply(ctx: Context): void {
 
   // The turn-local mutation accumulator both chat-side surfaces read: the
   // turn-tail row's select() and the prose-mention vocabulary derive from the
-  // 'deliverables' Turn data this Definition publishes. Registered against
-  // whichever conversation registry the running dsh exposes (see
-  // resolveConversationEvents); re-registered when the owning service is
-  // (re-)provided or replaced, and skipped entirely on a dsh that exposes
-  // neither — the sidebar tab derives from session snapshots and keeps
-  // working without it.
-  let registeredOn: ConversationDefinitionRegistry | undefined
-  const registerDeliverables = (): void => {
-    const events = resolveConversationEvents(ctx)
-    if (events === undefined || events === registeredOn) return
-    registeredOn = events
-    ctx.effect(
-      () => events.register(deliverablesDefinition),
-      'file-review-tab: deliverables definition',
-    )
-  }
-  registerDeliverables()
-  ctx.on('internal/service', (name: string) => {
-    if (name === 'conversationEvents' || name === 'uiConversation') registerDeliverables()
-  })
+  // 'deliverables' Turn data this Definition publishes. dsh 0.1.5 exposes the
+  // Definition registry as `ctx.uiConversation.events` (the old
+  // `conversationEvents` root is gone), and `cordis.patch.yml` composes the
+  // built-in ui-deliverables out, so this is the sole owner of the key.
+  ctx.effect(
+    () => ctx.uiConversation.events.register(deliverablesDefinition),
+    'file-review-tab: deliverables definition',
+  )
 
   // The chat turn-tail row — the original dsh-file-review card, verbatim.
   // priority -2 runs BEFORE dsh-better-sidebar's -1 interception row: chain
@@ -252,30 +223,20 @@ export function apply(ctx: Context): void {
           projectRoot,
           inspectChanges: (request: FileReviewRequest) => invoke('status', request),
           applyChanges: (request: FileReviewRequest) => invoke('apply', request),
-          // 审查 button / per-file chip: open (or focus) the sidebar tab with
-          // these paths pre-expanded. updateTab runs FIRST: an already-open
-          // tab receives the fresh meta reference here (the tab replays the
-          // expansion), while openTab below only FOCUSES an existing tab —
-          // it never applies a seed's meta to one (see the sidebar service's
-          // openTab: meta lands only on creation). For a not-yet-open tab
-          // updateTab is a strict no-op and openTab creates the tab WITH the
-          // meta. activateTab then guarantees focus either way.
-          // `path` rides along only so the host treats this as a CONTENT open:
-          // a collapsed side panel auto-expands to land the tab in sight
-          // (type-only opens leave collapsed panels alone). The tab itself
-          // never reads tab.path.
+          // 审查 button / per-file chip: publish the target through the
+          // plugin's own seed channel, then open (or focus) the sidebar tab by
+          // type. better-sidebar 0.19.1 mints native tab ids itself and cannot
+          // refresh an already-open tab's meta, and a `path` seed would be
+          // routed to the file editor (#632) instead of this component — so
+          // the seed channel, not tab.meta, is the delivery path. The native
+          // open still reveals the right panel (revealIfOpened), and the
+          // mounted/existing tab replays the newest seed.
           openInSidebarTab: (paths: readonly string[], turn?: number) => {
             const sidebar = ctx.betterSidebar
-            const first = paths[0]
-            if (sidebar === undefined || first === undefined) return
-            // `turn` anchors the deep link to one turn: the tab expands only
-            // that turn's rows for these paths (a recurring path stays
-            // collapsed in its other turns).
-            const meta = { expandPaths: [...paths], ...(turn !== undefined ? { turn } : {}) }
+            if (sidebar === undefined || paths.length === 0) return
+            publishFileReviewSeed(sessionId, paths, turn)
             const scope = { sessionId, ...(projectRoot !== undefined ? { cwd: projectRoot } : {}) }
-            sidebar.updateTab('file-review', { meta })
-            sidebar.openTab({ type: 'file-review', path: first, meta }, scope)
-            sidebar.activateTab('file-review', scope)
+            sidebar.openTab({ type: 'file-review' }, scope)
           },
         }
       },
@@ -288,7 +249,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const tChat = ctx.locale.bind(CHAT_NS)
     const mentions: ChatFileMentions = {
-      forClosing(owner) {
+      forClosing(owner, _sessionId) {
         // Same claim test the turn-tail chain entry runs: no produced files,
         // no vocabulary — the two surfaces agree by construction.
         const reviews = selectProducedFiles(owner)

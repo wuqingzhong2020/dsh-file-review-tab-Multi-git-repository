@@ -1,9 +1,9 @@
 /**
- * Literal deletion-path extraction from terminal call views (unknown-safe).
+ * Literal deletion-path extraction from terminal command text (unknown-safe).
  *
  * dsh has no dedicated delete-file tool: agents delete through the Bash/Pwsh
- * terminals, whose call views carry the raw command line in `title`. There is
- * no filesystem snapshot to consult, so this parser is deliberately
+ * terminals, whose `tool/call` arguments carry the raw command line in
+ * `command`. There is no filesystem snapshot to consult, so this parser is deliberately
  * conservative — it only reports paths that appear VERBATIM as arguments of a
  * known deletion command:
  *
@@ -25,10 +25,4 @@
  * report nothing.
  */
 export declare function deletedPathsFromCommand(command: string): readonly string[];
-/**
- * Deleted paths reported by one tool call view: terminal cards carry the
- * command in `title`. Every other card shape (diff/generic/…) declares no
- * deletions.
- */
-export declare function deletedPaths(view: unknown): readonly string[];
 //# sourceMappingURL=deleted-paths.d.ts.map

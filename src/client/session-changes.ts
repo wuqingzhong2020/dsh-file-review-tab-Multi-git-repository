@@ -1,18 +1,21 @@
 /**
  * Session-wide produced-file derivation from a finalized ConversationSnapshot.
- * Client-only and model-free: the vocabulary is the mutation tools' own
- * follow-along `locations` and diff views, never the closing prose. This is
- * the sidebar-tab analogue of dsh-file-review's turn-deliverables.ts: instead
- * of a ConversationNodeDefinition accumulating one turn's data for the
- * turn-tail slot, it derives EVERY in-window turn's changes from the session
- * snapshot's finalized nodes, attributing each tool result to its owning
- * turn through `turnEnds` (completed turns) or the live turn counters.
+ *
+ * dsh 0.1.5 removed the pre-rendered `callView` from `ToolResultNode`; the
+ * mutation facts now live in the call head (`call.name` + `call.argsRaw`) and
+ * the tool-private result metadata (`meta.diffs`). This module folds those
+ * into per-turn file changes for the sidebar tab, walking the settled tool
+ * nodes and, recursively, their Code Mode (`run_code`) sub-calls. Turn
+ * attribution still rides the Chat snapshot's `turnEnds` / live counters.
+ *
+ * Client-only and model-free: the vocabulary is the mutation tools' own call
+ * arguments and result metadata, never the closing prose.
  */
 import type {
-  ConversationSnapshot, ToolResultNode,
-} from '@deepseek-ai/dsh-client-runtime/client'
+  ConversationSnapshot, ToolCallBlock, ToolResultNode,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ProducedFileDiff, RecordedMutation } from '../change-types.ts'
-import { deletedPaths } from './deleted-paths.ts'
+import { appliedDiffs, callIntent } from './mutation-call.ts'
 import { normalizeSnapshot } from './snapshot-compat.ts'
 import { diffsFromBeforeAfter } from './recorded-diffs.ts'
 
@@ -38,60 +41,69 @@ interface FileAccumulator {
   deleted?: true
 }
 
-/**
- * Paths a call view reports having created or changed, by render intent
- * rather than tool name: a diff card, or a generic card whose kind is `edit`.
- * Mirrors dsh-file-review's producedPaths exactly (unknown-safe).
- */
-export function producedPaths(view: unknown): readonly string[] {
-  if (typeof view !== 'object' || view === null || Array.isArray(view)) return []
-  const record = view as Record<string, unknown>
-  if (record.card !== 'diff' && !(record.card === 'generic' && record.kind === 'edit')) return []
-  const locations = record.locations
-  if (!Array.isArray(locations)) return []
-  const paths: string[] = []
-  const seen = new Set<string>()
-  for (const location of locations) {
-    if (typeof location !== 'object' || location === null || Array.isArray(location)) continue
-    const path = (location as Record<string, unknown>).path
-    if (typeof path !== 'string' || seen.has(path)) continue
-    seen.add(path)
-    paths.push(path)
-  }
-  return paths
+/** One mutation extracted from a settled tool block. */
+interface BlockChange {
+  readonly path: string
+  readonly diffs: readonly ProducedFileDiff[]
+  readonly deleted?: true
 }
 
-/** Validate diff hunks crossing the Host/browser transport (unknown-safe). */
-export function producedDiffs(view: unknown): readonly ProducedFileDiff[] {
-  if (typeof view !== 'object' || view === null || Array.isArray(view)) return []
-  const record = view as Record<string, unknown>
-  if (record.card !== 'diff' || !Array.isArray(record.diffs)) return []
-  const diffs: ProducedFileDiff[] = []
-  for (const value of record.diffs) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return []
-    const { path, oldText, newText, oldStart, newStart } = value as Record<string, unknown>
-    if (typeof path !== 'string'
-      || (oldText !== null && typeof oldText !== 'string')
-      || typeof newText !== 'string'
-      || (oldStart !== undefined
-        && (typeof oldStart !== 'number' || !Number.isInteger(oldStart) || oldStart < 1))
-      || (newStart !== undefined
-        && (typeof newStart !== 'number' || !Number.isInteger(newStart) || newStart < 1))) return []
-    diffs.push({
-      path,
-      oldText,
-      newText,
-      ...(typeof oldStart === 'number' ? { oldStart } : {}),
-      ...(typeof newStart === 'number' ? { newStart } : {}),
-    })
+/** The call head of a running or settled tool block, when it carries one. */
+function callOf(block: ToolCallBlock): { readonly name: string; readonly argsRaw: string } | null {
+  const record = block as {
+    call?: { name?: unknown; argsRaw?: unknown } | null
+    name?: unknown
+    argsRaw?: unknown
   }
-  return diffs
+  if (record.call !== undefined && record.call !== null) {
+    if (typeof record.call.name === 'string' && typeof record.call.argsRaw === 'string') {
+      return { name: record.call.name, argsRaw: record.call.argsRaw }
+    }
+    return null
+  }
+  if (typeof record.name === 'string' && typeof record.argsRaw === 'string') {
+    return { name: record.name, argsRaw: record.argsRaw }
+  }
+  return null
 }
 
-/** Applied result hunks, or call-intent hunks when no result view exists. */
-function reviewDiffs(node: ToolResultNode): readonly ProducedFileDiff[] {
-  if (node.resultView !== null) return producedDiffs(node.resultView)
-  return producedDiffs(node.callView)
+/** The applied hunks for one settled block, or the call-argument intent. */
+function blockChanges(block: ToolCallBlock): readonly BlockChange[] {
+  const call = callOf(block)
+  if (call === null) return []
+  const intent = callIntent(call.name, call.argsRaw)
+  if (intent === null) return []
+  const settled = (block as { isError?: unknown }).isError !== undefined
+  if (settled && (block as ToolResultNode).isError) return []
+
+  const changes: BlockChange[] = []
+  if (intent.path !== null) {
+    let diffs = intent.diffs
+    if (settled) {
+      const applied = appliedDiffs((block as ToolResultNode).meta)
+      if (applied !== null) {
+        const own = applied.filter(diff => diff.path === intent.path)
+        if (own.length > 0) diffs = own
+      }
+    }
+    if (diffs.length > 0) changes.push({ path: intent.path, diffs })
+  }
+  for (const path of intent.deletions) changes.push({ path, diffs: [], deleted: true })
+  return changes
+}
+
+/** Settled changes for a tool block tree (the block itself plus `subCalls`). */
+function collectChanges(block: ToolCallBlock, out: BlockChange[]): void {
+  const settledNode = block as ToolResultNode
+  if (settledNode.kind === 'tool-result') {
+    for (const change of blockChanges(block)) out.push(change)
+  }
+  const subCalls = (block as { subCalls?: unknown }).subCalls
+  if (!Array.isArray(subCalls)) return
+  for (const child of subCalls) {
+    const node = child as ToolCallBlock
+    if ((node as ToolResultNode).kind === 'tool-result') collectChanges(node, out)
+  }
 }
 
 /**
@@ -121,32 +133,27 @@ function derive(snapshot: ConversationSnapshot): TurnFileChanges[] {
   const view = normalizeSnapshot(snapshot)
   for (const node of (view?.nodes ?? []) as readonly ToolResultNode[]) {
     if (node.kind !== 'tool-result' || node.isError) continue
-    const paths = producedPaths(node.callView)
-    // dsh has no delete-file tool: deletions happen in the terminals, and a
-    // successful terminal call's literal rm-family arguments are the only
-    // record of them. They surface as hunk-less, non-undoable entries.
-    const deletions = paths.length === 0 ? deletedPaths(node.callView) : []
-    if (paths.length === 0 && deletions.length === 0) continue
-    const diffs = reviewDiffs(node)
+    const changes: BlockChange[] = []
+    collectChanges(node, changes)
+    if (changes.length === 0) continue
     const { turn, live } = attribute(node.seq)
     let group = byTurn.get(turn)
     if (group === undefined) {
       group = { live, files: new Map() }
       byTurn.set(turn, group)
     }
-    for (const path of paths) {
-      const own = diffs.filter(diff => diff.path === path)
-      const existing = group.files.get(path)
-      if (existing === undefined) group.files.set(path, { diffs: [...own] })
+    for (const change of changes) {
+      const existing = group.files.get(change.path)
+      if (change.deleted === true) {
+        if (existing === undefined) group.files.set(change.path, { diffs: [], deleted: true })
+        else existing.deleted = true
+        continue
+      }
+      if (existing === undefined) group.files.set(change.path, { diffs: [...change.diffs] })
       else {
-        existing.diffs.push(...own)
+        existing.diffs.push(...change.diffs)
         delete existing.deleted
       }
-    }
-    for (const path of deletions) {
-      const existing = group.files.get(path)
-      if (existing === undefined) group.files.set(path, { diffs: [], deleted: true })
-      else existing.deleted = true
     }
   }
   return [...byTurn.entries()]
@@ -181,9 +188,10 @@ export function deriveSessionChanges(snapshot: ConversationSnapshot | null): Tur
 
 /**
  * One Code Mode (`run_code`) root visible in the snapshot, with the turn it
- * settles into. Children (`subCalls`) carry no reusable views, so the reset of
- * their review data arrives asynchronously from the Host recorder; these roots
- * are the join keys (the `run_code` `callId` is the dispatch `rootCallId`).
+ * settles into. The snapshot now carries settled `subCalls` with their own
+ * call heads and result metadata, so those are the primary source; this root
+ * list only feeds the Host recorder fallback for roots whose nested facts did
+ * not survive into the snapshot.
  */
 export interface SessionRoot {
   readonly turn: number
@@ -191,7 +199,7 @@ export interface SessionRoot {
   readonly rootCallId: string
 }
 
-/** Every `run_code` tool-result node in the window, in node order. */
+/** Every `run_code` tool-result node whose nested changes are not in the snapshot. */
 export function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[] {
   const attribute = turnAttribution(snapshot)
   const roots: SessionRoot[] = []
@@ -199,6 +207,11 @@ export function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[
   for (const node of (view?.nodes ?? []) as readonly ToolResultNode[]) {
     if (node.kind !== 'tool-result' || node.isError) continue
     if (node.subCalls.length === 0) continue
+    const nested: BlockChange[] = []
+    for (const child of node.subCalls) {
+      if ((child as ToolResultNode).kind === 'tool-result') collectChanges(child, nested)
+    }
+    if (nested.some(change => change.diffs.length > 0)) continue
     const { turn, live } = attribute(node.seq)
     roots.push({ turn, live, rootCallId: node.callId })
   }

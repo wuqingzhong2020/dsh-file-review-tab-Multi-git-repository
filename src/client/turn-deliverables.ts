@@ -1,15 +1,26 @@
 /**
- * Turn-scoped produced-file definition and readers. Client-only and
- * model-free: the vocabulary is the mutation tools' own follow-along
- * `locations`, never the closing prose.
+ * Turn-scoped produced-file definition and readers.
+ *
+ * dsh 0.1.5 moved the Chat turn-tail slot and its owner currency into
+ * `@deepseek-ai/dsh-client-ui-chat`, and the Conversation Definition contract
+ * no longer hands each match a pre-rendered wire view. The mutation facts are
+ * therefore derived the same way dsh 0.1.5's own ui-deliverables does it: from
+ * the `tool/call` arguments, plus the tool-private `meta.diffs` attached to a
+ * `tool/result` (dsh-tool-fs publishes the result-time contextual diff there).
+ * The Definition still publishes a richer `deliverables` Turn value than the
+ * built-in row — the hunks ride along so the turn-tail card can show +M −K and
+ * offer undo/redo through this plugin's Host service.
+ *
+ * Client-only and model-free: the vocabulary is the mutation tools' own call
+ * arguments and result metadata, never the closing prose.
  */
 import type {
-  ConversationMatch, ConversationNodeDefinition, ToolResultNode,
-} from '@deepseek-ai/dsh-client-runtime/client'
+  ConversationLocationData, ConversationMatch, ConversationNodeDefinition,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ProducedFileDiff, ProducedFileReview } from '../change-types.ts'
-import { deletedPaths } from './deleted-paths.ts'
+import { appliedDiffs, callIntent } from './mutation-call.ts'
 
 export type { ProducedFileDiff, ProducedFileReview } from '../change-types.ts'
 
@@ -26,77 +37,36 @@ export interface DeliverablesTurnData {
   readonly produced: readonly ProducedPath[]
 }
 
-declare module '@deepseek-ai/dsh-client-runtime/client' {
+declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationTurnDataMap {
-    /** Successful mutation paths accumulated in this Turn. */
+    /** Successful mutation paths (and their hunks) accumulated in this Turn. */
     deliverables: DeliverablesTurnData
   }
 }
 
 interface DeliverablesState extends DeliverablesTurnData {
   readonly turn: number
-  readonly calls: ReadonlyMap<string, ToolResultNode['callView']>
+  readonly calls: ReadonlyMap<string, ReturnType<typeof callIntent>>
 }
 
-/**
- * Paths a call view reports having created or changed, by render intent rather
- * than tool name: a diff card, or a generic card whose kind is `edit` (the
- * shape `str_replace_editor`'s insert presents). Every other card produces
- * nothing to open — a read looked, a delete removed, a terminal ran. Only
- * root call views enter this Turn accumulator; nested Code Mode dispatches
- * preserve the pre-assembly behavior and do not contribute independently.
- */
-function producedPaths(view: ToolResultNode['callView']): readonly string[] {
-  if (view === null
-    || (view.card !== 'diff' && !(view.card === 'generic' && view.kind === 'edit'))) return []
-  const locations = (view as { locations?: unknown }).locations
-  if (!Array.isArray(locations)) return []
-  const paths: string[] = []
-  const seen = new Set<string>()
-  for (const location of locations) {
-    if (typeof location !== 'object' || location === null || Array.isArray(location)) continue
-    const path = (location as Record<string, unknown>).path
-    if (typeof path !== 'string' || seen.has(path)) continue
-    seen.add(path)
-    paths.push(path)
-  }
-  return paths
-}
-
-/** Validate diff hunks crossing the Host/browser transport. */
-function producedDiffs(view: unknown): readonly ProducedFileDiff[] {
-  if (typeof view !== 'object' || view === null || Array.isArray(view)) return []
-  const record = view as Record<string, unknown>
-  if (record.card !== 'diff' || !Array.isArray(record.diffs)) return []
-  const diffs: ProducedFileDiff[] = []
-  for (const value of record.diffs) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return []
-    const { path, oldText, newText, oldStart, newStart } = value as Record<string, unknown>
-    if (typeof path !== 'string'
-      || (oldText !== null && typeof oldText !== 'string')
-      || typeof newText !== 'string'
-      || (oldStart !== undefined
-        && (typeof oldStart !== 'number' || !Number.isInteger(oldStart) || oldStart < 1))
-      || (newStart !== undefined
-        && (typeof newStart !== 'number' || !Number.isInteger(newStart) || newStart < 1))) return []
-    diffs.push({
-      path,
-      oldText,
-      newText,
-      ...(typeof oldStart === 'number' ? { oldStart } : {}),
-      ...(typeof newStart === 'number' ? { newStart } : {}),
-    })
-  }
-  return diffs
-}
-
-/** Applied result hunks, or successful-call intent only when no result view exists. */
-function reviewDiffs(
-  callView: ToolResultNode['callView'],
-  resultView: ConversationMatch['view'],
-): readonly ProducedFileDiff[] {
-  if (resultView?.for === 'result') return producedDiffs(resultView.view)
-  return producedDiffs(callView)
+/** Result payload structurally narrowed for the fields this Definition reads. */
+function toolResultFields(event: unknown): { readonly callId: string; readonly isError: boolean; readonly meta: unknown } | null {
+  const data = (event as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return null
+  const record = data as { message?: unknown; meta?: unknown }
+  const message = record.message
+  if (typeof message !== 'object' || message === null) return null
+  const source = (message as { source?: unknown }).source
+  const callId = typeof source === 'object' && source !== null
+    ? (source as { callId?: unknown }).callId
+    : undefined
+  const content = (message as { content?: unknown }).content
+  const first = Array.isArray(content)
+    ? (content[0] as { isError?: unknown } | undefined)
+    : undefined
+  return typeof callId === 'string'
+    ? { callId, isError: first?.isError === true, meta: record.meta }
+    : null
 }
 
 /**
@@ -137,19 +107,11 @@ export function reviewsForClosing(
 /**
  * Files produced by one Turn data value.
  *
- * The source is the mutation tools' own follow-along `locations`, not the
- * closing prose: a produced file must be listed whether or not the model
- * remembered to name it. A mutation is recognized by render intent, not by
- * tool name — a diff card, or a generic card whose `kind` is `edit` (the shape
- * `str_replace_editor`'s insert presents) — so a new mutation tool joins by
- * declaring what it does. Reads contribute nothing (looking at a file does not
- * produce it), and neither do deletes (there is nothing left to open) or
- * failed calls. Paths keep first-seen order and appear once, so a file written
- * and then edited in the same turn is one entry.
- *
- * The Conversation Location index owns turn membership before this function
- * runs, so paths cannot spill across turns and this derivation does not infer
- * boundaries from neighboring presentation Nodes.
+ * A mutation is recognized by its tool call intent, not by a result view: a
+ * write/edit/str_replace_editor call mutates one path, and a successful
+ * terminal call's literal rm-family arguments name deleted paths. Reads
+ * contribute nothing (looking at a file does not produce it); failed calls
+ * contribute nothing. Paths keep first-seen order and appear once.
  * @param data - engine-published Deliverables data for one Turn.
  * @param seq - closing Assistant seq; later Tool settlements are excluded.
  * @returns Produced paths in first-seen order; empty when the turn wrote nothing.
@@ -184,62 +146,77 @@ export function selectProducedFiles(owner: TurnTailOwnerProps): readonly Produce
   return reviews.length === 0 ? null : reviews
 }
 
+/** Whether an event entered the surface at its own log position (append copy). */
+function isAppendSurfaceEvent(event: unknown): boolean {
+  const record = event as { type?: unknown; surfaceOp?: unknown }
+  if (record.type !== 'system/message'
+    && record.type !== 'user/message'
+    && record.type !== 'assistant/message'
+    && record.type !== 'tool/result') return false
+  return record.surfaceOp === 'append'
+}
+
 /** Turn-local successful mutation accumulator; it publishes no view Node. */
 export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesState> = {
   kind: 'deliverables',
   match: (event) => {
-    if (event.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
-    if (event.type === 'tool/call') return { id: String(event.data.turn), role: 'update' }
-    if (event.type === 'tool/result'
-      && (event as { surfaceOp?: unknown }).surfaceOp === 'append') {
-      return { id: String(event.data.turn), role: 'update' }
+    const record = event as { type?: unknown; data?: { turn?: unknown } }
+    if (record.type === 'turn/start') return { id: String(record.data?.turn), role: 'start' }
+    if (record.type === 'tool/call') return { id: String(record.data?.turn), role: 'update' }
+    if (record.type === 'tool/result' && isAppendSurfaceEvent(event)) {
+      return { id: String(record.data?.turn), role: 'update' }
     }
     return null
   },
   start: (_context, match) => {
-    if (match.event.type !== 'turn/start') throw new Error('deliverables start requires turn/start')
-    return { turn: match.event.data.turn, calls: new Map(), produced: [] }
+    const record = match.event as { type?: unknown; data?: { turn?: unknown } }
+    if (record.type !== 'turn/start') throw new Error('deliverables start requires turn/start')
+    return { turn: Number(record.data?.turn), calls: new Map(), produced: [] }
   },
-  update: (context, match) => {
-    if (match.event.type === 'tool/call') {
+  update: (context, match: ConversationMatch) => {
+    const record = match.event as { type?: unknown; data?: unknown; seq?: unknown }
+    if (record.type === 'tool/call') {
+      const data = record.data as { callId?: unknown; name?: unknown; arguments?: unknown }
+      if (typeof data.callId !== 'string' || typeof data.name !== 'string') return context.state
       const calls = new Map(context.state.calls)
-      calls.set(
-        String(match.event.data.callId),
-        match.view?.for === 'call' ? match.view.view : null,
-      )
+      calls.set(data.callId, callIntent(data.name, data.arguments))
       return { ...context.state, calls }
     }
-    if (match.event.type !== 'tool/result') return context.state
-    const result = match.event.data.message.content[0]
-    if (result.isError === true) return context.state
-    const callId = String(match.event.data.message.source.callId)
-    const callView = context.state.calls.get(callId) ?? null
-    const diffs = reviewDiffs(callView, match.view)
-    const additions: ProducedPath[] = producedPaths(callView).map(path => ({
-      seq: match.event.seq,
-      path,
-      diffs: diffs.filter(diff => diff.path === path),
-    }))
-    // dsh deletes files only through the terminals; a successful terminal
-    // call's literal rm-family arguments are the only deletion record there
-    // is (dsh has no delete-file tool). They join the same produced
-    // vocabulary as hunks-bearing paths: no diffs, never undoable.
-    for (const path of callView !== null ? deletedPaths(callView) : []) {
-      if (additions.some(addition => addition.path === path)) continue
-      additions.push({ seq: match.event.seq, path, diffs: [], deleted: true })
+    if (record.type !== 'tool/result') return context.state
+    const result = toolResultFields(match.event)
+    if (result === null || result.isError) return context.state
+    const intent = context.state.calls.get(result.callId)
+    if (intent === undefined || intent === null) return context.state
+
+    const applied = appliedDiffs(result.meta)
+    const seq = typeof record.seq === 'number' ? record.seq : Number.POSITIVE_INFINITY
+    const additions: ProducedPath[] = []
+    if (intent.path !== null) {
+      const own = applied === null
+        ? intent.diffs
+        : applied.filter(diff => diff.path === intent.path)
+      additions.push({
+        seq,
+        path: intent.path,
+        diffs: own.length > 0 ? own : intent.diffs,
+      })
+    }
+    for (const path of intent.deletions) {
+      additions.push({ seq, path, diffs: [], deleted: true })
     }
     return additions.length === 0
       ? context.state
       : { ...context.state, produced: [...context.state.produced, ...additions] }
   },
-  buildLocationData: (context, scope) => scope !== 'turn' || context.state === undefined
-    ? null
-    : {
+  buildLocationData: (context, scope): ConversationLocationData | null => {
+    if (scope !== 'turn' || context.state === undefined) return null
+    return {
       kind: 'turn',
       turn: context.state.turn,
       key: 'deliverables',
       value: { produced: context.state.produced },
-    },
+    }
+  },
 }
 
 /**

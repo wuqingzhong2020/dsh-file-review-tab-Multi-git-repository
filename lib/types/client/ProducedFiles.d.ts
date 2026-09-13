@@ -1,5 +1,5 @@
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
-import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { FileReviewRequest, FileReviewResult } from '../change-types.ts';
 import { type ProducedFileReview } from './turn-deliverables.ts';
 import type { NS } from './chat-locales.ts';

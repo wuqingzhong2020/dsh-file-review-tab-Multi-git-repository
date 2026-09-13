@@ -10,7 +10,9 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   FileReviewAction, FileReviewFileState, FileReviewRequest, FileReviewResult,
@@ -23,6 +25,7 @@ import {
 } from './session-changes.ts'
 import { summarizeDiffs, UnifiedDiff, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import { t } from './locales.ts'
+import { currentFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
 import css from './FileReviewTab.module.css'
 
 const SUCCESS_NOTICE_DURATION = 3000
@@ -47,6 +50,17 @@ interface FileReviewRemote {
   status(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   apply(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   recorded(request: RecordedRequest): Promise<RemoteResult<RecordedResult>>
+}
+
+/** Observable Conversation snapshot source (dsh 0.1.5 UiConversation binding). */
+interface ConversationSource {
+  getSnapshot(): ConversationSnapshot
+  subscribe(listener: () => void): () => void
+}
+
+/** The slice of `ctx.uiConversation` this tab needs. */
+interface UiConversationFace {
+  binding(id: SessionId): { readonly snapshot: ConversationSource }
 }
 
 interface Notice {
@@ -181,13 +195,27 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const noticeSeqRef = useRef(0)
   const noticeTimerRef = useRef<number | null>(null)
 
-  // Live conversation snapshot for THIS session (uSES over the Session face).
-  const session: SessionFace | undefined = sessions.binding(sessionId as SessionId)?.session
+  // Live Conversation projection for THIS session. dsh 0.1.5 moved the
+  // projection off SessionFace (whose getSnapshot now returns the session
+  // lifecycle snapshot) onto the uiConversation binding's `snapshot` source.
+  const uiConversation = (ctx as unknown as { get(name: string): unknown })
+    .get('uiConversation') as UiConversationFace | undefined
+  let conversationSource: ConversationSource | undefined
+  try {
+    conversationSource = uiConversation?.binding(sessionId as SessionId).snapshot
+  } catch {
+    // The session may not have a binding yet (fresh/archived); the tab shows
+    // its empty state and re-derives once a snapshot is available.
+    conversationSource = undefined
+  }
   const subscribe = useCallback(
-    (listener: () => void) => session?.subscribe(listener) ?? (() => {}),
-    [session],
+    (listener: () => void) => conversationSource?.subscribe(listener) ?? (() => {}),
+    [conversationSource],
   )
-  const snapshot = useSyncExternalStore(subscribe, () => session?.getSnapshot() ?? null)
+  const snapshot = useSyncExternalStore(
+    subscribe,
+    () => conversationSource?.getSnapshot() ?? null,
+  )
 
   // Code Mode (run_code) roots and their Host-recorded mutations: nested
   // dispatches carry no reuseable views, so each root's file changes are
@@ -310,26 +338,18 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const rowRefs = useRef(new Map<string, HTMLLIElement>())
   const turnRefs = useRef(new Map<number, HTMLElement>())
   const bodyRef = useRef<HTMLDivElement | null>(null)
-  const lastMetaRef = useRef<unknown>(undefined)
+  const lastSeedNonceRef = useRef<number | undefined>(undefined)
   const pendingScrollRef = useRef<PendingScroll | null>(null)
 
   // Sidebar-tab deep link: the chat row's 审查 button (and per-file chips)
-  // land here as `tab.meta.expandPaths`. A NEW meta reference replays the
-  // expansion — merging into the user's own expanded set, never replacing it
-  // — and queues a scroll that lands the link's target at the top of the tab
-  // body. An unchanged reference (re-renders from unrelated sidebar state)
-  // never re-grabs the user's manual expand/collapse state.
-  useEffect(() => {
-    const meta = tab.meta
-    if (meta === lastMetaRef.current) return
-    lastMetaRef.current = meta
-    if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return
-    const raw = (meta as { expandPaths?: unknown; turn?: unknown }).expandPaths
-    if (!Array.isArray(raw)) return
-    const paths = raw.filter((value): value is string => typeof value === 'string')
+  // publish a session-scoped seed through this plugin's own channel, then
+  // open/focus this tab by type. better-sidebar 0.19.1 cannot refresh an
+  // already-open native tab's `meta` (and a `path` seed would be routed to the
+  // file editor), so the seed channel is the only reliable delivery path.
+  // Replaying merges into the user's own expanded set, never replacing it, and
+  // queues a scroll that lands the link's target at the top of the tab body.
+  const replayLink = useCallback((paths: readonly string[], targetTurn: number | undefined) => {
     if (paths.length === 0) return
-    const turnNo = (meta as { turn?: unknown }).turn
-    const targetTurn = typeof turnNo === 'number' && Number.isInteger(turnNo) ? turnNo : undefined
     // A link into an auto-archived turn must first make that turn render:
     // open the archive section and page to the owning group. The rows then
     // mount, flatKey re-arms, and the pending scroll below lands on them.
@@ -364,7 +384,33 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
       rowKey: stateKey(first.turn, first.path),
       turn: paths.length > 1 ? first.turn : null,
     }
-  }, [tab.meta])
+  }, [])
+
+  useEffect(() => {
+    const replay = (seed: FileReviewSeed): void => {
+      if (lastSeedNonceRef.current === seed.nonce) return
+      lastSeedNonceRef.current = seed.nonce
+      replayLink(seed.paths, seed.turn)
+    }
+    const pending = currentFileReviewSeed(sessionId)
+    if (pending !== undefined) replay(pending)
+    return subscribeFileReviewSeed((ownerSessionId, seed) => {
+      if (ownerSessionId === sessionId) replay(seed)
+    })
+  }, [sessionId, replayLink])
+
+  // Legacy meta fallback (better-sidebar versions that still deliver
+  // `expandPaths` through tab.meta); harmless when no meta is ever written.
+  useEffect(() => {
+    const meta = tab.meta
+    if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return
+    const raw = (meta as { expandPaths?: unknown }).expandPaths
+    if (!Array.isArray(raw)) return
+    const paths = raw.filter((value): value is string => typeof value === 'string')
+    const turnNo = (meta as { turn?: unknown }).turn
+    const targetTurn = typeof turnNo === 'number' && Number.isInteger(turnNo) ? turnNo : undefined
+    replayLink(paths, targetTurn)
+  }, [tab.meta, replayLink])
 
   // Scroll the deep-linked target to the TOP of the tab body — aligning to
   // the center left long reviews straddling the viewport, reading like a
