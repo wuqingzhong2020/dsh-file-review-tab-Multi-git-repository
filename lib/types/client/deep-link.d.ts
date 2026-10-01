@@ -2,11 +2,10 @@
  * Chat → sidebar deep-link channel.
  *
  * The chat turn-tail row knows which paths (and which turn) the user wants to
- * inspect, but better-sidebar's native right Sidebar mints its own tab ids and
- * does not refresh an already-open tab's `meta` (dsh-better-sidebar #632 /
- * 0.19.1 adapter behaviour). Passing a `path` seed is also unsafe there: the
- * native surface routes path-bearing opens to the file editor, so the review
- * tab would never mount.
+ * inspect, but better-sidebar's native right Sidebar mints its own tab ids
+ * and preserves an already-open tab's `meta` (including on a new navigation).
+ * A package-local channel delivers repeated selections without coupling to
+ * those native tab ids or storing transient selection in persisted tab state.
  *
  * The channel therefore carries the seed inside this plugin: the chat row
  * publishes it and then opens the tab by type; the tab body subscribes and

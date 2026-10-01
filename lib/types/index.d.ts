@@ -20,7 +20,7 @@ export declare const inject: string[];
  * every nested file mutation (`edit`/`write` — recognized by result shape, not
  * tool name) into the `fileReview` service, which the browser half later turns
  * into line-level hunks and merges into the owning `run_code` turn.
- * @param ctx - host context carrying the system-prompt registry and tool waterfall.
+ * @param ctx - host context carrying the system-prompt registry and tool runtime.
  */
 export declare function apply(ctx: Context): void;
 //# sourceMappingURL=index.d.ts.map

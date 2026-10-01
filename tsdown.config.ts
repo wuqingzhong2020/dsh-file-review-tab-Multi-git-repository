@@ -3,8 +3,8 @@ import { basename, dirname, resolve } from 'node:path'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 
-const PACKAGE_NAME = 'dsh-file-review-tab'
-const CSS_VIRTUAL_PREFIX = '\0dsh-file-review-tab-css:'
+const PACKAGE_NAME = 'dsh-file-review-tab-multi-git-repository'
+const CSS_VIRTUAL_PREFIX = '\0dsh-file-review-tab-multi-git-repository-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 const CLIENT_EXTERNALS = [
   'react',
@@ -14,7 +14,7 @@ const CLIENT_EXTERNALS = [
 /** Compile CSS Modules into package-owned style elements understood by the Web plugin loader. */
 function cssModulesPlugin() {
   return {
-    name: 'dsh-file-review-tab-css-modules',
+    name: 'dsh-file-review-tab-multi-git-repository-css-modules',
     resolveId(source: string, importer: string | undefined) {
       if (!source.endsWith('.module.css')) return null
       const file = importer === undefined ? source : resolve(dirname(importer), source)

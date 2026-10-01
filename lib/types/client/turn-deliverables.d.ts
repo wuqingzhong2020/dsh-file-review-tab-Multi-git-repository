@@ -1,15 +1,12 @@
 /**
  * Turn-scoped produced-file definition and readers.
  *
- * dsh 0.1.5 moved the Chat turn-tail slot and its owner currency into
- * `@deepseek-ai/dsh-client-ui-chat`, and the Conversation Definition contract
- * no longer hands each match a pre-rendered wire view. The mutation facts are
- * therefore derived the same way dsh 0.1.5's own ui-deliverables does it: from
- * the `tool/call` arguments, plus the tool-private `meta.diffs` attached to a
- * `tool/result` (dsh-tool-fs publishes the result-time contextual diff there).
- * The Definition still publishes a richer `deliverables` Turn value than the
- * built-in row — the hunks ride along so the turn-tail card can show +M −K and
- * offer undo/redo through this plugin's Host service.
+ * DSH 0.2's turn-tail slot is an ordered list, and its built-in `deliverables`
+ * definition owns the `deliverables` Turn key plus native Git-change cards.
+ * This plugin publishes a separate `fileReviewTab` Turn key so its own review
+ * entry can coexist without shadowing the host. Mutation facts come from the
+ * `tool/call` arguments and tool-private `meta.diffs` on `tool/result`; the
+ * hunks let the plugin show line stats and offer Host-backed undo/redo.
  *
  * Client-only and model-free: the vocabulary is the mutation tools' own call
  * arguments and result metadata, never the closing prose.
@@ -34,7 +31,7 @@ export interface DeliverablesTurnData {
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
     interface ConversationTurnDataMap {
         /** Successful mutation paths (and their hunks) accumulated in this Turn. */
-        deliverables: DeliverablesTurnData;
+        fileReviewTab: DeliverablesTurnData;
     }
 }
 interface DeliverablesState extends DeliverablesTurnData {
@@ -62,7 +59,7 @@ export declare function reviewsForClosing(data: Readonly<DeliverablesTurnData> |
  */
 export declare function producedForClosing(data: Readonly<DeliverablesTurnData> | undefined, seq?: number): readonly string[];
 /**
- * Claim the turn-tail chain only when its closing turn produced files.
+ * Select this list entry only when its closing turn produced files.
  * @param owner - Turn-tail owner currency for the closing assistant.
  * @returns Produced-file reviews as the component's match, or null to decline before mount.
  */

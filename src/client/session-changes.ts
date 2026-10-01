@@ -1,8 +1,7 @@
 /**
  * Session-wide produced-file derivation from a finalized ConversationSnapshot.
  *
- * dsh 0.1.5 removed the pre-rendered `callView` from `ToolResultNode`; the
- * mutation facts now live in the call head (`call.name` + `call.argsRaw`) and
+ * DSH 0.2 carries the mutation facts in the call head (`call.name` + `call.argsRaw`) and
  * the tool-private result metadata (`meta.diffs`). This module folds those
  * into per-turn file changes for the sidebar tab, walking the settled tool
  * nodes and, recursively, their Code Mode (`run_code`) sub-calls. Turn

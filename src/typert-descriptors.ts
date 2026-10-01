@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol'
 
-export const PACKAGE_NAME = 'dsh-file-review-tab'
+export const PACKAGE_NAME = 'dsh-file-review-tab-multi-git-repository'
 
 const diffSchema = z.object({
   path: z.string(),
@@ -30,19 +30,19 @@ const resultSchema = z.object({
 const agentCodec = {
   mode: 'strict' as const,
   typeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
-  schema: z.intersection(z.string(), z.unknown()),
+  create: () => z.intersection(z.string(), z.unknown()),
 }
 
 const requestCodec = {
   mode: 'strict' as const,
   typeSymbol: `${PACKAGE_NAME}#FileReviewRequest`,
-  schema: requestSchema,
+  create: () => requestSchema,
 }
 
 const resultCodec = {
   mode: 'strict' as const,
   typeSymbol: `${PACKAGE_NAME}#FileReviewResult`,
-  schema: resultSchema,
+  create: () => resultSchema,
 }
 
 const recordedMutationSchema = z.object({
@@ -64,13 +64,13 @@ const recordedResultSchema = z.object({
 const recordedRequestCodec = {
   mode: 'strict' as const,
   typeSymbol: `${PACKAGE_NAME}#RecordedRequest`,
-  schema: recordedRequestSchema,
+  create: () => recordedRequestSchema,
 }
 
 const recordedResultCodec = {
   mode: 'strict' as const,
   typeSymbol: `${PACKAGE_NAME}#RecordedResult`,
-  schema: recordedResultSchema,
+  create: () => recordedResultSchema,
 }
 
 function descriptor(method: 'status' | 'apply'): InvocationDescriptor {

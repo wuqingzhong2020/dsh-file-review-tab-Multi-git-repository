@@ -4,9 +4,8 @@
  *
  * 1. the chat turn-tail row (the original dsh-file-review card: "Edited N
  *    files · +M -K / Undo / Review"), registered into the
- *    'conversation.chat.turnTail' chain at priority -2 so it claims the chain
- *    BEFORE dsh-better-sidebar's own -1 interception row (chain election is
- *    first-claim-wins: exactly one row ever renders, never both); and
+ *    'conversation.chat.turnTail' list under its own id, alongside the built-in
+ *    changed-files entry (the native deliverables registry stays enabled); and
  * 2. the 'file-review' better-sidebar tab (per-session change list + inline
  *    red/green diffs + per-turn/per-file undo).
  *
@@ -24,7 +23,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from 'dsh-better-sidebar/client/service'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { ChatFileMentions } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
@@ -41,7 +39,7 @@ import {
 } from './chat-locales.ts'
 import { countChangedFiles, deriveSessionChanges, splitArchivedTurns } from './session-changes.ts'
 import {
-  deliverablesDefinition, producedFileMentions, selectProducedFiles,
+  deliverablesDefinition, selectProducedFiles,
 } from './turn-deliverables.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -53,12 +51,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /**
  * Required services: the sidebar registry, session snapshots, locale, remote,
- * and the slot registry (turn-tail chain). The conversation Definition
- * registry is deliberately NOT a static inject: its service name moved across
- * dsh releases (<= 0.1.1: root `conversationEvents`; 0.1.2-alpha.1+:
- * `uiConversation.events`), so a hard inject on either name leaves the whole
- * plugin forever "pending" on the other version and fails web boot (issue
- * #6). It is resolved dynamically in apply() instead.
+ * and the slot registry (turn-tail list). The plugin-owned Conversation
+ * Definition uses its own key so it can coexist with DSH 0.2's built-in
+ * `deliverables` definition and `chatFileMentions` service.
  */
 export const inject = [
   'betterSidebar',
@@ -119,7 +114,7 @@ interface BadgeConversationFace {
 }
 
 function badgeCount(ctx: Context, sessionId: string): number | null {
-  // dsh 0.1.5: the Conversation projection lives on the uiConversation
+  // DSH 0.2: the Conversation projection lives on the uiConversation
   // binding, not on the Session face (whose snapshot is session lifecycle).
   const uiConversation = (ctx as unknown as { get(name: string): unknown })
     .get('uiConversation') as BadgeConversationFace | undefined
@@ -167,7 +162,7 @@ export function apply(ctx: Context): void {
       if (disposed) void dispose()
       else disposeRemote = dispose
     }).catch((error: unknown) => {
-      console.error('[dsh-file-review-tab] remote mount error:', error)
+      console.error('[dsh-file-review-tab-multi-git-repository] remote mount error:', error)
     })
     return () => {
       disposed = true
@@ -175,30 +170,22 @@ export function apply(ctx: Context): void {
     }
   }, 'file-review-tab: typert remote')
 
-  // The turn-local mutation accumulator both chat-side surfaces read: the
-  // turn-tail row's select() and the prose-mention vocabulary derive from the
-  // 'deliverables' Turn data this Definition publishes. dsh 0.1.5 exposes the
-  // Definition registry as `ctx.uiConversation.events` (the old
-  // `conversationEvents` root is gone), and `cordis.patch.yml` composes the
-  // built-in ui-deliverables out, so this is the sole owner of the key.
+  // Plugin-owned Turn data uses a separate key from DSH 0.2's built-in
+  // `deliverables` definition and its native file-mention service.
   ctx.effect(
     () => ctx.uiConversation.events.register(deliverablesDefinition),
     'file-review-tab: deliverables definition',
   )
 
-  // The chat turn-tail row — the original dsh-file-review card, verbatim.
-  // priority -2 runs BEFORE dsh-better-sidebar's -1 interception row: chain
-  // election is first-claim-wins in ascending priority order, so this row
-  // renders and the sidebar's chip row declines (never a double row). When
-  // this plugin is composed out, the -1 row (or the host fallback) takes over
-  // again — the off state needs no cleanup here.
+  // DSH 0.2 exposes an ordered list: our review action lives alongside (not
+  // instead of) the built-in changes card and better-sidebar contributions.
   ctx.effect(
     () => ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
       name: 'conversation.chat.turnTail',
-      select: selectProducedFiles,
-      priority: -2,
+      id: 'dsh-file-review-tab-multi-git-repository',
+      order: 110,
       locale: CHAT_NS,
-      registrant: 'dsh-file-review-tab',
+      registrant: 'dsh-file-review-tab-multi-git-repository',
       inject: (sessionId: string) => {
         const sessions = (ctx as unknown as { readonly sessions: ISessions }).sessions
         const projectRoot = sessions.list.getSnapshot().byId[sessionId as SessionId]?.cwd
@@ -225,10 +212,8 @@ export function apply(ctx: Context): void {
           applyChanges: (request: FileReviewRequest) => invoke('apply', request),
           // 审查 button / per-file chip: publish the target through the
           // plugin's own seed channel, then open (or focus) the sidebar tab by
-          // type. better-sidebar 0.19.1 mints native tab ids itself and cannot
-          // refresh an already-open tab's meta, and a `path` seed would be
-          // routed to the file editor (#632) instead of this component — so
-          // the seed channel, not tab.meta, is the delivery path. The native
+          // type. better-sidebar 0.24.1 preserves an already-open tab's meta;
+          // the seed channel reliably delivers repeated links to that tab. The native
           // open still reveals the right panel (revealIfOpened), and the
           // mounted/existing tab replays the newest seed.
           openInSidebarTab: (paths: readonly string[], turn?: number) => {
@@ -240,29 +225,23 @@ export function apply(ctx: Context): void {
           },
         }
       },
-    }, ProducedFiles)),
+    }, ({ turn, seq, openFile, projectRoot, inspectChanges, applyChanges, openInSidebarTab, t }) => {
+      const matched = selectProducedFiles({ turn, seq, openFile })
+      return matched === null ? null : (
+        <ProducedFiles
+          matched={matched}
+          turn={turn}
+          openFile={openFile}
+          projectRoot={projectRoot}
+          inspectChanges={inspectChanges}
+          applyChanges={applyChanges}
+          openInSidebarTab={openInSidebarTab}
+          t={t}
+        />
+      )
+    })),
     'file-review-tab: turn-tail row',
   )
-
-  // The prose side of the same vocabulary: the chat view reaches this face
-  // via ctx.get, so its absence — this plugin composed out — is the off state.
-  ctx.effect(() => {
-    const tChat = ctx.locale.bind(CHAT_NS)
-    const mentions: ChatFileMentions = {
-      forClosing(owner, _sessionId) {
-        // Same claim test the turn-tail chain entry runs: no produced files,
-        // no vocabulary — the two surfaces agree by construction.
-        const reviews = selectProducedFiles(owner)
-        if (reviews === null) return undefined
-        return producedFileMentions(
-          reviews.map(review => review.path),
-          owner.openFile,
-          path => tChat('produced.open', { name: path }),
-        )
-      },
-    }
-    return ctx.provide('chatFileMentions', mentions)
-  }, 'file-review-tab: chat file mentions')
 
   ctx.effect(() => ctx.betterSidebar.registerTab({
     id: 'file-review',

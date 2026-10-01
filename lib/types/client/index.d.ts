@@ -4,9 +4,8 @@
  *
  * 1. the chat turn-tail row (the original dsh-file-review card: "Edited N
  *    files · +M -K / Undo / Review"), registered into the
- *    'conversation.chat.turnTail' chain at priority -2 so it claims the chain
- *    BEFORE dsh-better-sidebar's own -1 interception row (chain election is
- *    first-claim-wins: exactly one row ever renders, never both); and
+ *    'conversation.chat.turnTail' list under its own id, alongside the built-in
+ *    changed-files entry (the native deliverables registry stays enabled); and
  * 2. the 'file-review' better-sidebar tab (per-session change list + inline
  *    red/green diffs + per-turn/per-file undo).
  *
@@ -25,12 +24,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 /**
  * Required services: the sidebar registry, session snapshots, locale, remote,
- * and the slot registry (turn-tail chain). The conversation Definition
- * registry is deliberately NOT a static inject: its service name moved across
- * dsh releases (<= 0.1.1: root `conversationEvents`; 0.1.2-alpha.1+:
- * `uiConversation.events`), so a hard inject on either name leaves the whole
- * plugin forever "pending" on the other version and fails web boot (issue
- * #6). It is resolved dynamically in apply() instead.
+ * and the slot registry (turn-tail list). The plugin-owned Conversation
+ * Definition uses its own key so it can coexist with DSH 0.2's built-in
+ * `deliverables` definition and `chatFileMentions` service.
  */
 export declare const inject: string[];
 /**

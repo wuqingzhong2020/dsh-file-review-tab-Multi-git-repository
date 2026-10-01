@@ -1,15 +1,15 @@
 /**
- * Shared file-mutation facts for dsh 0.1.5.
+ * Shared file-mutation facts for DSH 0.2.
  *
  * The Conversation Definition contract no longer hands matches a pre-rendered
  * wire view, so both the chat turn-tail row and the sidebar tab derive a
- * mutation from the same two sources the dsh 0.1.5 tooling uses:
+ * mutation from the same two sources the DSH file tooling uses:
  *
  * - `tool/call` arguments identify the mutated path and the intended hunks
  *   (`write` / `edit` / `str_replace_editor`), or the terminal command whose
  *   literal rm-family arguments name deleted paths (`bash` / `pwsh`);
  * - `tool/result` `meta.diffs` carries the applied contextual hunks that
- *   dsh-tool-fs attaches on settlement (no line numbers in 0.1.5).
+ *   dsh-tool-fs attaches on settlement; missing line positions are reconstructed from context.
  *
  * Unknown tools and malformed arguments yield null, keeping the vocabulary
  * conservative: a call only produces review data when its shape is known.

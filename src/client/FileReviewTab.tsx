@@ -30,6 +30,8 @@ import css from './FileReviewTab.module.css'
 
 const SUCCESS_NOTICE_DURATION = 3000
 const ERROR_NOTICE_DURATION = 8000
+const ARCHIVE_STORAGE_PREFIX = 'dsh-file-review-tab-multi-git-repository:archive:'
+const LEGACY_ARCHIVE_STORAGE_PREFIX = 'dsh-file-review-tab:archive:'
 
 /** Tab component props (a narrowing of better-sidebar's TabComponentProps). */
 export interface FileReviewTabProps {
@@ -52,7 +54,7 @@ interface FileReviewRemote {
   recorded(request: RecordedRequest): Promise<RemoteResult<RecordedResult>>
 }
 
-/** Observable Conversation snapshot source (dsh 0.1.5 UiConversation binding). */
+/** Observable target-neutral Conversation snapshot source (DSH 0.2). */
 interface ConversationSource {
   getSnapshot(): ConversationSnapshot
   subscribe(listener: () => void): () => void
@@ -195,9 +197,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const noticeSeqRef = useRef(0)
   const noticeTimerRef = useRef<number | null>(null)
 
-  // Live Conversation projection for THIS session. dsh 0.1.5 moved the
-  // projection off SessionFace (whose getSnapshot now returns the session
-  // lifecycle snapshot) onto the uiConversation binding's `snapshot` source.
+  // Live target-neutral Conversation projection for THIS session. DSH 0.2
+  // keeps Chat-owned transcript state under the `chat` entry of `views`.
   const uiConversation = (ctx as unknown as { get(name: string): unknown })
     .get('uiConversation') as UiConversationFace | undefined
   let conversationSource: ConversationSource | undefined
@@ -272,7 +273,12 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   // doesn't re-mount everything the user already collapsed away.
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(`dsh-file-review-tab:archive:${sessionId}`)
+      const storageKey = `${ARCHIVE_STORAGE_PREFIX}${sessionId}`
+      let raw = window.localStorage.getItem(storageKey)
+      if (raw === null) {
+        raw = window.localStorage.getItem(`${LEGACY_ARCHIVE_STORAGE_PREFIX}${sessionId}`)
+        if (raw !== null) window.localStorage.setItem(storageKey, raw)
+      }
       const parsed = raw === null ? undefined : JSON.parse(raw) as { open?: unknown; pages?: unknown }
       setArchiveOpen(parsed?.open === true)
       setArchivePages(
@@ -288,7 +294,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        `dsh-file-review-tab:archive:${sessionId}`,
+        `${ARCHIVE_STORAGE_PREFIX}${sessionId}`,
         JSON.stringify({ open: archiveOpen, pages: archivePages }),
       )
     } catch {
@@ -343,9 +349,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
 
   // Sidebar-tab deep link: the chat row's 审查 button (and per-file chips)
   // publish a session-scoped seed through this plugin's own channel, then
-  // open/focus this tab by type. better-sidebar 0.19.1 cannot refresh an
-  // already-open native tab's `meta` (and a `path` seed would be routed to the
-  // file editor), so the seed channel is the only reliable delivery path.
+  // open/focus this tab by type. better-sidebar 0.24.1 keeps an existing
+  // native tab's `meta`, so repeated links use the seed channel instead.
   // Replaying merges into the user's own expanded set, never replacing it, and
   // queues a scroll that lands the link's target at the top of the tab body.
   const replayLink = useCallback((paths: readonly string[], targetTurn: number | undefined) => {
