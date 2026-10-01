@@ -27,6 +27,9 @@ import { summarizeDiffs, UnifiedDiff, type UnifiedDiffStats } from './UnifiedDif
 import { t } from './locales.ts'
 import { currentFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
 import css from './FileReviewTab.module.css'
+import type { ReviewWorkspace } from '../repository-types.ts'
+import { fileRepository, repositoryRelativePath } from './repository-paths.ts'
+import { subscribeRepositories } from './repository-events.ts'
 
 const SUCCESS_NOTICE_DURATION = 3000
 const ERROR_NOTICE_DURATION = 8000
@@ -49,6 +52,7 @@ export interface FileReviewTabProps {
 }
 
 interface FileReviewRemote {
+  workspace(): Promise<RemoteResult<ReviewWorkspace>>
   status(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   apply(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   recorded(request: RecordedRequest): Promise<RemoteResult<RecordedResult>>
@@ -194,8 +198,28 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tick, setTick] = useState(0)
+  const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
+  const [repositoryFilter, setRepositoryFilter] = useState('*')
   const noticeSeqRef = useRef(0)
   const noticeTimerRef = useRef<number | null>(null)
+
+  useEffect(() => subscribeRepositories(() => { setTick(value => value + 1) }), [])
+  useEffect(() => {
+    setWorkspace(null)
+    setRepositoryFilter('*')
+  }, [sessionId])
+  useEffect(() => {
+    if (!visible) return
+    let active = true
+    const remote = sessions.scope(sessionId as SessionId)?.get('remote.fileReview') as FileReviewRemote | undefined
+    void remote?.workspace().then(result => {
+      if (active && result.ok) {
+        setWorkspace(result.value)
+        setRepositoryFilter(current => current === '*' || current === '?' || result.value.repositories.some(repo => repo.path === current) ? current : '*')
+      }
+    }).catch(() => { /* Re-read on refresh or when the tab becomes visible. */ })
+    return () => { active = false }
+  }, [sessions, sessionId, visible, tick])
 
   // Live target-neutral Conversation projection for THIS session. DSH 0.2
   // keeps Chat-owned transcript state under the `chat` entry of `views`.
@@ -259,13 +283,19 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     () => mergeRecordedTurns(deriveSessionChanges(snapshot), roots, recorded),
     [snapshot, roots, recorded],
   )
+  const repositories = workspace?.repositories ?? []
+  const ownerOf = (path: string) => fileRepository(resolveSessionPath(cwd, path), repositories)
+  const filteredTurns = useMemo(() => repositoryFilter === '*' ? turns : turns.map(turn => ({
+    ...turn,
+    files: turn.files.filter(file => (fileRepository(resolveSessionPath(cwd, file.path), workspace?.repositories ?? [])?.path ?? '?') === repositoryFilter),
+  })).filter(turn => turn.files.length > 0), [turns, repositoryFilter, workspace, cwd])
   // Auto-archive (issue #5): only the newest turns stay in the main list;
   // older completed turns collapse into the tab's bottom section, which
   // renders nothing until opened and then only ARCHIVE_PAGE_TURNS groups
   // per loaded page — long sessions no longer mount dozens of diff groups.
   const { main: mainTurns, archived: archivedTurns } = useMemo(
-    () => splitArchivedTurns(turns),
-    [turns],
+    () => splitArchivedTurns(filteredTurns),
+    [filteredTurns],
   )
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archivePages, setArchivePages] = useState(1)
@@ -331,12 +361,10 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     () => flat.map(item => `${item.turn}|${item.path}|${item.diffs.length}`).join(';'),
     [flat],
   )
-  const flatRef = useRef(flat)
-  flatRef.current = flat
   const turnsRef = useRef(turns)
   turnsRef.current = turns
-  const archivedTurnsRef = useRef(archivedTurns)
-  archivedTurnsRef.current = archivedTurns
+  const archivedTurnsRef = useRef(splitArchivedTurns(turns).archived)
+  archivedTurnsRef.current = splitArchivedTurns(turns).archived
 
   // Deep-link plumbing: file-row elements by stateKey and turn-group sections
   // by turn number for scrollIntoView, the last replayed meta reference, and a
@@ -355,6 +383,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   // queues a scroll that lands the link's target at the top of the tab body.
   const replayLink = useCallback((paths: readonly string[], targetTurn: number | undefined) => {
     if (paths.length === 0) return
+    setRepositoryFilter('*')
     // A link into an auto-archived turn must first make that turn render:
     // open the archive section and page to the owning group. The rows then
     // mount, flatKey re-arms, and the pending scroll below lands on them.
@@ -372,16 +401,17 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     // With a turn anchor only THAT turn's rows expand — a path that recurs in
     // other turns stays collapsed there; without one, every occurrence expands
     // (legacy meta shape).
-    const matches = (item: FlatChange): boolean =>
+    const matches = (item: { turn: number; path: string }): boolean =>
       paths.includes(item.path) && (targetTurn === undefined || item.turn === targetTurn)
+    const allFiles = turnsRef.current.flatMap(turn => turn.files.map(file => ({ turn: turn.turn, path: file.path })))
     setExpanded((current) => {
       const next = new Set(current)
-      for (const item of flatRef.current) {
+      for (const item of allFiles) {
         if (matches(item)) next.add(stateKey(item.turn, item.path))
       }
       return next
     })
-    const first = flatRef.current.find(item => matches(item))
+    const first = allFiles.find(item => matches(item))
     // Multi-path links (the 审查 button) target the turn group so the whole
     // review leads the viewport; single-path links (a file chip) target that
     // file's row. An unmatched link leaves nothing pending.
@@ -643,6 +673,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     const fileAction: FileReviewAction = state === 'undone' ? 'redo' : 'undo'
     const fileBusy = busyKey === key
     const stats = summarizeDiffs(file.diffs)
+    const repository = ownerOf(file.path)
     return (
       <li
         key={file.path}
@@ -667,7 +698,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           }}
         >
           <Chevron open={isOpen} />
-          <span className={css.fileName}>{basename(file.path)}</span>
+          {repository !== undefined && <span className={css.repositoryBadge} title={repository.path}>{repository.name}</span>}
+          <span className={css.fileName}>{repository === undefined ? basename(file.path) : repositoryRelativePath(resolveSessionPath(cwd, file.path), repository)}</span>
           {file.deleted === true
             ? <span className={css.deletedBadge}>{t('deleted')}</span>
             : <Stats stats={stats} />}
@@ -745,6 +777,15 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           ⟳
         </button>
       </header>
+      {workspace?.project !== null && workspace?.project !== undefined && <div className={css.repositoryBar}>
+        <span title={workspace.project.root}>{t('repoScope', { name: workspace.project.name || basename(workspace.project.root), count: repositories.filter(repo => repo.state === 'ready').length })}</span>
+        <select aria-label={t('repository')} value={repositoryFilter} onChange={event => { setRepositoryFilter(event.target.value) }}>
+          <option value="*">{t('repoAll')}</option>
+          {repositories.filter(repo => repo.state === 'ready' || repo.source === 'project').map(repo => <option key={repo.path} value={repo.path}>{repo.name}</option>)}
+          <option value="?">{t('repoOther')}</option>
+        </select>
+        <small title={workspace.warnings.join('\n')}>{t('repoSettingsHint')}{workspace.warnings.length > 0 ? ' ⚠' : ''}</small>
+      </div>}
       {notice !== null && (
         <div
           className={`${css.notice} ${notice.tone === 'success' ? css.noticeSuccess : css.noticeError}`}
@@ -754,8 +795,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         </div>
       )}
       <div className={css.body} ref={bodyRef}>
-        {turns.length === 0
-          ? <div className={css.empty}>{t('empty')}</div>
+        {filteredTurns.length === 0
+          ? <div className={css.empty}>{t(repositoryFilter === '*' ? 'empty' : 'repoFilterEmpty')}</div>
           : (
             <>
               {mainTurns.map(renderTurn)}

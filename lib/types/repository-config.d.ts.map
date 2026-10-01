@@ -1,0 +1,1 @@
+{"version":3,"file":"repository-config.d.ts","sourceRoot":"","sources":["../../src/repository-config.ts"],"names":[],"mappings":"AAAA,OAAO,MAAM,MAAM,0BAA0B,CAAA;AAC7C,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,uBAAuB,CAAA;AAE1D,MAAM,WAAW,gBAAgB;IAC/B,OAAO,CAAC,EAAE,OAAO,CAAA;IACjB,QAAQ,EAAE,aAAa,EAAE,CAAA;CAC1B;AAED,oFAAoF;AACpF,eAAO,MAAM,MAAM,EAAE,MAUnB,CAAA"}

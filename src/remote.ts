@@ -6,10 +6,15 @@ import type {
   FileReviewRequest, FileReviewResult, RecordedRequest, RecordedResult,
 } from './change-types.ts'
 import { FILE_REVIEW_INVOCATIONS, PACKAGE_NAME } from './typert-descriptors.ts'
+import type { NamedReviewRepository, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface TypertRemoteNamespaceMap {
     fileReview: {
+      project: (agentId: SessionId) => Promise<RemoteResult<ReviewProjectPage>>
+      saveProject: (agentId: SessionId, request: SaveReviewProject) => Promise<RemoteResult<ReviewProjectPage>>
+      setTemporaryRepositories: (agentId: SessionId, entries: NamedReviewRepository[]) => Promise<RemoteResult<ReviewWorkspace>>
+      workspace: (agentId: SessionId) => Promise<RemoteResult<ReviewWorkspace>>
       status: (
         agentId: SessionId,
         request: FileReviewRequest,
@@ -25,6 +30,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     }
   }
   interface TypertRemoteMap {
+    'fileReview/project': (agentId: SessionId) => Promise<RemoteResult<ReviewProjectPage>>
+    'fileReview/saveProject': (agentId: SessionId, request: SaveReviewProject) => Promise<RemoteResult<ReviewProjectPage>>
+    'fileReview/setTemporaryRepositories': (agentId: SessionId, entries: NamedReviewRepository[]) => Promise<RemoteResult<ReviewWorkspace>>
+    'fileReview/workspace': (agentId: SessionId) => Promise<RemoteResult<ReviewWorkspace>>
     'fileReview/status': (
       agentId: SessionId,
       request: FileReviewRequest,
@@ -39,6 +48,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     ) => Promise<RemoteResult<RecordedResult>>
   }
   interface TypertRemoteScopeMap {
+    'agent:fileReview/project': () => Promise<RemoteResult<ReviewProjectPage>>
+    'agent:fileReview/saveProject': (request: SaveReviewProject) => Promise<RemoteResult<ReviewProjectPage>>
+    'agent:fileReview/setTemporaryRepositories': (entries: NamedReviewRepository[]) => Promise<RemoteResult<ReviewWorkspace>>
+    'agent:fileReview/workspace': () => Promise<RemoteResult<ReviewWorkspace>>
     'agent:fileReview/status': (
       request: FileReviewRequest,
     ) => Promise<RemoteResult<FileReviewResult>>

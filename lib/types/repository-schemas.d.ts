@@ -1,0 +1,128 @@
+import { z } from 'zod';
+export declare const namedReviewRepositorySchema: z.ZodObject<{
+    name: z.ZodString;
+    path: z.ZodString;
+}, z.core.$strip>;
+export declare const reviewProjectSchema: z.ZodObject<{
+    name: z.ZodString;
+    root: z.ZodString;
+    includeProjectRoot: z.ZodBoolean;
+    configFiles: z.ZodArray<z.ZodString>;
+    repositories: z.ZodArray<z.ZodString>;
+    namedRepositories: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        path: z.ZodString;
+    }, z.core.$strip>>>;
+    enabled: z.ZodOptional<z.ZodBoolean>;
+}, z.core.$strip>;
+export declare const reviewSettingsSchema: z.ZodObject<{
+    projects: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        root: z.ZodString;
+        includeProjectRoot: z.ZodBoolean;
+        configFiles: z.ZodArray<z.ZodString>;
+        repositories: z.ZodArray<z.ZodString>;
+        namedRepositories: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            path: z.ZodString;
+        }, z.core.$strip>>>;
+        enabled: z.ZodOptional<z.ZodBoolean>;
+    }, z.core.$strip>>;
+    revision: z.ZodNumber;
+}, z.core.$strip>;
+export declare const reviewWorkspaceSchema: z.ZodObject<{
+    project: z.ZodNullable<z.ZodObject<{
+        name: z.ZodString;
+        root: z.ZodString;
+        includeProjectRoot: z.ZodBoolean;
+        configFiles: z.ZodArray<z.ZodString>;
+        repositories: z.ZodArray<z.ZodString>;
+        namedRepositories: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            path: z.ZodString;
+        }, z.core.$strip>>>;
+        enabled: z.ZodOptional<z.ZodBoolean>;
+    }, z.core.$strip>>;
+    repositories: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        path: z.ZodString;
+        relativePath: z.ZodString;
+        source: z.ZodString;
+        state: z.ZodEnum<{
+            error: "error";
+            ready: "ready";
+            missing: "missing";
+            notGit: "notGit";
+        }>;
+        reason: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>;
+    warnings: z.ZodArray<z.ZodString>;
+    roots: z.ZodArray<z.ZodString>;
+}, z.core.$strip>;
+export declare const reviewProjectPageSchema: z.ZodObject<{
+    project: z.ZodObject<{
+        name: z.ZodString;
+        root: z.ZodString;
+        includeProjectRoot: z.ZodBoolean;
+        configFiles: z.ZodArray<z.ZodString>;
+        repositories: z.ZodArray<z.ZodString>;
+        namedRepositories: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            path: z.ZodString;
+        }, z.core.$strip>>>;
+        enabled: z.ZodOptional<z.ZodBoolean>;
+    }, z.core.$strip>;
+    revision: z.ZodNumber;
+    configured: z.ZodBoolean;
+    workspace: z.ZodObject<{
+        project: z.ZodNullable<z.ZodObject<{
+            name: z.ZodString;
+            root: z.ZodString;
+            includeProjectRoot: z.ZodBoolean;
+            configFiles: z.ZodArray<z.ZodString>;
+            repositories: z.ZodArray<z.ZodString>;
+            namedRepositories: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                name: z.ZodString;
+                path: z.ZodString;
+            }, z.core.$strip>>>;
+            enabled: z.ZodOptional<z.ZodBoolean>;
+        }, z.core.$strip>>;
+        repositories: z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            path: z.ZodString;
+            relativePath: z.ZodString;
+            source: z.ZodString;
+            state: z.ZodEnum<{
+                error: "error";
+                ready: "ready";
+                missing: "missing";
+                notGit: "notGit";
+            }>;
+            reason: z.ZodOptional<z.ZodString>;
+        }, z.core.$strip>>;
+        warnings: z.ZodArray<z.ZodString>;
+        roots: z.ZodArray<z.ZodString>;
+    }, z.core.$strip>;
+    fileRevision: z.ZodString;
+    temporaryRepositories: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        path: z.ZodString;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export declare const saveReviewProjectSchema: z.ZodObject<{
+    project: z.ZodObject<{
+        name: z.ZodString;
+        root: z.ZodString;
+        includeProjectRoot: z.ZodBoolean;
+        configFiles: z.ZodArray<z.ZodString>;
+        repositories: z.ZodArray<z.ZodString>;
+        namedRepositories: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            path: z.ZodString;
+        }, z.core.$strip>>>;
+        enabled: z.ZodOptional<z.ZodBoolean>;
+    }, z.core.$strip>;
+    revision: z.ZodNumber;
+    fileRevision: z.ZodString;
+}, z.core.$strip>;
+//# sourceMappingURL=repository-schemas.d.ts.map

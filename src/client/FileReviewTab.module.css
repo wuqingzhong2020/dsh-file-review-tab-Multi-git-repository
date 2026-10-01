@@ -30,6 +30,11 @@
   font-weight: 600;
 }
 
+.repositoryBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--dsw-alias-border-l2); flex: none; }
+.repositoryBar select { max-width: 100%; color: inherit; background: var(--dsw-alias-background-l1); border: 1px solid var(--dsw-alias-border-l2); border-radius: 5px; padding: 3px; }
+.repositoryBar small { flex-basis: 100%; color: var(--dsw-alias-label-secondary); font-size: 11px; }
+.repositoryBadge { flex: none; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); padding: 1px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 4px; font-size: 10px; }
+
 .refreshButton {
   margin-left: auto;
   padding: 2px 6px;

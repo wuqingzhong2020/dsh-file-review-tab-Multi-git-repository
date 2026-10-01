@@ -1,7 +1,7 @@
 /** Host-side, workspace-contained undo / redo service for produced text diffs. */
 
 import { readFile, lstat, realpath } from 'node:fs/promises'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { basename, isAbsolute, relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -10,6 +10,10 @@ import type {
   FileReviewAction, FileReviewChange, FileReviewFileResult, FileReviewRequest, FileReviewResult,
   ProducedFileDiff, RecordedMutation, RecordedRequest, RecordedResult,
 } from './change-types.ts'
+import type { RepositorySettings } from './repository-settings.ts'
+import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts'
+import { inside, pathKey, previewProject, resolveReviewWorkspace } from './repository-workspace.ts'
+import { PROJECT_FILE_NAME, readProjectFile, writeProjectFile } from './repository-project-file.ts'
 
 type InspectState = Exclude<FileReviewFileResult['state'], 'error'>
 
@@ -46,20 +50,13 @@ function restoreNewlines(text: string, crlf: boolean): string {
   return crlf ? text.replace(/\n/g, '\r\n') : text
 }
 
-function inside(root: string, candidate: string): boolean {
-  const child = relative(root, candidate)
-  return child === '' || (!child.startsWith('..') && !isAbsolute(child))
-}
-
-async function resolveFile(cwd: string, requestedPath: string): Promise<ResolvedFile> {
-  const root = await realpath(cwd)
-  const candidate = resolve(root, requestedPath)
-  if (!inside(root, candidate)) throw new Error('path is outside the session workspace')
+async function resolveFile(cwd: string, requestedPath: string, roots: readonly string[]): Promise<ResolvedFile> {
+  const candidate = resolve(await realpath(cwd), requestedPath)
   const linkStat = await lstat(candidate)
   if (linkStat.isSymbolicLink()) throw new Error('symbolic links are not supported')
   if (!linkStat.isFile()) throw new Error('path is not a regular file')
   const filename = await realpath(candidate)
-  if (!inside(root, filename)) throw new Error('resolved path is outside the session workspace')
+  if (!roots.some(root => inside(root, filename))) throw new Error('resolved path is outside the configured project repositories')
   const bytes = await readFile(filename)
   const text = bytes.toString('utf8')
   if (!Buffer.from(text, 'utf8').equals(bytes)) throw new Error('file is not valid UTF-8 text')
@@ -169,7 +166,7 @@ function inspectText(text: string, file: FileReviewChange): InspectedFile {
   return { state: 'conflict', reason: 'current content does not match the recorded change' }
 }
 
-async function inspectOne(cwd: string, file: FileReviewChange): Promise<FileReviewFileResult> {
+async function inspectOne(cwd: string, file: FileReviewChange, roots: readonly string[]): Promise<FileReviewFileResult> {
   if (file.diffs.length === 0 || !file.diffs.every(diff => hunkSupported(diff, file.path))) {
     return {
       path: file.path,
@@ -179,7 +176,7 @@ async function inspectOne(cwd: string, file: FileReviewChange): Promise<FileRevi
     }
   }
   try {
-    const resolved = await resolveFile(cwd, file.path)
+    const resolved = await resolveFile(cwd, file.path, roots)
     const inspected = inspectText(resolved.lfText, file)
     return { path: file.path, state: inspected.state, changed: false, reason: inspected.reason }
   } catch (error) {
@@ -196,6 +193,7 @@ async function applyOne(
   cwd: string,
   file: FileReviewChange,
   action: FileReviewAction,
+  roots: readonly string[],
 ): Promise<FileReviewFileResult> {
   if (file.diffs.length === 0 || !file.diffs.every(diff => hunkSupported(diff, file.path))) {
     return {
@@ -206,7 +204,7 @@ async function applyOne(
     }
   }
   try {
-    const resolved = await resolveFile(cwd, file.path)
+    const resolved = await resolveFile(cwd, file.path, roots)
     const inspected = inspectText(resolved.lfText, file)
     const sourceState = action === 'undo' ? 'applied' : 'undone'
     const targetState = action === 'undo' ? 'undone' : 'applied'
@@ -261,9 +259,108 @@ function agentKey(agent: Agent): string {
 export class FileReviewService extends TypertRemoteService {
   /** Per-agent record of Code Mode (`run_code`) file mutations, dispatch order. */
   private readonly recordLog = new Map<string, RecordedMutation[]>()
+  private readonly temporaryRepositories = new Map<string, NamedReviewRepository[]>()
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, private readonly projectSettings?: RepositorySettings) {
     super(ctx, 'fileReview')
+  }
+
+  /** Read only the project selected by this Agent's authoritative directory. */
+  async project(agent: Agent): Promise<ReviewProjectPage> {
+    const settings = this.projectSettings?.get() ?? { projects: [], revision: 0 }
+    const cwd = sessionCwd(agent)
+    const root = await realpath(cwd)
+    const localFile = await readProjectFile(root)
+    const matched = await resolveReviewWorkspace(cwd, settings.projects)
+    const project = localFile !== null ? { ...localFile.project, name: basename(root) }
+      : matched.project !== null ? { ...matched.project, name: basename(matched.project.root) }
+      : { name: basename(root), root, includeProjectRoot: true, configFiles: [], repositories: [], enabled: true }
+    const workspace = await previewProject(project)
+    return {
+      project, revision: settings.revision, configured: localFile !== null,
+      workspace, fileRevision: localFile?.revision ?? '',
+      temporaryRepositories: localFile !== null ? this.temporaryRepositories.get(agentKey(agent)) ?? [] : [],
+    }
+  }
+
+  /** Preview and save cannot choose another project's root through the wire. */
+  async preview(agent: Agent, project: ReviewProject): Promise<ReviewWorkspace> {
+    const current = await this.project(agent)
+    if (pathKey(await realpath(project.root)) !== pathKey(current.project.root)) throw new Error('Project root does not belong to this session')
+    return previewProject({ ...project, name: current.project.name, root: current.project.root })
+  }
+
+  async saveProject(agent: Agent, request: SaveReviewProject): Promise<ReviewProjectPage> {
+    const preview = await this.preview(agent, {
+      ...request.project, configFiles: [], repositories: [],
+    })
+    const project = preview.project!
+    await writeProjectFile({
+      ...project,
+      enabled: request.project.enabled ?? project.enabled ?? true,
+      namedRepositories: project.namedRepositories?.filter(entry => !isAbsolute(entry.path)),
+    }, request.fileRevision)
+    if (this.projectSettings !== undefined) {
+      const settings = this.projectSettings.get()
+      const index = settings.projects.findIndex(item => pathKey(item.root) === pathKey(project.root))
+      const projects = [...settings.projects]
+      const indexEntry = {
+        name: project.name, root: project.root, includeProjectRoot: project.includeProjectRoot,
+        configFiles: [PROJECT_FILE_NAME], repositories: [], enabled: request.project.enabled ?? project.enabled ?? true,
+      }
+      if (index === -1) projects.push(indexEntry)
+      else projects[index] = indexEntry
+      // The project-local file is authoritative. A profile index only keeps
+      // direct sessions in explicitly configured external repositories working.
+      try { await this.projectSettings.save({ projects, revision: settings.revision }) } catch { /* local file remains usable */ }
+    }
+    return this.project(agent)
+  }
+
+  async workspace(agent: Agent): Promise<ReviewWorkspace> {
+    const indexed = this.projectSettings?.get().projects ?? []
+    const active: ReviewProject[] = []
+    for (const project of indexed) {
+      if (!project.configFiles.includes(PROJECT_FILE_NAME) || project.enabled === false) continue
+      try {
+        const local = await readProjectFile(project.root)
+        if (local !== null && local.project.enabled !== false) active.push(project)
+      } catch {
+        // Invalid or unavailable project files never expand another session's scope.
+      }
+    }
+    const base = await resolveReviewWorkspace(sessionCwd(agent), active)
+    const temporary = this.temporaryRepositories.get(agentKey(agent)) ?? []
+    if (base.project === null || temporary.length === 0) return base
+    const extra = await previewProject({
+      name: base.project.name, root: base.project.root, includeProjectRoot: false,
+      configFiles: [], repositories: [], namedRepositories: temporary,
+    })
+    const repositories = [...base.repositories]
+    const seen = new Set(repositories.map(repo => pathKey(repo.path)))
+    for (const repo of extra.repositories) {
+      if (seen.has(pathKey(repo.path))) continue
+      seen.add(pathKey(repo.path))
+      repositories.push({ ...repo, source: 'temporary' })
+    }
+    return {
+      ...base, repositories, warnings: [...base.warnings, ...extra.warnings],
+      roots: [...new Map([...base.roots, ...extra.roots].map(root => [pathKey(root), root])).values()],
+    }
+  }
+
+  /** Cross-volume repositories live only for the receiving agent's session. */
+  async setTemporaryRepositories(agent: Agent, entries: NamedReviewRepository[]): Promise<ReviewWorkspace> {
+    const current = await this.project(agent)
+    if (!current.configured) throw new Error('Enable this project before adding temporary repositories')
+    const root = current.project.root
+    for (const entry of entries) {
+      if (!isAbsolute(entry.path) || !isAbsolute(relative(root, entry.path))) {
+        throw new Error('Temporary repositories must use absolute paths on another volume')
+      }
+    }
+    this.temporaryRepositories.set(agentKey(agent), entries)
+    return this.workspace(agent)
   }
 
   /** Append one nested (Code Mode) file mutation for the receiving agent. */
@@ -291,16 +388,18 @@ export class FileReviewService extends TypertRemoteService {
   /** Inspect current disk state without changing files. */
   async status(agent: Agent, request: FileReviewRequest): Promise<FileReviewResult> {
     const cwd = sessionCwd(agent)
-    const files = await Promise.all(request.files.map(file => inspectOne(cwd, file)))
+    const { roots } = await this.workspace(agent)
+    const files = await Promise.all(request.files.map(file => inspectOne(cwd, file, roots)))
     return { files }
   }
 
   /** Toggle every independently safe file while the receiving Agent is idle. */
   async apply(agent: Agent, request: FileReviewRequest): Promise<FileReviewResult> {
-    const cwd = sessionCwd(agent)
     return agent.runMaintenance(async () => {
+      const cwd = sessionCwd(agent)
+      const { roots } = await this.workspace(agent)
       const files: FileReviewFileResult[] = []
-      for (const file of request.files) files.push(await applyOne(cwd, file, request.action))
+      for (const file of request.files) files.push(await applyOne(cwd, file, request.action, roots))
       return { files }
     })
   }

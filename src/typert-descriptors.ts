@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol'
+import { namedReviewRepositorySchema, reviewProjectPageSchema, reviewWorkspaceSchema, saveReviewProjectSchema } from './repository-schemas.ts'
 
 export const PACKAGE_NAME = 'dsh-file-review-tab-multi-git-repository'
 
@@ -111,4 +112,38 @@ export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
   descriptor('status'),
   descriptor('apply'),
   recordedDescriptor(),
+  {
+    id: `${PACKAGE_NAME}#fileReview/workspace`, service: 'fileReview', namespace: 'fileReview',
+    method: 'workspace', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [{ name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec }],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewWorkspace`, create: () => reviewWorkspaceSchema },
+  },
+  {
+    id: `${PACKAGE_NAME}#fileReview/project`, service: 'fileReview', namespace: 'fileReview',
+    method: 'project', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [{ name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec }],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewProjectPage`, create: () => reviewProjectPageSchema },
+  },
+  {
+    id: `${PACKAGE_NAME}#fileReview/saveProject`, service: 'fileReview', namespace: 'fileReview',
+    method: 'saveProject', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'request', wire: 'request', source: 'json', codec: {
+        mode: 'strict', typeSymbol: `${PACKAGE_NAME}#SaveReviewProject`, create: () => saveReviewProjectSchema,
+      } },
+    ],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewProjectPage`, create: () => reviewProjectPageSchema },
+  },
+  {
+    id: `${PACKAGE_NAME}#fileReview/setTemporaryRepositories`, service: 'fileReview', namespace: 'fileReview',
+    method: 'setTemporaryRepositories', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'entries', wire: 'entries', source: 'json', codec: {
+        mode: 'strict', typeSymbol: `${PACKAGE_NAME}#NamedReviewRepositories`, create: () => z.array(namedReviewRepositorySchema).max(512),
+      } },
+    ],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewWorkspace`, create: () => reviewWorkspaceSchema },
+  },
 ]

@@ -6,6 +6,7 @@
 
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
 - **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
+- **会话「多代码仓管理」页签**：在「对话」「轨迹」旁边，直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换工程会自动显示对应配置；文件审查显示所属仓库及仓库内路径，可筛选单个仓库。支持主仓库、嵌套仓库及显式配置的外部仓库。
 - **删除文件可见**：dsh 没有删除文件的工具，删除发生在终端命令里——插件解析 `rm` 族命令（`rm` / `rmdir` / `unlink` / `Remove-Item` / `del` / `rd` 等）的字面路径参数，被删文件以「已删除」标记出现在两个入口（内容已不存在，故无行级 diff、不可撤销）。带通配符（`rm *.log`）或命令替换（`rm $(...)`）的删除不识别——受影响文件事后无法枚举。
 - **自动归档**：主列表只保留最近 5 轮（进行中的轮次永不归档），更早的已完成轮次沉入底部「已归档 N 轮」折叠区。折叠时归档内容零渲染，展开后每页加载 10 轮（「加载更多」续页），diff 行另有懒挂载——长会话不再一次性挂载几十个 diff 组。深链跳到已归档轮次会自动展开并定位；展开状态按会话记忆；角标只统计主列表。
 - **PTC / Code Mode 支持**：`run_code` 程序内部的 `edit`/`write` 子调用也会被捕获——Host 端快照完整 before/after，浏览器端重建带行号的行级 hunks 并入所属轮次；diff 查看、状态检查、撤销/重做均可用。标准模式行为不变（对话尾部审查行仍只覆盖标准模式轮次）。
@@ -28,17 +29,56 @@ dsh plugin --profile desktop add github:wuqingzhong2020/dsh-file-review-tab-Mult
 dsh plugin --profile web add dsh-file-review-tab-multi-git-repository
 ```
 
-对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
+对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-directory-picker.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-directory-picker.tgz"
 ```
 
-桌面版安装后请重启应用，让 Host 与 Web 插件重新加载。确认 `package.json` 使用 `dsh-better-sidebar` **0.24.1**；在已安装桌面的设置与侧边栏中打开「文件审查」。
+桌面版安装后请重启应用，让 Host 与 Web 插件重新加载。确认 `package.json` 使用 `dsh-better-sidebar` **0.24.1**；在会话顶部打开「多代码仓管理」，在侧边栏打开「文件审查」。
 
 前置依赖：DeepSeek Harness 桌面版 / Web **0.2.0-rc.2** + [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) **0.24.1**。本版本针对这组接口构建并完成静态检查；旧版宿主请使用旧包 `dsh-file-review-tab@0.5.x`（DSH 0.1.5）或 `@0.4.1`（更早版本）。
 
-在桌面版中，安装的新组合包通常会由热重载自动加载；若侧栏未出现「文件审查」，请重启桌面版。独立 Web Profile 若未启用热重载，则需重启 `dsh web`。加载后，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。宿主原生改动卡仍会显示；插件 Tab 另外列出文件工具（包括 `run_code` 子调用）产生的改动，嵌套仓库中的文件工具改动也按会话工作区路径处理。纯终端/Git 修改（删除操作除外）不会完整显示，会话工作区外的路径也不可撤销；请将本 Tab 作为宿主原生改动卡的补充，而非 Git 工作树的完整替代视图。
+在桌面版中，安装的新组合包通常会由热重载自动加载；若侧栏未出现「文件审查」，请重启桌面版。独立 Web Profile 若未启用热重载，则需重启 `dsh web`。加载后，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。插件列出本会话文件工具（包括 `run_code` 子调用）产生的改动；纯终端/Git 修改（删除操作除外）不会完整显示。Git 工作树的全部未提交改动仍由 better-sidebar 的 Git 页面查看。
+
+## 配置多仓库项目
+
+进入目标工程的会话，点击顶部 **对话 / 轨迹 / 多代码仓管理** 中的「多代码仓管理」。当前工程目录和项目名称由会话确定，不能在这里修改。不同工程各自维护自己的配置文件。
+
+1. 如果工程还没有配置文件，点击 **启用多代码仓管理**。点击 **添加仓库**，填写仓库名称与相对工程目录的路径；每行的 **打开** 可选择目录，同盘目录自动换算为相对路径。**删除** 会先询问确认，确认后只从列表移除，不删除磁盘目录。勾选项决定是否同时审查工程根目录。
+2. 点击 **保存配置**。插件在当前工程根目录创建或更新 `dsh-file-review-repositories.json`，并在下方显示各仓库的 Git 状态。根目录显示为 `.`，子仓库显示为 `project/PluginManager` 等相对路径。
+3. 之后打开该工程或其子目录的会话时，插件会自动发现并读取该文件。配置文件可随工程一起保存或提交到 Git。**没有该文件的工程不会启用多代码仓范围**，仍按原有会话目录审查。
+
+配置文件示例：
+
+```json
+{
+  "version": 1,
+  "includeProjectRoot": true,
+  "repositories": [
+    { "name": "PluginManager", "path": "project/PluginManager" },
+    { "name": "ThirdPartyManager", "path": "project/ThirdPartyManager" }
+  ]
+}
+```
+
+仓库路径相对**当前工程根目录**解析。同一磁盘的绝对输入会在保存时转换为相对路径；跨磁盘的目录无法相对表示，会显示为绝对路径并标记为临时仓库，仅在当前会话使用，**不会写入配置文件**。插件不会 clone、pull 或修改仓库。直接修改配置文件后，重新加载页面即可读取新内容。
+
+若旧 Profile 中已有 `submodules.ini`、`.gitmodules` 或其他仓库清单，启用页面会把识别到的仓库列成可编辑行，供主动迁移。旧 Profile 记录本身不会启用多代码仓范围。首次保存后，新文件接管配置，旧清单不再是依赖；例如 ProjectManager 的 `submodules.ini` 仅用于一次迁移。新工程无需准备仓库清单。
+
+默认同时审查项目根目录内的文件。如果只需维护指定子仓库，可取消对应选项。会话位于项目根目录或其子目录时，自动选用最近的工程配置文件；会话直接打开显式配置的外部仓库时，也能通过当前 Profile 的项目索引匹配所属项目。多个项目共用同一个外部仓库时，优先使用已保存列表中的第一个匹配项目。未配置的会话仍使用原有的会话目录范围。
+
+撤销和重新应用只允许当前匹配项目的范围；Host 验证真实路径，拒绝通过符号链接或目录联接越界。新建、删除、冲突和缺少完整差异的文件仍按原有规则处理。
+
+## 开发验证
+
+```powershell
+pnpm typecheck
+pnpm build
+node --test tests/repository-workspace.test.mjs
+```
+
+测试使用临时仓库目录，覆盖不同项目、INI/JSON 清单、外部仓库、路径去重、Windows 路径识别以及撤销的真实路径边界；不改动实际工程仓库。
 
 ## 致谢
 
