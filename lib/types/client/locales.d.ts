@@ -108,6 +108,12 @@ export declare const zh: {
     readonly expandContext: "展开 {count} 行未修改代码（剩余 {remaining} 行）";
     readonly collapseContext: "收起展开的上下文";
     readonly unavailableContext: "省略 {count} 行：历史记录未包含这些代码";
+    readonly diffLayout: "差异布局";
+    readonly diffSplit: "并排";
+    readonly diffUnified: "统一";
+    readonly diffWrap: "自动换行";
+    readonly diffOld: "旧版";
+    readonly diffNew: "新版";
     readonly stats: "新增 {added} 行，删除 {removed} 行";
     readonly unavailable: "无法为此更改还原可审查的差异。";
     readonly refresh: "刷新状态";

@@ -33,6 +33,12 @@ export interface UnifiedVisibleBlock {
     readonly gap: UnifiedGap | null;
     readonly lines: readonly UnifiedLine[];
 }
+export interface SplitDiffRow {
+    readonly old: UnifiedLine | null;
+    readonly next: UnifiedLine | null;
+}
+/** Align each contiguous replacement, keeping absent lines blank on that side. */
+export declare function splitDiffRows(lines: readonly UnifiedLine[]): SplitDiffRow[];
 export declare function hunkLines(diff: ProducedFileDiff): UnifiedLine[];
 export declare function buildUnifiedHunks(diffs: readonly ProducedFileDiff[], contextLines: number): UnifiedHunk[];
 /** Reveal exactly 20 available lines, starting next to the visible changes. */

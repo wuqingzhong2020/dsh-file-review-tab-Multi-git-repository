@@ -34,7 +34,7 @@ export declare function commentAnchorKey(anchor: ReviewCommentAnchor): string;
 /** A deterministic snapshot tag: comments never silently move to another diff revision. */
 export declare function reviewDiffRevision(diffs: readonly ProducedFileDiff[]): string;
 export declare function fileCommentAnchor(target: ReviewCommentTarget): ReviewCommentAnchor;
-export declare function lineCommentAnchor(target: ReviewCommentTarget, row: ReviewCommentLine, lines: readonly ReviewCommentLine[], revision: string): ReviewCommentAnchor;
+export declare function lineCommentAnchor(target: ReviewCommentTarget, row: ReviewCommentLine, lines: readonly ReviewCommentLine[], revision: string, contextSide?: 'old' | 'new'): ReviewCommentAnchor;
 export declare function parseReviewComments(raw: string): readonly ReviewComment[];
 export interface CommentMessageLabels {
     readonly introduction: string;

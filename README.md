@@ -8,6 +8,7 @@
 - **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
 - **仓库分组**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。点击仓库标题可收起或展开全部文件；会话范围继续保留轮次分组及确认、撤销操作。
 - **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 20 行未修改代码；中间间隔从两端各展开 10 行，首尾间隔从改动处向外展开。点击「收起展开的上下文」恢复默认显示。
+- **两种差异布局**：顶部选择「统一」或「并排」。统一视图上下列出删除与新增行；并排视图左侧旧版、右侧新版，对齐对应的改动行。支持「自动换行」开关，关闭后横向滚动查看长行；布局与换行选择保存在应用本地，切换布局保留已展开的上下文和评论。并排视图两侧都可对实际代码行评论，引用各自的新旧行号。
 - **会话「多代码仓管理」页签**：在「对话」「轨迹」旁边，直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换工程会自动显示对应配置；文件审查显示所属仓库及仓库内路径，可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
 - **删除文件可见**：dsh 没有删除文件的工具，删除发生在终端命令里——插件解析 `rm` 族命令（`rm` / `rmdir` / `unlink` / `Remove-Item` / `del` / `rd` 等）的字面路径参数，被删文件以「已删除」标记出现在两个入口（内容已不存在，故无行级 diff、不可撤销）。带通配符（`rm *.log`）或命令替换（`rm $(...)`）的删除不识别——受影响文件事后无法枚举。
 - **自动归档**：主列表只保留最近 5 轮（进行中的轮次永不归档），更早的已完成轮次沉入底部「已归档 N 轮」折叠区。折叠时归档内容零渲染，展开后每页加载 10 轮（「加载更多」续页），diff 行另有懒挂载——长会话不再一次性挂载几十个 diff 组。深链跳到已归档轮次会自动展开并定位；展开状态按会话记忆；角标只统计主列表。
@@ -33,10 +34,10 @@ dsh plugin --profile desktop add github:wuqingzhong2020/dsh-file-review-tab-Mult
 dsh plugin --profile web add dsh-file-review-tab-multi-git-repository
 ```
 
-对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-github-diff.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
+对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-diff-layouts.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-github-diff.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-diff-layouts.tgz"
 ```
 
 桌面版安装后请重启应用，让 Host 与 Web 插件重新加载。确认 `package.json` 使用 `dsh-better-sidebar` **0.24.1**；在会话顶部打开「多代码仓管理」，在侧边栏打开「文件审查」。

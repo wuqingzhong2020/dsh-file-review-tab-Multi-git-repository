@@ -18,6 +18,6 @@ interface UnifiedDiffProps {
     readonly showFileHeaders?: boolean | undefined;
     readonly reviewTarget?: ReviewCommentTarget | undefined;
 }
-/** GitHub-style unified view with two gutters and incremental context expansion. */
+/** Two presentations share the original rows, context expansion, and anchors. */
 export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, reviewTarget }: UnifiedDiffProps): import("react").JSX.Element | null;
 //# sourceMappingURL=UnifiedDiff.d.ts.map

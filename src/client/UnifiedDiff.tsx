@@ -2,12 +2,14 @@ import { useCallback, useMemo, useState, type CSSProperties } from 'react'
 import type { ProducedFileDiff as DiffHunk } from '../change-types.ts'
 import {
   buildUnifiedHunks, CONTEXT_EXPANSION_LINES, expandContextGap, unifiedDiffText,
-  unifiedHunkRange, unifiedVisibleBlocks, visibleHunkRows,
+  splitDiffRows, unifiedHunkRange, unifiedVisibleBlocks, visibleHunkRows,
   type ContextExpansion, type UnifiedGap, type UnifiedLine,
 } from './unified-diff-model.ts'
 import css from './UnifiedDiff.module.css'
 import { ReviewCommentLine, ReviewOutdatedComments } from './ReviewComments.tsx'
 import { lineCommentAnchor, reviewDiffRevision, type ReviewCommentTarget } from './review-comments.ts'
+import { useDiffViewPreferences } from './DiffViewControls.tsx'
+import { t } from './locales.ts'
 
 export { summarizeDiffs, unifiedDiffText } from './unified-diff-model.ts'
 export type { UnifiedDiffStats } from './unified-diff-model.ts'
@@ -37,8 +39,10 @@ function ExpandIcon({ direction }: { direction: UnifiedGap['position'] }) {
   </svg>
 }
 
-/** GitHub-style unified view with two gutters and incremental context expansion. */
+/** Two presentations share the original rows, context expansion, and anchors. */
 export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton = true, showFileHeaders = true, reviewTarget }: UnifiedDiffProps) {
+  const preferences = useDiffViewPreferences()
+  const isSplit = preferences.layout === 'split'
   const hunks = useMemo(() => buildUnifiedHunks(diffs, contextLines), [contextLines, diffs])
   const revision = useMemo(() => reviewDiffRevision(diffs), [diffs])
   const [progress, setProgress] = useState<{ revision: string; gaps: ReadonlyMap<string, ContextExpansion> }>(() => ({ revision, gaps: new Map() }))
@@ -69,7 +73,8 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
     const total = totals.get(diff.path) ?? { added: 0, removed: 0 }
     totals.set(diff.path, { added: total.added + (hunks[index]?.added ?? 0), removed: total.removed + (hunks[index]?.removed ?? 0) })
   })
-  const renderLine = (row: UnifiedLine, key: string, lines: readonly UnifiedLine[]) => <ReviewCommentLine key={key} anchor={reviewTarget ? lineCommentAnchor(reviewTarget, row, lines, revision) : undefined}>
+  const renderLine = (row: UnifiedLine, key: string, lines: readonly UnifiedLine[]) => <ReviewCommentLine key={key} anchor={reviewTarget ? lineCommentAnchor(reviewTarget, row, lines, revision) : undefined}
+    alternateAnchor={reviewTarget && row.kind === 'context' ? lineCommentAnchor(reviewTarget, row, lines, revision, 'old') : undefined}>
     {button => <div className={`${css.unifiedLine} ${css[`unified_${row.kind}`] ?? ''}`} data-line-kind={row.kind} data-old-line={row.oldNumber ?? undefined} data-new-line={row.newNumber ?? undefined}>
       <span className={`${css.unifiedLineNumber} ${css.unifiedOldNumber}`}>{button}{row.oldNumber}</span>
       <span className={css.unifiedLineNumber}>{row.newNumber}</span>
@@ -77,8 +82,19 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
       <span className={css.unifiedText}>{row.text}</span>
     </div>}
   </ReviewCommentLine>
+  const renderSplitCell = (row: UnifiedLine | null, side: 'old' | 'new', key: number, lines: readonly UnifiedLine[]) => <div key={key}
+    className={`${css.splitCell} ${row ? css[`unified_${row.kind}`] ?? '' : css.splitMissing}`}>
+    {row && <ReviewCommentLine anchor={reviewTarget ? lineCommentAnchor(reviewTarget, row, lines, revision, side) : undefined}>
+      {button => <div className={`${css.splitLine} ${css[`unified_${row.kind}`] ?? ''}`} data-line-kind={row.kind} data-diff-side={side}
+        data-old-line={side === 'old' ? row.oldNumber ?? undefined : undefined} data-new-line={side === 'new' ? row.newNumber ?? undefined : undefined}>
+        <span className={`${css.unifiedLineNumber} ${css.unifiedOldNumber}`}>{button}{side === 'old' ? row.oldNumber : row.newNumber}</span>
+        <span className={css.unifiedSign}>{row.kind === 'del' ? '-' : row.kind === 'add' ? '+' : ' '}</span>
+        <span className={css.unifiedText}>{row.text}</span>
+      </div>}
+    </ReviewCommentLine>}
+  </div>
   let previousPath: string | undefined
-  return <div className={`${css.unifiedBlock} ${showFileHeaders ? '' : css.unifiedEmbedded} ${reviewTarget ? css.commentEnabled : ''} ${className ?? ''}`} style={style} data-diff="" data-diff-layout="unified">
+  return <div className={`${css.unifiedBlock} ${showFileHeaders ? '' : css.unifiedEmbedded} ${reviewTarget ? css.commentEnabled : ''} ${preferences.wrap ? css.wrapLines : ''} ${className ?? ''}`} style={style} data-diff="" data-diff-layout={preferences.layout} data-diff-wrap={preferences.wrap}>
     {(showCopyButton || expansions.size > 0) && <div className={css.unifiedToolbar}>
       {expansions.size > 0 && <button type="button" onClick={() => { setProgress({ revision, gaps: new Map() }) }}>{labels.collapseContext}</button>}
       {showCopyButton && <button type="button" className={css.unifiedCopyButton} onClick={onCopy}>{copied ? labels.copied : labels.copy}</button>}
@@ -95,8 +111,11 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
           <span className={css.unifiedAdded}>+{total.added}</span><span className={css.unifiedRemoved}>-{total.removed}</span>
         </header>}
         {hunk.unchangedBefore > 0 && <div className={css.unifiedUnavailable} title={labels.unavailableContext(hunk.unchangedBefore)}>{labels.unavailableContext(hunk.unchangedBefore)}</div>}
-        <div className={css.unifiedBody}>
-          {blocks.map((block, blockIndex) => <div key={block.gap?.id ?? `block:${blockIndex}`}>
+        {isSplit && <div className={css.splitLegend}><span>{t('diffOld')}</span><span>{t('diffNew')}</span></div>}
+        <div className={`${css.unifiedBody} ${isSplit ? css.splitBody : ''}`}>
+          {blocks.map((block, blockIndex) => {
+            const splitRows = isSplit ? splitDiffRows(block.lines) : []
+            return <div key={block.gap?.id ?? `block:${blockIndex}`}>
             <div className={css.unifiedHunkHeader}>
               {block.gap ? <button type="button" className={css.unifiedGapButton}
                 aria-label={labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}
@@ -109,8 +128,11 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
                 {block.gap && block.lines.length === 0 && <small>{labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}</small>}
               </span>
             </div>
-            {block.lines.map(row => renderLine(row, `${row.kind}:${row.oldNumber ?? ''}:${row.newNumber ?? ''}`, hunk.lines))}
-          </div>)}
+            {isSplit ? splitRows.length > 0 && <div className={css.splitGrid} style={{ gridTemplateRows: `repeat(${splitRows.length}, minmax(22px, auto))` }}>
+              <div className={`${css.splitPane} ${css.splitOldPane}`}>{splitRows.map((row, index) => renderSplitCell(row.old, 'old', index, hunk.lines))}</div>
+              <div className={`${css.splitPane} ${css.splitNewPane}`}>{splitRows.map((row, index) => renderSplitCell(row.next, 'new', index, hunk.lines))}</div>
+            </div> : block.lines.map(row => renderLine(row, `${row.kind}:${row.oldNumber ?? ''}:${row.newNumber ?? ''}`, hunk.lines))}
+          </div>})}
         </div>
       </section>
     })}

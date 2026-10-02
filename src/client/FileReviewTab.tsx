@@ -37,6 +37,7 @@ import type { ReviewCommentTarget } from './review-comments.ts'
 import { confirmationStoreFor, isTurnConfirmed, pendingTurnChanges } from './review-confirmations.ts'
 import { groupReviewFiles } from './review-repository-groups.ts'
 import { ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
+import { DiffViewControls } from './DiffViewControls.tsx'
 
 type ReviewMode = 'session' | 'last-turn' | 'pending' | GitReviewMode
 
@@ -837,7 +838,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           ⟳
         </button>
       </header>
-      <ReviewCommentsProvider key={sessionId} ctx={ctx} sessionId={sessionId}>
+      <ReviewCommentsProvider key={sessionId} ctx={ctx} sessionId={sessionId} controls={<DiffViewControls />}>
       {!isGitMode && workspace?.project !== null && workspace?.project !== undefined && <div className={css.repositoryBar}>
         <span title={workspace.project.root}>{t('repoScope', { name: workspace.project.name || basename(workspace.project.root), count: repositories.filter(repo => repo.state === 'ready').length })}</span>
         <select aria-label={t('repository')} value={repositoryFilter} onChange={event => { setRepositoryFilter(event.target.value) }}>

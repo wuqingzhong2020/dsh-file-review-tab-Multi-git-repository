@@ -62,6 +62,21 @@
 .unifiedOldNumber { padding-left: calc(8px + var(--diff-comment-width)); }
 .unifiedSign { text-align: center; user-select: none; }
 .unifiedText { padding: 0 14px 0 6px; }
+.wrapLines .unifiedLine { min-width: 0; grid-template-columns: calc(var(--diff-gutter-width) + var(--diff-comment-width)) var(--diff-gutter-width) 20px minmax(0, 1fr); }
+.wrapLines .unifiedText { white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+.splitLegend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--dsw-alias-background-l2); border-bottom: 1px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); font: var(--dsw-font-xs-13); }
+.splitLegend span { padding: 4px 10px; }
+.splitLegend span + span { border-left: 1px solid var(--dsw-alias-border-l2); }
+.splitBody { overflow: visible; }
+.splitGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Subgrid shares each pair's height, including wrapped code and comment cards. */
+.splitPane { display: grid; grid-template-rows: subgrid; grid-row: 1 / -1; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.splitOldPane { grid-column: 1; }
+.splitNewPane { grid-column: 2; border-left: 1px solid var(--dsw-alias-border-l2); }
+.splitCell { min-width: 0; }
+.splitMissing { background: var(--dsw-alias-background-l2, #f6f8fa); }
+.splitLine { display: grid; grid-template-columns: calc(var(--diff-gutter-width) + var(--diff-comment-width)) 20px minmax(max-content, 1fr); min-width: max-content; min-height: 22px; line-height: 22px; white-space: pre; }
+.wrapLines .splitLine { min-width: 0; grid-template-columns: calc(var(--diff-gutter-width) + var(--diff-comment-width)) 20px minmax(0, 1fr); }
 .unified_del { background: color-mix(in srgb, var(--diff-del) 10%, var(--diff-base)); }
 .unified_add { background: color-mix(in srgb, var(--diff-add) 14%, var(--diff-base)); }
 .unified_del .unifiedLineNumber { background: color-mix(in srgb, var(--diff-del) 22%, var(--diff-base)); }

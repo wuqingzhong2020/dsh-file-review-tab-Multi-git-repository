@@ -2,16 +2,18 @@ import type { ReactNode } from 'react';
 import type { Context } from '@deepseek-ai/cordis';
 import { type CommentScope, type ReviewCommentAnchor, type ReviewCommentTarget } from './review-comments.ts';
 export declare function commentScopeLabel(scope: CommentScope): string;
-export declare function ReviewCommentsProvider({ ctx, sessionId, children }: {
+export declare function ReviewCommentsProvider({ ctx, sessionId, children, controls }: {
     ctx: Context;
     sessionId: string;
     children: ReactNode;
+    controls?: ReactNode;
 }): import("react").JSX.Element;
 /** Inline comment affordance shared by historical tool diffs and working-tree diffs. */
-export declare function ReviewCommentLine({ anchor, children }: {
+export declare function ReviewCommentLine({ anchor, alternateAnchor, children }: {
     anchor?: ReviewCommentAnchor | undefined;
+    alternateAnchor?: ReviewCommentAnchor | undefined;
     children: (button: ReactNode) => ReactNode;
-}): string | number | boolean | Iterable<ReactNode> | import("react").JSX.Element | null | undefined;
+}): string | number | boolean | import("react").JSX.Element | Iterable<ReactNode> | null | undefined;
 export declare function ReviewFileCommentButton({ target }: {
     target?: ReviewCommentTarget | undefined;
 }): import("react").JSX.Element | null;

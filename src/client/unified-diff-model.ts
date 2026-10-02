@@ -27,6 +27,25 @@ export interface UnifiedHunk {
 }
 export interface ContextExpansion { readonly before: number; readonly after: number }
 export interface UnifiedVisibleBlock { readonly gap: UnifiedGap | null; readonly lines: readonly UnifiedLine[] }
+export interface SplitDiffRow { readonly old: UnifiedLine | null; readonly next: UnifiedLine | null }
+
+/** Align each contiguous replacement, keeping absent lines blank on that side. */
+export function splitDiffRows(lines: readonly UnifiedLine[]): SplitDiffRow[] {
+  const rows: SplitDiffRow[] = []
+  let cursor = 0
+  while (cursor < lines.length) {
+    const line = lines[cursor]!
+    if (line.kind === 'context') { rows.push({ old: line, next: line }); cursor++; continue }
+    const old: UnifiedLine[] = []; const next: UnifiedLine[] = []
+    while (cursor < lines.length && lines[cursor]?.kind !== 'context') {
+      const changed = lines[cursor++]!
+      if (changed.kind === 'del') old.push(changed)
+      else next.push(changed)
+    }
+    for (let index = 0; index < Math.max(old.length, next.length); index++) rows.push({ old: old[index] ?? null, next: next[index] ?? null })
+  }
+  return rows
+}
 
 export function hunkLines(diff: ProducedFileDiff): UnifiedLine[] {
   const oldLines = diff.oldText === null ? [] : diffContentLines(diff.oldText)

@@ -37,7 +37,7 @@ interface CommentsContext {
 }
 const Comments = createContext<CommentsContext | null>(null)
 
-export function ReviewCommentsProvider({ ctx, sessionId, children }: { ctx: Context; sessionId: string; children: ReactNode }) {
+export function ReviewCommentsProvider({ ctx, sessionId, children, controls }: { ctx: Context; sessionId: string; children: ReactNode; controls?: ReactNode }) {
   const store = useMemo(() => storeFor(sessionId), [sessionId])
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [composer, setComposer] = useState<Composer | null>(null)
@@ -74,6 +74,7 @@ export function ReviewCommentsProvider({ ctx, sessionId, children }: { ctx: Cont
         {t(snapshot.busy ? 'commentSending' : 'commentSubmit')}
       </button>
       {composer && <small>{t('commentFinishEditing')}</small>}
+      {controls}
     </div>
     {notice && <p className={css.notice} role="status">{notice}</p>}
     {snapshot.storageError && <p className={css.notice} role="alert">{t('commentStorageError')}</p>}
@@ -139,10 +140,10 @@ function CommentThread({ anchor }: { anchor: ReviewCommentAnchor }) {
   </div>
 }
 /** Inline comment affordance shared by historical tool diffs and working-tree diffs. */
-export function ReviewCommentLine({ anchor, children }: { anchor?: ReviewCommentAnchor | undefined; children: (button: ReactNode) => ReactNode }) {
+export function ReviewCommentLine({ anchor, alternateAnchor, children }: { anchor?: ReviewCommentAnchor | undefined; alternateAnchor?: ReviewCommentAnchor | undefined; children: (button: ReactNode) => ReactNode }) {
   const context = useContext(Comments)
   if (!context || !anchor) return children(null)
-  return <>{children(<button type="button" className={css.lineAdd} title={t('commentAddLine')} aria-label={`${t('commentAddLine')} · ${position(anchor)}`} disabled={context.snapshot.busy} onClick={() => { context.start(anchor, 'inline') }}>+</button>)}<CommentThread anchor={anchor} /></>
+  return <>{children(<button type="button" className={css.lineAdd} title={t('commentAddLine')} aria-label={`${t('commentAddLine')} · ${position(anchor)}`} disabled={context.snapshot.busy} onClick={() => { context.start(anchor, 'inline') }}>+</button>)}<CommentThread anchor={anchor} />{alternateAnchor && <CommentThread anchor={alternateAnchor} />}</>
 }
 export function ReviewFileCommentButton({ target }: { target?: ReviewCommentTarget | undefined }) {
   const context = useContext(Comments)

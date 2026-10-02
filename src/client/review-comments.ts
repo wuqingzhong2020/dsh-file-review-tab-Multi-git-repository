@@ -78,8 +78,8 @@ function referenceIndex(lines: readonly ReviewCommentLine[]) {
   }
   return index
 }
-export function lineCommentAnchor(target: ReviewCommentTarget, row: ReviewCommentLine, lines: readonly ReviewCommentLine[], revision: string): ReviewCommentAnchor {
-  const side = row.kind === 'del' ? 'old' : 'new'
+export function lineCommentAnchor(target: ReviewCommentTarget, row: ReviewCommentLine, lines: readonly ReviewCommentLine[], revision: string, contextSide: 'old' | 'new' = 'new'): ReviewCommentAnchor {
+  const side = row.kind === 'del' ? 'old' : row.kind === 'add' ? 'new' : contextSide
   const reference = referenceIndex(lines)
   const sameSide = side === 'old' ? reference.old : reference.next
   const index = (side === 'old' ? reference.oldIndex : reference.newIndex).get(row) ?? -1
