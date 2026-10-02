@@ -43,6 +43,7 @@
     "cordis.patch.yml",
     "scripts/patch-desktop-directory-picker.mjs",
     "README.md",
+    "README.en.md",
     "docs/"
   ],
   "dsh": {

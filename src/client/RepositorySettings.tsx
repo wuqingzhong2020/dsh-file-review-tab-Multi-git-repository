@@ -9,6 +9,8 @@ import { repositoriesChanged } from './repository-events.ts'
 import { pickRepositoryDirectory } from './directory-picker.ts'
 import { absoluteReviewPath, normalizeReviewPath, relativeProjectDirectory, repositoryProjectPath } from './repository-paths.ts'
 import { t } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
+import { localizeReviewMessage } from './message-locales.ts'
 import css from './RepositorySettings.module.css'
 
 interface ProjectRemote {
@@ -60,6 +62,7 @@ function temporaryEntries(project: ReviewProject): NamedReviewRepository[] {
 
 /** A session-owned editor for the repositories of this conversation's project. */
 export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId: string }) {
+  useReviewLocale()
   const sessions = (ctx as Context & { sessions: ISessions }).sessions
   const remote = (): ProjectRemote => {
     const service = sessions.scope(sessionId as SessionId)?.get('remote.fileReview') as ProjectRemote | undefined
@@ -71,7 +74,7 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
   const [preview, setPreview] = useState<ReviewWorkspace | null>(null)
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState<string | { key: 'projectSaved' }>('')
   const [pendingDelete, setPendingDelete] = useState<number | null>(null)
   const [pickerError, setPickerError] = useState<{ index: number; message: string } | null>(null)
   const requestVersion = useRef(0)
@@ -165,7 +168,7 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
       setPreview(result.workspace)
       setDirty(false)
       repositoriesChanged()
-      setMessage(t('projectSaved'))
+      setMessage({ key: 'projectSaved' })
     } catch (error) { if (requestVersion.current === version) setMessage(error instanceof Error ? error.message : String(error)) }
     finally { if (requestVersion.current === version) setBusy(false) }
   }
@@ -180,7 +183,7 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
         </button>
       </div>
     </header>
-    {message && <p className={css.message} role="status">{message}</p>}
+    {message && <p className={css.message} role="status">{typeof message === 'string' ? localizeReviewMessage(message) : t(message.key)}</p>}
     {draft !== null && <fieldset disabled={busy} className={css.form}>
       <label className={css.field}>{t('projectCurrentRoot')}<input value={draft.root} readOnly /></label>
       <label className={css.field}>{t('projectName')}<input value={draft.name} readOnly /></label>
@@ -213,18 +216,18 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
             <button type="button" onClick={() => { void chooseDirectory(index) }}>{t('projectOpenRepo')}</button>
             <button type="button" aria-label={`${t('projectRemoveRepo')} ${entry.name || index + 1}`} onClick={() => { setPendingDelete(index) }}>{t('projectRemoveRepo')}</button>
           </div>
-          {pickerError?.index === index && <p className={css.pickerError} role="alert">{pickerError.message}</p>}
+          {pickerError?.index === index && <p className={css.pickerError} role="alert">{localizeReviewMessage(pickerError.message)}</p>}
         </div>)}
       </div>
       <button type="button" onClick={() => { edit({ namedRepositories: [...(draft.namedRepositories ?? []), { name: '', path: '' }] }) }}>{t('projectAddRepo')}</button>
     </fieldset>}
     {preview !== null && <div className={css.preview}>
       <h3>{t('projectResolved', { count: preview.repositories.filter(repo => repo.state === 'ready').length, total: preview.repositories.length })}</h3>
-      {preview.warnings.map(warning => <p className={css.message} key={warning}>{warning}</p>)}
+      {preview.warnings.map(warning => <p className={css.message} key={warning}>{localizeReviewMessage(warning)}</p>)}
       <table><thead><tr><th>{t('repository')}</th><th>{t('projectPath')}</th><th>{t('projectState')}</th></tr></thead>
         <tbody>{preview.repositories.map(repo => <tr key={repo.path}>
           <td>{repo.name}<small>{repo.source === 'project' ? t('projectRootSource') : repo.source === 'manual' ? t('projectManual') : repo.source === 'temporary' ? t('projectTemporary') : repo.source}</small></td>
-          <td>{repo.relativePath}</td><td title={repo.reason}>{t(repo.state === 'ready' ? 'repoReady' : repo.state === 'missing' ? 'repoMissing' : repo.state === 'notGit' ? 'repoNotGit' : 'stateError')}</td>
+          <td>{repo.relativePath}</td><td title={repo.reason ? localizeReviewMessage(repo.reason) : undefined}>{t(repo.state === 'ready' ? 'repoReady' : repo.state === 'missing' ? 'repoMissing' : repo.state === 'notGit' ? 'repoNotGit' : 'stateError')}</td>
         </tr>)}</tbody>
       </table>
     </div>}

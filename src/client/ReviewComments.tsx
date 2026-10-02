@@ -8,6 +8,8 @@ import {
 } from './review-comments.ts'
 import { sendReviewComments } from './review-comments-send.ts'
 import { t } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
+import { localizeReviewMessage } from './message-locales.ts'
 import css from './ReviewComments.module.css'
 
 const stores = new Map<string, ReviewCommentStore>()
@@ -38,20 +40,21 @@ interface CommentsContext {
 const Comments = createContext<CommentsContext | null>(null)
 
 export function ReviewCommentsProvider({ ctx, sessionId, children, controls }: { ctx: Context; sessionId: string; children: ReactNode; controls?: ReactNode }) {
+  useReviewLocale()
   const store = useMemo(() => storeFor(sessionId), [sessionId])
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [composer, setComposer] = useState<Composer | null>(null)
   const [open, setOpen] = useState(false)
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState<{ key: 'commentSent' | 'commentSendFailed'; details?: string } | null>(null)
   const start: CommentsContext['start'] = (anchor, placement, comment) => {
     if (snapshot.busy) return
     setComposer({ anchor, placement, id: comment?.id, text: comment?.text ?? '' })
     setOpen(placement === 'list')
-    setNotice('')
+    setNotice(null)
   }
   const submit = async () => {
     if (composer || snapshot.busy) return
-    setNotice('')
+    setNotice(null)
     try {
       const sent = await store.submit(async comments => {
         const message = formatReviewComments(comments, {
@@ -61,8 +64,8 @@ export function ReviewCommentsProvider({ ctx, sessionId, children, controls }: {
         })
         await sendReviewComments(ctx, sessionId, message)
       })
-      if (sent) { setNotice(t('commentSent')); setOpen(false) }
-    } catch (cause) { setNotice(`${t('commentSendFailed')}: ${cause instanceof Error ? cause.message : String(cause)}`) }
+      if (sent) { setNotice({ key: 'commentSent' }); setOpen(false) }
+    } catch (cause) { setNotice({ key: 'commentSendFailed', details: cause instanceof Error ? cause.message : String(cause) }) }
   }
   return <Comments.Provider value={{ snapshot, store, composer, setComposer, start }}>
     <div className={css.toolbar}>
@@ -76,7 +79,7 @@ export function ReviewCommentsProvider({ ctx, sessionId, children, controls }: {
       {composer && <small>{t('commentFinishEditing')}</small>}
       {controls}
     </div>
-    {notice && <p className={css.notice} role="status">{notice}</p>}
+    {notice && <p className={css.notice} role="status">{t(notice.key)}{notice.details ? `: ${localizeReviewMessage(notice.details)}` : ''}</p>}
     {snapshot.storageError && <p className={css.notice} role="alert">{t('commentStorageError')}</p>}
     {open && <div className={css.summary} aria-label={t('commentList')}>
       <small>{t('commentDraftHint')}</small>

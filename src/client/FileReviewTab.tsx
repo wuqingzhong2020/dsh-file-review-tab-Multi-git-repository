@@ -24,7 +24,10 @@ import {
   type SessionFileChange, type TurnFileChanges,
 } from './session-changes.ts'
 import { summarizeDiffs, UnifiedDiff, type UnifiedDiffStats } from './UnifiedDiff.tsx'
-import { t } from './locales.ts'
+import { t, type CopyKey } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
+import { followReviewTabTitle } from './sidebar-title.ts'
+import { localizeReviewMessage } from './message-locales.ts'
 import { currentFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
 import css from './FileReviewTab.module.css'
 import type { ReviewWorkspace } from '../repository-types.ts'
@@ -58,7 +61,7 @@ export interface FileReviewTabProps {
    * the chat turn-tail row writes via updateTab/openTab: a fresh meta
    * reference replays as "expand those files' diffs and scroll to the first".
    */
-  readonly tab: { readonly meta?: unknown }
+  readonly tab: { readonly id: string; readonly title: string; readonly meta?: unknown }
 }
 
 interface FileReviewRemote {
@@ -82,7 +85,8 @@ interface UiConversationFace {
 interface Notice {
   readonly seq: number
   readonly tone: 'success' | 'error'
-  readonly text: string
+  readonly key: CopyKey
+  readonly details?: string | undefined
 }
 
 /** One flattened (turn, file) change unit used for status requests. */
@@ -201,6 +205,8 @@ function LazyDiff({ children }: { children: ReactNode }) {
 
 /** The sidebar tab body: per-turn change groups with inline diffs and undo. */
 export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewTabProps) {
+  useReviewLocale()
+  useEffect(() => followReviewTabTitle(ctx.betterSidebar, tab), [ctx, tab.id])
   const sessions = (ctx as unknown as { readonly sessions: ISessions }).sessions
   const [states, setStates] = useState<ReadonlyMap<string, FileReviewFileState>>(() => new Map())
   const [statusPending, setStatusPending] = useState(false)
@@ -516,7 +522,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, expanded, tab.meta, flatKey])
 
-  const showNotice = useCallback((tone: Notice['tone'], text: string) => {
+  const showNotice = useCallback((tone: Notice['tone'], key: CopyKey, details?: string) => {
     noticeSeqRef.current += 1
     const seq = noticeSeqRef.current
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
@@ -524,7 +530,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
       () => { setNotice(current => current?.seq === seq ? null : current) },
       tone === 'success' ? SUCCESS_NOTICE_DURATION : ERROR_NOTICE_DURATION,
     )
-    setNotice({ seq, tone, text })
+    setNotice({ seq, tone, key, details })
   }, [])
 
   useEffect(() => () => {
@@ -614,12 +620,12 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
       const target = action === 'undo' ? 'undone' : 'applied'
       const failures = result.files.filter(file => file.state !== target)
       if (failures.length === 0) {
-        showNotice('success', t(action === 'undo' ? 'undoSuccess' : 'redoSuccess'))
+        showNotice('success', action === 'undo' ? 'undoSuccess' : 'redoSuccess')
       } else {
-        showNotice('error', t(action === 'undo' ? 'undoPartial' : 'redoPartial'))
+        showNotice('error', action === 'undo' ? 'undoPartial' : 'redoPartial')
       }
     }).catch((error: unknown) => {
-      showNotice('error', `${t('toggleError')}: ${error instanceof Error ? error.message : String(error)}`)
+      showNotice('error', 'toggleError', error instanceof Error ? error.message : String(error))
     }).finally(() => { setBusyKey(null) })
   }, [busyKey, invoke, mergeResultStates, showNotice])
 
@@ -868,7 +874,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           {repositories.filter(repo => repo.state === 'ready' || repo.source === 'project').map(repo => <option key={repo.path} value={repo.path}>{repo.name}</option>)}
           <option value="?">{t('repoOther')}</option>
         </select>
-        <small title={workspace.warnings.join('\n')}>{t('repoSettingsHint')}{workspace.warnings.length > 0 ? ' ⚠' : ''}</small>
+        <small title={workspace.warnings.map(localizeReviewMessage).join('\n')}>{t('repoSettingsHint')}{workspace.warnings.length > 0 ? ' ⚠' : ''}</small>
       </div>}
       {!isGitMode && confirmationSnapshot.storageError && <div className={`${css.notice} ${css.noticeError}`} role="alert">{t('confirmationStorageError')}</div>}
       {notice !== null && (
@@ -876,7 +882,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           className={`${css.notice} ${notice.tone === 'success' ? css.noticeSuccess : css.noticeError}`}
           role="alert"
         >
-          {notice.text}
+          {t(notice.key)}{notice.details ? `: ${localizeReviewMessage(notice.details)}` : ''}
         </div>
       )}
       {isGitMode ? <GitReviewPanel ctx={ctx} sessionId={sessionId} mode={reviewMode} visible={visible} tick={tick} /> : <div className={css.body} ref={bodyRef}>

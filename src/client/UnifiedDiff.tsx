@@ -10,6 +10,7 @@ import { ReviewCommentLine, ReviewOutdatedComments } from './ReviewComments.tsx'
 import { lineCommentAnchor, reviewDiffRevision, type ReviewCommentTarget } from './review-comments.ts'
 import { useDiffViewPreferences } from './DiffViewControls.tsx'
 import { t } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
 
 export { summarizeDiffs, unifiedDiffText } from './unified-diff-model.ts'
 export type { UnifiedDiffStats } from './unified-diff-model.ts'
@@ -53,6 +54,7 @@ function CollapseContextIcon() {
 
 /** Two presentations share the original rows, context expansion, and anchors. */
 export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton = true, showFileHeaders = true, reviewTarget }: UnifiedDiffProps) {
+  useReviewLocale()
   const preferences = useDiffViewPreferences()
   const isSplit = preferences.layout === 'split'
   const hunks = useMemo(() => buildUnifiedHunks(diffs, contextLines), [contextLines, diffs])

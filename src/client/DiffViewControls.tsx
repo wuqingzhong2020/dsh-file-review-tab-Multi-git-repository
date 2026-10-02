@@ -1,6 +1,7 @@
 import { useId, useRef, useState, useSyncExternalStore } from 'react'
 import { DiffViewStore, type DiffLayout } from './diff-view-preferences.ts'
 import { t } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
 import css from './DiffViewControls.module.css'
 
 let store: DiffViewStore | undefined
@@ -17,6 +18,7 @@ export function useDiffViewPreferences() {
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }
 export function DiffViewControls() {
+  useReviewLocale()
   const preferences = useDiffViewPreferences()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()

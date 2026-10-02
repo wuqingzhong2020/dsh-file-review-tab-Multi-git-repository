@@ -12,6 +12,8 @@ export interface FileReviewTabProps {
      * reference replays as "expand those files' diffs and scroll to the first".
      */
     readonly tab: {
+        readonly id: string;
+        readonly title: string;
         readonly meta?: unknown;
     };
 }

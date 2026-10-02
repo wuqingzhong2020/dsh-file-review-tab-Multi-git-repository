@@ -83,6 +83,10 @@ flowchart TB
 
 插件自己的审查行与宿主内置改动卡共存，使用独立的注册标识。不要通过关闭宿主原生 `deliverables` 或文件提及服务来实现扩展。
 
+`attachLocale` 在 `ctx.effect` 中接入 `ctx.locale.getSnapshot/subscribe`，以宿主「通用设置 → 语言」的选择为准。`useReviewLocale` 让插件界面实时刷新文案，不重新挂载页面或清空编辑状态。服务替换、插件禁用及 HMR 都释放旧订阅；仅独立预览或测试未接入宿主时使用浏览器语言。已显示的通知保存词典键或原始错误信息，在渲染时翻译；Host 返回的差异、路径及状态契约保持原样。
+
+原生侧栏标签另有打开时保存的标题，不能只依赖 Tab 描述符的 `title()`。`FileReviewTab` 挂载时通过 `followReviewTabTitle` 修正已保存的标题，并用 `betterSidebar.updateTab` 随语言变化更新；仅修改标题，保留标签 ID、深链、展开状态和草稿，卸载时释放订阅。
+
 ### 2.3 包与构建边界
 
 [package.json](../package.json)、[cordis.patch.yml](../cordis.patch.yml) 和 [tsdown.config.ts](../tsdown.config.ts) 共同决定加载方式：
@@ -117,7 +121,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 评论 | [ReviewComments.tsx](../src/client/ReviewComments.tsx)、[review-comments.ts](../src/client/review-comments.ts)、[review-comments-send.ts](../src/client/review-comments-send.ts) | 评论编辑、定位、存储和发送 |
 | 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
 | 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](../src/client/repository-events.ts) | 深链定位和配置变化通知 |
-| 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts) | Tab/管理页及对话审查行的中英文文案 |
+| 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts)、[use-review-locale.ts](../src/client/use-review-locale.ts)、[message-locales.ts](../src/client/message-locales.ts) | 中英文词典、宿主语言订阅、界面实时刷新及已识别的错误说明翻译 |
 | Desktop 兼容适配 | [patch-desktop-directory-picker.mjs](../scripts/patch-desktop-directory-picker.mjs) | 为特定 Desktop 构建的目录选择桥增加起始目录参数 |
 
 ## 4. 两条差异数据链路

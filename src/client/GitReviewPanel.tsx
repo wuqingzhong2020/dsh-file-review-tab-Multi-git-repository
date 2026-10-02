@@ -6,6 +6,8 @@ import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { GitReviewDiff, GitReviewFile, GitReviewFileRequest, GitReviewMode, GitReviewRequest, GitReviewResult } from '../git-review-types.ts'
 import { UnifiedDiff } from './UnifiedDiff.tsx'
 import { t } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
+import { localizeReviewMessage } from './message-locales.ts'
 import { resolveSessionPath } from './session-changes.ts'
 import css from './FileReviewTab.module.css'
 import { ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
@@ -24,6 +26,7 @@ async function unwrap<T>(promise: Promise<RemoteResult<T>>): Promise<T> {
   return result.value
 }
 export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: Context; sessionId: string; mode: GitReviewMode; visible: boolean; tick: number }) {
+  useReviewLocale()
   const sessions = (ctx as Context & { sessions: ISessions }).sessions
   const remote = (): GitRemote => {
     const value = sessions.scope(sessionId as SessionId)?.get('remote.fileReview') as GitRemote | undefined
@@ -100,8 +103,8 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
       {!loading && data?.comparisons.length ? <small title={data.comparisons.join('\n')}>{selected ? data.comparisons[0] : t('reviewRepoCount', { count: data.repositories.length })}</small> : null}
     </div>
     <div className={css.body}>
-      {error && <p className={`${css.notice} ${css.noticeError}`} role="alert">{error}</p>}
-      {!loading && !error && data?.warnings.map(warning => <p className={`${css.notice} ${css.noticeError}`} key={warning}>{warning}</p>)}
+      {error && <p className={`${css.notice} ${css.noticeError}`} role="alert">{localizeReviewMessage(error)}</p>}
+      {!loading && !error && data?.warnings.map(warning => <p className={`${css.notice} ${css.noticeError}`} key={warning}>{localizeReviewMessage(warning)}</p>)}
       {loading ? <p className={css.empty} role="status">{t('reviewLoading')}</p>
         : !error && data && !data.files.length ? <p className={css.empty}>{t(data.repositories.length ? 'reviewGitEmpty' : 'reviewNoGit')}</p> : null}
       {!loading && !error && data && data.files.length > 0 && <section className={css.turnGroup}>
@@ -138,9 +141,9 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
               }}>{t('openInEditor')}</button>}
             </div>
             <ReviewFileCommentThread target={commentTarget} />
-            {open && <div className={css.diffWrap}>{diff === null || diff === undefined ? <p>{t('reviewLoading')}</p> : typeof diff === 'string' ? <p role="alert">{diff}</p>
+            {open && <div className={css.diffWrap}>{diff === null || diff === undefined ? <p>{t('reviewLoading')}</p> : typeof diff === 'string' ? <p role="alert">{localizeReviewMessage(diff)}</p>
               : diff.diffs.length ? <UnifiedDiff diffs={diff.diffs} reviewTarget={commentTarget} contextLines={3} showCopyButton showFileHeaders={false} labels={{ copy: t('copy'), copied: t('copied'), expandContext: (count, remaining) => t('expandContext', { count, remaining }), collapseContext: t('collapseContext'), unavailableContext: count => t('unavailableContext', { count }) }} />
-                : <p>{diff.binary ? t('reviewBinaryHint') : t('reviewMetadataOnly')}{diff.note ? ` (${diff.note})` : ''}</p>}</div>}
+                : <p>{diff.binary ? t('reviewBinaryHint') : t('reviewMetadataOnly')}{diff.note ? ` (${localizeReviewMessage(diff.note)})` : ''}</p>}</div>}
           </li>
         })}</ul>
         </ReviewRepositoryGroup>)}

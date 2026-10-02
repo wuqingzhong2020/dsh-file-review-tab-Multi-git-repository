@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react'
 import { t } from './locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
 import css from './FileReviewTab.module.css'
 
 export function FileContentsButton({ expanded, label, onClick, controls }: { expanded: boolean; label: string; onClick: () => void; controls?: string }) {
@@ -16,6 +17,7 @@ export function ReviewRepositoryGroup({ name, path, count, children, collapsed, 
   collapsed: boolean; onCollapsedChange: (collapsed: boolean) => void
   contentsExpanded: boolean; onContentsExpandedChange: (expanded: boolean) => void
 }) {
+  useReviewLocale()
   const bodyId = useId()
   const expanded = contentsExpanded && !collapsed
   return <section className={css.repositoryGroup} aria-label={name}>

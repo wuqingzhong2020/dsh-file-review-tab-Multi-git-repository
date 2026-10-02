@@ -179,12 +179,18 @@ export declare const zh: {
 export type CopyKey = keyof typeof zh;
 /** The en dictionary. */
 export declare const en: Record<CopyKey, string>;
-/** Attach (or detach, with undefined) the DSH locale service. */
-export declare function attachLocale(service: {
+export interface ReviewLocaleSource {
     getSnapshot(): {
         active: string;
     };
-} | undefined): void;
+    subscribe?(listener: () => void): () => void;
+}
+export type ReviewLocale = 'zh' | 'en';
+/** Follow the host's General settings language; dispose on plugin disable/HMR. */
+export declare function attachLocale(service: ReviewLocaleSource | undefined): () => void;
+export declare function subscribeLocale(listener: () => void): () => void;
+/** The active locale id ('zh' | 'en'): the DSH locale service's snapshot when attached. */
+export declare function getLocaleSnapshot(): ReviewLocale;
 /** Translate a copy key; `{name}` placeholders interpolate from `params`. */
 export declare function t(key: CopyKey, params?: Record<string, string | number>): string;
 //# sourceMappingURL=locales.d.ts.map

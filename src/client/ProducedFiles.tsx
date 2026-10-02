@@ -15,7 +15,9 @@ import type {
   FileReviewAction, FileReviewRequest, FileReviewResult,
 } from '../change-types.ts'
 import { basename, type ProducedFileReview } from './turn-deliverables.ts'
-import type { NS } from './chat-locales.ts'
+import type { DeliverablesKey, NS } from './chat-locales.ts'
+import { useReviewLocale } from './use-review-locale.ts'
+import { localizeReviewMessage } from './message-locales.ts'
 import { summarizeDiffs, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import css from './ProducedFiles.module.css'
 
@@ -31,8 +33,9 @@ interface NoticeFile {
 interface ToggleNotice {
   readonly seq: number
   readonly tone: 'success' | 'error'
-  readonly title: string
+  readonly title: DeliverablesKey
   readonly description?: string | undefined
+  readonly descriptionKey?: DeliverablesKey | undefined
   readonly files: readonly NoticeFile[]
 }
 
@@ -107,7 +110,7 @@ function ErrorIcon() {
 function ResultToast({
   notice, closeLabel, dismissLabel, fileListLabel, fileOpenLabel, openFile, onDone,
 }: {
-  readonly notice: ToggleNotice
+  readonly notice: Omit<ToggleNotice, 'title'> & { readonly title: string }
   readonly closeLabel: string
   readonly dismissLabel: string
   readonly fileListLabel: string
@@ -194,6 +197,7 @@ export function ProducedFiles({
   inspectChanges = unavailableChanges, applyChanges = unavailableChanges,
   openInSidebarTab, t,
 }: ProducedFilesProps) {
+  useReviewLocale()
   // The owning turn number (TurnLocation.turn) rides every deep link so the
   // sidebar tab expands this turn's rows only.
   const turnNumber = turnLocation.turn
@@ -285,23 +289,23 @@ export function ProducedFiles({
       if (failures.length === 0) {
         showToast({
           tone: 'success',
-          title: t(action === 'undo' ? 'produced.undoSuccess' : 'produced.redoSuccess'),
+          title: action === 'undo' ? 'produced.undoSuccess' : 'produced.redoSuccess',
           files: [],
         })
         return
       }
       showToast({
         tone: 'error',
-        title: t(action === 'undo' ? 'produced.undoPartial' : 'produced.redoPartial'),
-        description: t(action === 'undo'
+        title: action === 'undo' ? 'produced.undoPartial' : 'produced.redoPartial',
+        descriptionKey: action === 'undo'
           ? 'produced.undoPartialDescription'
-          : 'produced.redoPartialDescription'),
+          : 'produced.redoPartialDescription',
         files: failures,
       })
     }).catch((error: unknown) => {
       showToast({
         tone: 'error',
-        title: t(action === 'undo' ? 'produced.undoError' : 'produced.redoError'),
+        title: action === 'undo' ? 'produced.undoError' : 'produced.redoError',
         description: error instanceof Error ? error.message : String(error),
         files: [],
       })
@@ -393,7 +397,8 @@ export function ProducedFiles({
       {toast !== null && (
         <ResultToast
           key={toast.seq}
-          notice={toast}
+          notice={{ ...toast, title: t(toast.title), description: toast.descriptionKey ? t(toast.descriptionKey)
+            : toast.description === undefined ? undefined : localizeReviewMessage(toast.description) }}
           closeLabel={t('produced.noticeClose')}
           dismissLabel={t('produced.noticeDismiss')}
           fileListLabel={t('produced.skippedFiles', { count: String(toast.files.length) })}

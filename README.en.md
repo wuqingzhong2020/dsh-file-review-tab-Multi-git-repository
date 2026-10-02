@@ -1,0 +1,161 @@
+# dsh-file-review-tab-multi-git-repository
+
+[简体中文](README.md) | [English](README.en.md)
+
+Current version: **v0.1.1**.
+
+**dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 and [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1.**
+
+Building on the original file review sidebar tab and end-of-turn review row, this plugin adds project-level repository configuration, review across repositories, review comments, and turn confirmations. The host's built-in change summaries, review page, and file mentions remain enabled.
+
+## Developer documentation
+
+Before developing or troubleshooting, read the [Architecture and development guide](docs/ARCHITECTURE.md) (Chinese). It covers the Host/Client boundary, the two diff data flows, repository configuration, communication contracts, state storage, file operation boundaries, and common entry points for changes. This README is the project entry point; consult the architecture guide alongside it.
+
+Release maintainers should also read the [Public release and plugin marketplace guide](docs/RELEASING.md) (Chinese), which explains pushing source code to GitHub, uploading prebuilt packages, and applying for marketplace inclusion.
+
+## Features
+
+- **End-of-turn review row**: After a turn ends, a row shows the edited file count, additions and deletions, and Undo / Review actions. Clicking Review or an individual filename **opens the sidebar tab through a deep link, expands the relevant file's diff, and scrolls to the top of that turn's group**, instead of opening a full-width drawer. This is a separate entry that coexists with the host's native change card; it does not replace or disable it.
+- **File review sidebar tab**: Lists files changed in the current session, grouped by turn. Expand a file to see a line-by-line red/green diff. Supports undoing a turn, undoing a single file, and reapplying changes. The tab badge updates with the changed file count.
+- **Repository groups and content expansion**: Each group header shows the repository name and changed file count, with repository-relative file paths below it. The icon beside a repository header expands or collapses all file diffs in that repository. The turn header icon controls file contents across all repositories in that turn; in Git scopes, the icon beside the file count controls all currently displayed file contents. Collapsing contents keeps filenames visible. Clicking the repository name or its left arrow hides or shows the entire file list. If some files are already expanded, the icon first expands the rest, then collapses all on the next click. Each action affects only its own scope. Git diffs load on demand and are cached; bulk expansion requests at most four files concurrently.
+- **GitHub-style diffs**: Old/new line-number columns, red/green change backgrounds, and blue hunk headers. By default, three context lines are kept around each change. The arrow on the left of a blue header reveals N more unchanged lines per click (20 by default). Middle intervals divide N lines between both ends; leading and trailing intervals expand outward from the change. Additional upward/downward double-arrow icons reveal all remaining unchanged lines in the adjacent interval, reaching the beginning or end of the recorded content, or the neighboring change block. An expanded interval keeps a local collapse icon, including after full expansion. Clicking it hides only that interval's expanded unchanged lines, leaving other intervals unchanged. Collapse expanded context restores the default display for all intervals.
+- **Review settings**: The Settings button sits to the left of the diff layout selector. It opens a dialog where you can set the number of unchanged lines to expand per click: a positive integer, defaulting to 20. Save applies the setting immediately and stores it locally. Cancel or Esc discards the current edit. The setting applies to session and Git scopes, and to unified and split views.
+- **Two diff layouts**: Choose Unified or Split at the top. Unified lists removed and added lines vertically. Split shows the old version on the left and the new version on the right, aligning corresponding changes. Wrap lines can be turned off to inspect long lines with horizontal scrolling. Layout and wrapping choices are saved locally. Switching layouts preserves expanded context and comments. Both sides of the split view support comments on actual code lines, using their respective old/new line numbers.
+- **Multi-repository management session tab**: Next to the conversation and trace tabs, add, edit, or remove repositories maintained by the current project. Save them to `dsh-file-review-repositories.json` in the project root. Switching projects loads the corresponding configuration. File review shows each file's repository and repository-relative path, with filtering by repository. Supports the main repository, nested repositories, and external repositories used temporarily in the current session.
+- **Deleted files remain visible**: dsh has no file deletion tool, so deletions happen through terminal commands. The plugin parses literal path arguments in commands such as `rm`, `rmdir`, `unlink`, `Remove-Item`, `del`, and `rd`. Deleted files appear with a deleted marker in both review entry points. Their content is no longer available, so there is no line diff or undo. Deletions using wildcards (`rm *.log`) or command substitution (`rm $(...)`) are not recognized because the affected files cannot be enumerated afterward.
+- **Automatic archiving**: The main list keeps the latest five turns; turns in progress are never archived. Older completed turns move into a collapsed Archived turns section at the bottom. Archived contents are not rendered while collapsed. Expanding it loads ten turns per page, with Load more for subsequent pages. Diff rows also mount lazily, avoiding dozens of diff groups mounting at once in long sessions. Deep links to archived turns automatically expand and locate them. Expansion state is remembered per session; the tab badge counts only the main list.
+- **PTC / Code Mode support**: Nested `edit`/`write` calls inside `run_code` programs are captured. The Host snapshots the full before/after content, and the browser reconstructs line-numbered hunks and associates them with the correct turn. Diff viewing, status checks, undo, and reapply are supported. Standard mode behavior is unchanged; the end-of-turn review row still covers standard-mode turns only.
+- **Review scopes**: Choose Last turn, This session, Pending review, Uncommitted, Unstaged, Staged, Committed, or Branch. Session scopes retain undo support. Pending review lists unconfirmed turns and supports confirming a turn, undoing a turn, and undoing individual files. Confirmations are stored locally per session and survive restarts; they can be undone in This session. Git scopes support worktree, index, historical commit, and branch comparisons, aggregated using the project's repository configuration.
+- **Review comments**: In Last turn, This session, Pending review, Uncommitted, and Unstaged, hover over a code line and click ＋ to add a line comment, or add a whole-file comment beside a file. Comments can be edited and deleted. The top review comments button shows the pending list. Submitting comments sends the opinions, repository, file path, old/new line numbers, and reference code to the Agent in the current session. If the Agent is busy, the message is queued for the next turn; the existing input draft is preserved. Failed submissions retain comments for retry, while successful submissions clear the submitted batch.
+- **Session isolation**: Each session reviews files using its own project configuration. Status polling pauses while the tab is hidden.
+- **Host language setting**: File review, multi-repository management, settings dialogs, comments, and the end-of-turn review row follow Chinese or English in General settings → Language. Changes apply immediately while preserving expanded diffs, comment drafts, and unsaved repository edits. Plugin notices and recognized error explanations switch language as well; paths, code, and user input keep their original text.
+- **Narrow-container support**: In a half-width sidebar, turn headers wrap and secondary details such as line statistics and Open in editor yield space, keeping filenames and undo actions visible.
+- **Style isolation**: CSS Modules and the host's `--dsw-alias-*` theme tokens keep styles isolated from the conversation area and other plugins.
+
+## Installation
+
+Supported versions: **DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
+
+The public package is named `dsh-file-review-tab-multi-git-repository-0.1.1.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+
+### DeepSeek Harness Desktop
+
+For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
+
+```powershell
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.1.tgz"
+```
+
+Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open Multi-repository management at the top of the session, and open File review from the ＋ menu in the better-sidebar sidebar.
+
+### Standalone Web Profile
+
+Once the Release is published, install from the version-specific package URL:
+
+```sh
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.1/dsh-file-review-tab-multi-git-repository-0.1.1.tgz
+```
+
+You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
+
+```sh
+dsh plugin --profile web add github:wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
+```
+
+If hot reloading is disabled, restart `dsh web` after installation. For older host versions, refer to the upstream `dsh-file-review-tab` compatibility notes.
+
+### Desktop directory picker starting-path adapter
+
+The native directory picker in Desktop 0.2.0-rc.2 does not accept a starting path. To make Open start at the entered path, install the plugin, fully exit Desktop, then run the bundled compatibility script in PowerShell. Change the second argument if Desktop is installed elsewhere:
+
+```powershell
+node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-multi-git-repository\scripts\patch-desktop-directory-picker.mjs" "D:\app\DeepSeekHarnessDesktop\resources\app.asar"
+```
+
+The adapter only adds a starting-path parameter to the native directory picker. It preserves existing window and sender checks and creates an `app.asar.dsh-directory-picker-*.bak` backup beside the original file. The script can be run repeatedly and stops for unsupported Desktop builds. Recheck the adapter after updating Desktop. Installing the `.tgz` alone does not modify the host.
+
+## Public releases and plugin marketplace inclusion
+
+**Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
+
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the complete `v0.1.1` packaging, push, and Release workflow. The [Release notes](docs/releases/v0.1.1.md) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. These supporting documents are in Chinese.
+
+The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
+
+## Switching review scopes
+
+The dropdown beside the File review title defaults to **Last turn**. Available scopes are:
+
+- **Last turn / This session**: Tool-produced changes from the latest turn or the entire session, with undo and reapply. If the latest turn changed no files, the view is empty; it does not fall back to an earlier turn.
+- **Pending review**: Unconfirmed tool-produced changes in the current session, grouped by turn. For example, after five turns of edits, confirming the first three with Confirm turn leaves only turns four and five in this scope. Confirmation applies to the whole turn across all repositories. A turn must finish before it can be confirmed. This session and Last turn show a confirmed marker, with Undo confirmation to return the turn to Pending review. Confirmations are stored locally per session; they do not change files or Git state and do not clear review comments. If additional changes are recorded for the same turn later, it becomes pending again. This scope retains safe undo and reapply. Older unconfirmed turns load ten at a time through Load more, rather than going into the collapsed archive.
+- **Uncommitted**: The combined diff from HEAD to the current worktree, including untracked files.
+- **Unstaged**: The diff from the index to the worktree, including untracked files.
+- **Staged**: The diff from HEAD to the index.
+- **Committed**: Changes in a commit relative to its first parent. After selecting a specific repository, choose from its latest 50 commits. All repositories defaults to each repository's latest commit.
+- **Branch**: Committed changes from the merge base with the selected branch to the current HEAD. After selecting a specific repository, choose a local or remote branch. All repositories automatically selects each repository's default branch or another comparable branch. A message is shown when no comparison branch is available.
+
+Git scopes use the project's repository configuration and the current session's temporary repositories. Filter by repository, expand line diffs, or open files in the editor. New, deleted, and renamed files are supported. Binary files, symbolic links, and untracked files larger than 2 MiB display an explanation. Git scopes are read-only: they do not stage, commit, switch branches, or undo changes. Use the refresh action in the upper-right corner to reread disk state.
+
+Git context comes from the actual versions in the selected comparison, including the original code for historical commits. PTC / Code Mode can expand the full recorded before/after content. If a historical standard-tool turn recorded only a partial diff, missing content is marked as not recorded; current disk content is never substituted for a historical version. Expanding context does not change the original undo diff or comment anchors. Copy diff still copies the compact diff with three context lines.
+
+## Submitting file review comments
+
+Expand a diff in Last turn, This session, Pending review, Uncommitted, or Unstaged. Hover over the left side of a code line, click **＋**, enter an opinion, then click the comment action, or press Ctrl+Enter. Added lines reference new-version line numbers; deleted lines reference old-version line numbers. Use the comment action beside a file to comment on the whole file, including files without an available text diff.
+
+Adding a comment saves a pending draft. The top review comments button lets you view, edit, and delete opinions from different files and scopes together. After finishing edits, submit the comments as a single message to the Agent in the session associated with the file review. The existing conversation input draft is preserved. If the Agent is busy, the message is queued for the next turn. Failed submissions retain pending comments; successful submissions clear only the submitted batch. Submitted content remains visible in the conversation.
+
+Comments are stored locally per session and remain available after changing scopes, filtering repositories, or restarting. They are not written to `dsh-file-review-repositories.json`. Last turn, This session, and Pending review share comments for the same turn. When diff content changes, existing comments retain their original references and show a notice instead of moving automatically to another code line. The submitted message asks the Agent to verify the current file content before acting on those comments.
+
+## Configuring a multi-repository project
+
+Open a session for the target project and select **Multi-repository management** beside the conversation and trace tabs. The session determines the current project directory and name; they cannot be edited here. Each project maintains its own configuration file.
+
+1. If the project has no configuration file, **Reload saved configuration** is disabled and the save action reads **Generate new configuration file**. Click **Add repository** and enter its name and path. Each row's **Open** action starts from that row's existing valid directory, accepting both project-relative and absolute paths. Empty, nonexistent, or non-directory paths fall back to the current project directory. Selected directories inside the project become relative paths; directories outside it remain absolute. **Remove** asks for confirmation and removes only the list entry, leaving the directory on disk intact. Checkboxes control whether multi-repository management is enabled and whether files in the project root are reviewed as well.
+2. Click **Generate new configuration file**. The plugin creates `dsh-file-review-repositories.json` in the current project root and shows the Git status of each repository below. The action then changes to **Save configuration**, and reloading becomes available. The root is shown as `.`, and child repositories use relative paths such as `project/PluginManager`.
+3. Subsequent sessions in the project or its subdirectories automatically discover and read this file. It can be kept with the project or committed to Git. **Projects without this file do not enable multi-repository scope** and continue to review using the original session directory.
+
+Example configuration:
+
+```json
+{
+  "version": 1,
+  "includeProjectRoot": true,
+  "repositories": [
+    { "name": "PluginManager", "path": "project/PluginManager" },
+    { "name": "ThirdPartyManager", "path": "project/ThirdPartyManager" }
+  ]
+}
+```
+
+Repository paths are resolved relative to the **current project root**. Only repositories inside the project are saved as relative paths. Repositories outside it, including parent or sibling directories on the same drive and directories on other drives, are shown as absolute paths and marked temporary. They are used only in the current session and **are not written to the configuration file**. The temporary badge appears on the right side of the path input; hovering over it shows the full explanation. It does not increase row height, keeping inputs and action buttons aligned. Manually entered `../` paths that point outside the project are also converted to absolute paths. Junctions pointing outside the project are not saved either. The plugin does not clone, pull, or modify repositories. After editing the configuration file directly, click **Reload saved configuration** to load the new content.
+
+If an older Profile contains `submodules.ini`, `.gitmodules`, or another repository manifest, opening the management page imports recognized repositories as editable rows for explicit migration. The old Profile entry alone does not enable multi-repository scope. After the first save, the new configuration file takes over and the old manifest is no longer a dependency. For example, ProjectManager's `submodules.ini` is used only for a one-time migration. New projects need no repository manifest.
+
+Files inside the project root are reviewed by default. Disable the corresponding option if you only want to maintain the listed child repositories. Sessions in the project root or its subdirectories automatically use the nearest project configuration file. Temporary external repositories belong only to the session that added them and do not affect other projects or sessions. Unconfigured sessions retain the original session-directory scope.
+
+Undo and reapply are restricted to the currently matched project scope. The Host checks real paths and rejects attempts to cross the permitted boundaries through symbolic links or directory junctions. New files, deletions, conflicts, and files without complete diffs retain the original handling rules.
+
+## Development validation
+
+Use Node.js 24 and pnpm 11, and first run `pnpm install --frozen-lockfile` to install the locked dependencies. Some tests import `.ts` files directly, while others import `lib/index.js`. Keep source code and `lib/` synchronized when developing features.
+
+```powershell
+pnpm typecheck
+pnpm build
+node --test tests/*.test.mjs
+```
+
+Tests use temporary repository directories and cover separate projects, INI/JSON manifests, external repositories, path deduplication, Windows path recognition, real-path boundaries for undo, Git worktree/index comparisons, historical commits, branches, new files, renames, deletions, and repositories without HEAD. They do not modify the actual project repositories.
+
+Tests require neither Desktop nor the maintainer's project directories. Git integration tests require `git` on PATH. Link-boundary tests require a writable system temporary directory and permission to create directory links. Personal Git configuration is not yet fully isolated, so cross-platform results must be verified on the relevant platforms; passing on one machine does not establish support everywhere. See the [Architecture guide's validation notes](docs/ARCHITECTURE.md#102-验证能力与当前仓库情况) (Chinese) for environment requirements and planned improvements. `tests/` is development source and belongs in Git; it is excluded from the installation package.
+
+## Acknowledgments
+
+This plugin modifies and extends [Lzh3070/dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab). Thanks to its author for the file review sidebar tab, conversation review row, and related foundations.
+
+The upstream core diff renderer and undo service originate from [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review) (MIT License, © ZhangWenChao). Sidebar integration uses the public `ctx.betterSidebar` registration API provided by [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar).
+
+## License
+
+[MIT](./LICENSE)

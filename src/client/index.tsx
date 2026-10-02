@@ -145,7 +145,7 @@ function badgeCount(ctx: Context, sessionId: string): number | null {
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
-  attachLocale(ctx.locale)
+  ctx.effect(() => attachLocale(ctx.locale), 'file-review-tab: follow host language')
   ctx.effect(() => {
     const offZh = ctx.locale.register(LOCALE_NS, 'zh', zh)
     const offEn = ctx.locale.register(LOCALE_NS, 'en', en)

@@ -265,24 +265,45 @@ export const en: Record<CopyKey, string> = {
   repoSettingsHint: 'Configure repository sources and scope in this conversation’s Multi-repository management tab',
 }
 
-/** The DSH locale service attached by the client apply (absent → browser detection). */
-let localeService: { getSnapshot(): { active: string } } | undefined
+export interface ReviewLocaleSource {
+  getSnapshot(): { active: string }
+  subscribe?(listener: () => void): () => void
+}
+export type ReviewLocale = 'zh' | 'en'
+const localeListeners = new Set<() => void>()
+let localeAttachment: { service: ReviewLocaleSource | undefined; unsubscribe?: (() => void) | undefined } | undefined
+const notifyLocale = () => { for (const listener of localeListeners) listener() }
 
-/** Attach (or detach, with undefined) the DSH locale service. */
-export function attachLocale(service: { getSnapshot(): { active: string } } | undefined): void {
-  localeService = service
+/** Follow the host's General settings language; dispose on plugin disable/HMR. */
+export function attachLocale(service: ReviewLocaleSource | undefined): () => void {
+  localeAttachment?.unsubscribe?.()
+  const attachment = { service, unsubscribe: service?.subscribe?.(notifyLocale) }
+  localeAttachment = attachment
+  notifyLocale()
+  return () => {
+    if (localeAttachment !== attachment) return
+    attachment.unsubscribe?.()
+    localeAttachment = undefined
+    notifyLocale()
+  }
+}
+
+export function subscribeLocale(listener: () => void): () => void {
+  localeListeners.add(listener)
+  return () => { localeListeners.delete(listener) }
 }
 
 /** The active locale id ('zh' | 'en'): the DSH locale service's snapshot when attached. */
-function activeLocale(): string {
-  return localeService?.getSnapshot().active
+export function getLocaleSnapshot(): ReviewLocale {
+  const active = localeAttachment?.service?.getSnapshot().active
     ?? (typeof navigator !== 'undefined' ? navigator.language : '')
     ?? 'en'
+  return active.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
 /** Translate a copy key; `{name}` placeholders interpolate from `params`. */
 export function t(key: CopyKey, params?: Record<string, string | number>): string {
-  const dict = activeLocale().toLowerCase().startsWith('zh') ? zh : en
+  const dict = getLocaleSnapshot() === 'zh' ? zh : en
   let text: string = dict[key]
   if (params !== undefined) {
     for (const [name, value] of Object.entries(params)) {
