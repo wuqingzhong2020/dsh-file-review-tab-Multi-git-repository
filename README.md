@@ -8,6 +8,8 @@
 
 开始开发或排查问题前，请先阅读 [整体架构与开发接入指南](docs/ARCHITECTURE.md)。该文档说明 Host/Client 边界、两条差异数据链路、多仓库配置、通信契约、状态存储、文件操作边界以及常见修改入口；本文作为工程入口，后续引用 README 时也请一并参考架构文档。
 
+发布维护者另请阅读 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中说明 GitHub 源码推送、预构建安装包上传和市场收录申请。
+
 ## 功能
 
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
@@ -28,36 +30,53 @@
 
 ## 安装
 
+适配版本：**DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
+
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.1.0.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+
+### DeepSeek Harness Desktop
+
+对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
+
+```powershell
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.0.tgz"
+```
+
+维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；在会话顶部打开「多代码仓管理」，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。
+
+### 独立 Web Profile
+
+Release 发布后，可从固定版本的安装包 URL 安装：
+
 ```sh
-# 普通 dsh Profile
-dsh plugin --profile desktop add dsh-file-review-tab-multi-git-repository
-
-# 从 GitHub 安装
-dsh plugin --profile desktop add github:wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
-
-# 独立 Web Profile
-dsh plugin --profile web add dsh-file-review-tab-multi-git-repository
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.0/dsh-file-review-tab-multi-git-repository-0.1.0.tgz
 ```
 
-对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-file-contents.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
+也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
+
+```sh
+dsh plugin --profile web add github:wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
+```
+
+未启用热重载时，安装后重启 `dsh web`。旧版宿主请参考上游 `dsh-file-review-tab` 的版本适配说明。
+
+### Desktop 目录选择起始路径适配
+
+Desktop 0.2.0-rc.2 原生目录选择接口不接收起始路径。要让「打开」按填写的路径定位，安装插件后完全退出 Desktop，在 PowerShell 中运行包内兼容脚本；宿主安装在其他位置时，请修改第二个参数：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-file-contents.tgz"
+node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-multi-git-repository\scripts\patch-desktop-directory-picker.mjs" "D:\app\DeepSeekHarnessDesktop\resources\app.asar"
 ```
 
-桌面版安装后请重启应用，让 Host 与 Web 插件重新加载。确认 `package.json` 使用 `dsh-better-sidebar` **0.24.1**；在会话顶部打开「多代码仓管理」，在侧边栏打开「文件审查」。
+适配只为原生目录选择增加起始路径参数，保留现有窗口及来源验证，并在原文件旁备份 `app.asar.dsh-directory-picker-*.bak`。脚本可重复运行；不匹配的 Desktop 构建会停止。Desktop 更新后需要重新检查适配。安装 `.tgz` 本身不会自动修改宿主。
 
-Desktop 0.2.0-rc.2 原生目录选择接口不接收起始路径。要让「打开」按填写的路径定位，关闭 Desktop 后，在本仓库目录运行一次兼容适配：
+## 公开发布与插件市场收录
 
-```powershell
-node scripts/patch-desktop-directory-picker.mjs "D:\app\DeepSeekHarnessDesktop\resources\app.asar"
-```
+**npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-适配只为原生目录选择增加起始路径参数，保留现有窗口及来源验证，并在原文件旁备份 `app.asar.dsh-directory-picker-*.bak`。脚本可重复运行；不匹配的 Desktop 构建会停止。Desktop 更新后需要重新检查适配。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供 `v0.1.0` 的打包、推送与 Release 发布步骤；另有 [本版本发布说明](docs/releases/v0.1.0.md) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
-前置依赖：DeepSeek Harness 桌面版 / Web **0.2.0-rc.2** + [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) **0.24.1**。本版本针对这组接口构建并完成静态检查；旧版宿主请使用旧包 `dsh-file-review-tab@0.5.x`（DSH 0.1.5）或 `@0.4.1`（更早版本）。
-
-在桌面版中，安装的新组合包通常会由热重载自动加载；若侧栏未出现「文件审查」，请重启桌面版。独立 Web Profile 若未启用热重载，则需重启 `dsh web`。加载后，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。会话范围列出文件工具（包括 `run_code` 子调用）记录的改动；Git 范围也可查看终端、编辑器等产生的改动。
+插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
 ## 切换审查范围
 
@@ -114,6 +133,8 @@ Git 范围的上下文来自所选比较的真实版本，查看历史提交时�
 
 ## 开发验证
 
+建议开发人员统一使用 Node.js 24、pnpm 11，并先运行 `pnpm install --frozen-lockfile` 安装锁定依赖。部分测试直接导入 `.ts`，另一些导入 `lib/index.js`，功能开发时需保持源码与 `lib/` 同步。
+
 ```powershell
 pnpm typecheck
 pnpm build
@@ -121,6 +142,8 @@ node --test tests/*.test.mjs
 ```
 
 测试使用临时仓库目录，覆盖不同项目、INI/JSON 清单、外部仓库、路径去重、Windows 路径识别、撤销的真实路径边界，以及 Git 工作区/暂存区、历史提交、分支、新文件、重命名、删除和无 HEAD 仓库；不改动实际工程仓库。
+
+测试不要求安装 Desktop，也不依赖维护者的工程目录。Git 集成测试要求 `git` 可从 PATH 调用；链接边界测试要求系统临时目录可写并允许创建目录链接。个人 Git 配置尚未完全隔离，跨平台通过情况需要实际验证，不能仅凭本机结果保证。详细环境条件与后续改进见[架构文档的验证说明](docs/ARCHITECTURE.md#102-验证能力与当前仓库情况)。`tests/` 是开发源码，应纳入 Git；安装包不包含测试目录。
 
 ## 致谢
 

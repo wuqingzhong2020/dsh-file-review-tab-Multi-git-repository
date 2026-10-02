@@ -42,7 +42,8 @@
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
     "scripts/patch-desktop-directory-picker.mjs",
-    "README.md"
+    "README.md",
+    "docs/"
   ],
   "dsh": {
     "bundle": {

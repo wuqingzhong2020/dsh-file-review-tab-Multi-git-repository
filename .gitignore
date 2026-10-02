@@ -1,7 +1,30 @@
+# Dependencies and local caches
 node_modules/
+.pnpm-store/
+.cache/
+*.tsbuildinfo
+
+# Release assets: upload to GitHub Release, do not commit
+/dist/
 *.tgz
-*.log
-.DS_Store
+*.tgz.sha256
+
+# Generated test reports (keep tests/ source files)
 coverage/
-dist/
-tests/
+.nyc_output/
+
+# Logs, temporary files and local backups
+*.log
+*.bak
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep lib/ tracked for the current GitHub source-install workflow.

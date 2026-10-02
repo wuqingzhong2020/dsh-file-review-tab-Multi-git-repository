@@ -361,7 +361,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 以下命令供后续功能开发使用；**仅补充文档时不需要编译或测试插件**：
 
 ~~~powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm build
 ~~~
@@ -374,7 +374,17 @@ pnpm build
 
 本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`package.json` 当前没有 `test` 脚本。
 
-**当前 [.gitignore](../.gitignore) 忽略了 `tests/`。** 新克隆工程可能没有这些本地测试文件，接手时应先确认是否获得测试目录，再执行以下命令；不能把「没有测试文件」当成测试通过。
+`tests/` 不再被 [.gitignore](../.gitignore) 忽略，应与源码一并提交。已有本地测试文件在移除忽略规则后会显示为未跟踪；提交并推送后，其他开发人员才能在克隆中获得它们。测试创建的临时仓库位于系统临时目录，`coverage/` 等生成报告继续忽略。接手时应确认测试文件齐全，不能把「没有测试文件」当成测试通过。
+
+测试没有绑定维护者的工程目录或 Desktop 安装目录。路径样例中的 `D:/Projects/App` 等字符串用于验证 Windows 路径规则，不要求开发人员具备相同的盘符或目录；Desktop 桥接和 ASAR 补丁测试使用模拟对象及内存数据，不需要启动或修改桌面应用。
+
+接手时仍需确认以下环境条件：
+
+- **运行时与依赖**：建议统一使用 Node.js 24、pnpm 11，并通过 `pnpm install --frozen-lockfile` 安装锁定依赖。测试直接导入 `.ts`，旧 Node 版本可能无法执行；`directory-start`、`git-review` 和 `repository-workspace` 测试还导入 `lib/index.js`，功能变更后需先同步产物。
+- **Git**：`git-review.test.mjs` 会在临时目录调用 PATH 中的 `git`，创建仓库和本地提交，不需要 GitHub 账号。测试已指定提交身份并关闭提交签名，但尚未完全隔离系统/全局 Git 配置，例如全局忽略规则、属性、钩子和仓库模板可能影响结果。
+- **文件系统**：系统临时目录需要可写；`repository-workspace.test.mjs` 的越界验证会在 Windows 创建目录联接，在其他系统创建符号链接，环境需允许对应操作。
+
+这些条件说明测试并非仅供维护者本机使用，也不等于已验证所有平台。后续完善可移植性时，应先隔离 Git 集成测试的配置和模板，再在 Windows/Linux CI 中执行相同的依赖安装、构建和测试流程；不能以忽略整个 `tests/` 代替验证。纯数据模型测试与 Git/链接集成测试失败时，需分别排查业务逻辑和环境条件。
 
 ~~~powershell
 node --test tests/*.test.mjs
@@ -390,11 +400,11 @@ node --test tests/*.test.mjs
 pnpm pack --pack-destination dist
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.0.tgz`；README 中带功能后缀的 tgz 是具体本地安装包命名，不是 `pnpm pack` 自动生成的名称。同版本反复安装可给打包文件增加唯一后缀，以便明确本次安装的产物。
+默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.0.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 
-`package.json` 的 `files` 当前包含运行产物、补丁、兼容脚本和 README，**不包含 `docs/`**；本文目前随源码仓库维护。若将来要求随 npm 包提供开发文档，需要另行调整发布文件列表。
+`package.json` 的 `files` 包含运行产物、补丁、兼容脚本、README 和 `docs/`。预构建安装包同时提供架构及发布文档，README 中的相对文档链接可以在包内继续使用。
 
 ### 10.4 常见修改入口
 
