@@ -35,6 +35,8 @@ import type { GitReviewMode } from '../git-review-types.ts'
 import { ReviewCommentsProvider, ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
 import { confirmationStoreFor, isTurnConfirmed, pendingTurnChanges } from './review-confirmations.ts'
+import { groupReviewFiles } from './review-repository-groups.ts'
+import { ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
 
 type ReviewMode = 'session' | 'last-turn' | 'pending' | GitReviewMode
 
@@ -636,6 +638,12 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
 
   /** Render one turn group (latest turn first). */
   const renderTurn = (turn: TurnFileChanges) => {
+    const repositoryGroups = groupReviewFiles(turn.files, file => {
+      const repository = ownerOf(file.path)
+      return repository ? { key: repository.path, name: repository.name, path: repository.path }
+        : workspace?.project ? { key: '?', name: t('repoOther'), path: '' }
+          : { key: cwd ?? '?', name: basename(cwd ?? '') || t('repoOther'), path: cwd ?? '' }
+    })
     const fullTurn = turns.find(item => item.turn === turn.turn) ?? turn
     const confirmed = isTurnConfirmed(fullTurn, confirmationSnapshot.confirmed)
     const turnStats = turn.files.reduce<UnifiedDiffStats>(
@@ -693,9 +701,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
             </button>
           </div>
         </header>
-        <ul className={css.fileList}>
-          {turn.files.map(file => renderFile(turn, file))}
-        </ul>
+        {repositoryGroups.map(group => <ReviewRepositoryGroup key={`${sessionId}:${turn.turn}:${group.key}`} name={group.name} path={group.path} count={group.files.length}>
+          <ul className={css.fileList}>{group.files.map(file => renderFile(turn, file))}</ul>
+        </ReviewRepositoryGroup>)}
       </section>
     )
   }
@@ -741,8 +749,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           }}
         >
           <Chevron open={isOpen} />
-          {repository !== undefined && <span className={css.repositoryBadge} title={repository.path}>{repository.name}</span>}
-          <span className={css.fileName}>{repository === undefined ? basename(file.path) : repositoryRelativePath(resolveSessionPath(cwd, file.path), repository)}</span>
+          <span className={css.fileName}>{commentTarget.path}</span>
           {file.deleted === true
             ? <span className={css.deletedBadge}>{t('deleted')}</span>
             : <Stats stats={stats} />}
@@ -787,15 +794,16 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
                   ? <p className={css.diffUnavailable}>{t('unavailable')}</p>
                   : (
                   <UnifiedDiff
-                    diffs={file.diffs}
+                    diffs={file.reviewDiffs ?? file.diffs}
                     contextLines={3}
                     showCopyButton
                     showFileHeaders={false}
                     labels={{
                       copy: t('copy'),
                       copied: t('copied'),
-                      showUnchanged: count => t('showUnchanged', { count }),
-                      hideUnchanged: count => t('hideUnchanged', { count }),
+                      expandContext: (count, remaining) => t('expandContext', { count, remaining }),
+                      collapseContext: t('collapseContext'),
+                      unavailableContext: count => t('unavailableContext', { count }),
                     }}
                     className={css.reviewDiff}
                     reviewTarget={commentTarget}

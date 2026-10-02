@@ -10,6 +10,8 @@ import { resolveSessionPath } from './session-changes.ts'
 import css from './FileReviewTab.module.css'
 import { ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
+import { groupReviewFiles } from './review-repository-groups.ts'
+import { ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
 
 interface GitRemote {
   gitReview(request: GitReviewRequest): Promise<RemoteResult<GitReviewResult>>
@@ -62,6 +64,10 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
   const selected = data?.repositories.find(repo => repo.path === repository)
   const totals = data?.files.reduce((stats, file) => ({ added: stats.added + file.added, removed: stats.removed + file.removed }), { added: 0, removed: 0 })
   const refsMode = mode === 'commit' || mode === 'branch'
+  const repositoryGroups = groupReviewFiles(data?.files ?? [], file => ({
+    key: file.repository, path: file.repository,
+    name: data?.repositories.find(repo => repo.path === file.repository)?.name ?? file.repository,
+  }))
   return <div className={css.gitPanel}>
     <div className={css.repositoryBar}>
       <select aria-label={t('repository')} value={repository} onChange={event => { setRepository(event.target.value); setRef('') }}>
@@ -84,7 +90,8 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
         : !error && data && !data.files.length ? <p className={css.empty}>{t(data.repositories.length ? 'reviewGitEmpty' : 'reviewNoGit')}</p> : null}
       {!loading && !error && data && data.files.length > 0 && <section className={css.turnGroup}>
         <header className={css.turnHeader}><span className={css.turnTitle}>{t('reviewFiles', { count: data.files.length })}</span></header>
-        <ul className={css.fileList}>{data.files.map(file => {
+        {repositoryGroups.map(group => <ReviewRepositoryGroup key={`${sessionId}:${mode}:${group.key}`} name={group.name} path={group.path} count={group.files.length}>
+        <ul className={css.fileList}>{group.files.map(file => {
           const key = keyOf(file); const open = expanded.has(key); const diff = diffs.get(key)
           const repo = data.repositories.find(item => item.path === file.repository)
           const commentTarget: ReviewCommentTarget | undefined = mode === 'uncommitted' || mode === 'unstaged' ? {
@@ -94,7 +101,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
           return <li className={css.fileItem} key={key}>
             <div className={css.fileRow}>
               <button className={css.gitFileName} type="button" aria-expanded={open} title={file.path} onClick={() => { toggle(file) }}>
-                <span>{open ? '⌄' : '›'}</span><span className={css.repositoryBadge} title={file.repository}>{repo?.name}</span><span className={css.fileName}>{file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}</span>
+                <span>{open ? '⌄' : '›'}</span><span className={css.fileName}>{file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}</span>
               </button>
               <span className={css.stateBadge}>{file.status}</span>
               {file.binary ? <span className={css.stateBadge}>{t('reviewBinary')}</span> : <span className={css.stats}><span className={css.added}>+{file.added}</span><span className={css.removed}>-{file.removed}</span></span>}
@@ -106,10 +113,11 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
             </div>
             <ReviewFileCommentThread target={commentTarget} />
             {open && <div className={css.diffWrap}>{diff === null || diff === undefined ? <p>{t('reviewLoading')}</p> : typeof diff === 'string' ? <p role="alert">{diff}</p>
-              : diff.diffs.length ? <UnifiedDiff diffs={diff.diffs} reviewTarget={commentTarget} contextLines={3} showCopyButton showFileHeaders={false} labels={{ copy: t('copy'), copied: t('copied'), showUnchanged: count => t('showUnchanged', { count }), hideUnchanged: count => t('hideUnchanged', { count }) }} />
+              : diff.diffs.length ? <UnifiedDiff diffs={diff.diffs} reviewTarget={commentTarget} contextLines={3} showCopyButton showFileHeaders={false} labels={{ copy: t('copy'), copied: t('copied'), expandContext: (count, remaining) => t('expandContext', { count, remaining }), collapseContext: t('collapseContext'), unavailableContext: count => t('unavailableContext', { count }) }} />
                 : <p>{diff.binary ? t('reviewBinaryHint') : t('reviewMetadataOnly')}{diff.note ? ` (${diff.note})` : ''}</p>}</div>}
           </li>
         })}</ul>
+        </ReviewRepositoryGroup>)}
       </section>}
     </div>
   </div>

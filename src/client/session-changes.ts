@@ -22,6 +22,8 @@ import { diffsFromBeforeAfter } from './recorded-diffs.ts'
 export interface SessionFileChange {
   readonly path: string
   readonly diffs: readonly ProducedFileDiff[]
+  /** Full recorded versions for display only; safe undo keeps the original hunks. */
+  readonly reviewDiffs?: readonly ProducedFileDiff[]
   /** Terminal commands deleted this path in this turn (display-only). */
   readonly deleted?: true
 }
@@ -37,6 +39,7 @@ export interface TurnFileChanges {
 /** Internal per-path accumulator: hunk list plus the last deletion state. */
 interface FileAccumulator {
   diffs: ProducedFileDiff[]
+  reviewDiffs?: ProducedFileDiff[]
   deleted?: true
 }
 
@@ -260,6 +263,7 @@ export function mergeRecordedTurns(
     for (const file of turn.files) {
       files.set(file.path, {
         diffs: [...file.diffs],
+        ...(file.reviewDiffs ? { reviewDiffs: [...file.reviewDiffs] } : {}),
         ...(file.deleted === true ? { deleted: true as const } : {}),
       })
     }
@@ -276,9 +280,13 @@ export function mergeRecordedTurns(
     for (const mutation of mutations) {
       const diffs = diffsFromBeforeAfter(mutation.path, mutation.before, mutation.after)
       if (diffs.length === 0) continue
+      const full = { path: mutation.path, oldText: mutation.before, newText: mutation.after, oldStart: 1, newStart: 1 }
       const existing = group.files.get(mutation.path)
-      if (existing === undefined) group.files.set(mutation.path, { diffs: [...diffs] })
-      else existing.diffs.push(...diffs)
+      if (existing === undefined) group.files.set(mutation.path, { diffs: [...diffs], reviewDiffs: [full] })
+      else {
+        existing.reviewDiffs = [...(existing.reviewDiffs ?? existing.diffs), full]
+        existing.diffs.push(...diffs)
+      }
     }
   }
   return [...groups.entries()]
@@ -289,6 +297,7 @@ export function mergeRecordedTurns(
       files: [...group.files.entries()].map(([path, own]) => ({
         path,
         diffs: own.diffs,
+        ...(own.reviewDiffs ? { reviewDiffs: own.reviewDiffs } : {}),
         ...(own.deleted === true ? { deleted: true as const } : {}),
       })),
     }))

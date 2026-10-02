@@ -1,16 +1,13 @@
 import type { ProducedFileDiff as DiffHunk } from '../change-types.ts';
 import { type ReviewCommentTarget } from './review-comments.ts';
-/** Locale labels required by the review diff. */
+export { summarizeDiffs, unifiedDiffText } from './unified-diff-model.ts';
+export type { UnifiedDiffStats } from './unified-diff-model.ts';
 export interface UnifiedDiffLabels {
     readonly copy: string;
     readonly copied: string;
-    readonly showUnchanged: (count: number) => string;
-    readonly hideUnchanged: (count: number) => string;
-}
-/** Added and removed line totals derived from the same hunks the viewer renders. */
-export interface UnifiedDiffStats {
-    readonly added: number;
-    readonly removed: number;
+    readonly expandContext: (count: number, remaining: number) => string;
+    readonly collapseContext: string;
+    readonly unavailableContext: (count: number) => string;
 }
 interface UnifiedDiffProps {
     readonly diffs: readonly DiffHunk[];
@@ -21,15 +18,6 @@ interface UnifiedDiffProps {
     readonly showFileHeaders?: boolean | undefined;
     readonly reviewTarget?: ReviewCommentTarget | undefined;
 }
-/** Serialize recorded hunks as one plain-text unified diff. */
-export declare function unifiedDiffText(diffs: readonly DiffHunk[]): string;
-/** Count added and removed lines using the viewer's exact line-diff algorithm. */
-export declare function summarizeDiffs(diffs: readonly DiffHunk[]): UnifiedDiffStats;
-/**
- * Render line-aligned hunks with a single gutter and expandable context gaps.
- * @param props - Unified diff data, locale labels, and presentation options.
- * @returns The line-numbered unified diff surface.
- */
-export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, reviewTarget, }: UnifiedDiffProps): import("react").JSX.Element | null;
-export {};
+/** GitHub-style unified view with two gutters and incremental context expansion. */
+export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, reviewTarget }: UnifiedDiffProps): import("react").JSX.Element | null;
 //# sourceMappingURL=UnifiedDiff.d.ts.map

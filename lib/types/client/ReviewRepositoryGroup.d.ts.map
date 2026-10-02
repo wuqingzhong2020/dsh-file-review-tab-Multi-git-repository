@@ -1,0 +1,1 @@
+{"version":3,"file":"ReviewRepositoryGroup.d.ts","sourceRoot":"","sources":["../../../src/client/ReviewRepositoryGroup.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAmB,KAAK,SAAS,EAAE,MAAM,OAAO,CAAA;AAIvD,wBAAgB,qBAAqB,CAAC,EAAE,IAAI,EAAE,IAAI,EAAE,KAAK,EAAE,QAAQ,EAAE,EAAE;IAAE,IAAI,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAC;IAAC,KAAK,EAAE,MAAM,CAAC;IAAC,QAAQ,EAAE,SAAS,CAAA;CAAE,+BAYxI"}

@@ -373,6 +373,46 @@
   font-size: 12px;
 }
 
+.repositoryGroup + .repositoryGroup {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.repositoryGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 0;
+  background: var(--dsw-alias-background-l2, #f6f8fa);
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.repositoryGroupHeader:hover {
+  background: var(--dsw-alias-border-l1);
+}
+
+.repositoryGroupHeader:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-link-primary, #4d6bfe);
+  outline-offset: -2px;
+}
+
+.repositoryGroupName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.repositoryGroupHeader .turnCount {
+  margin-left: auto;
+}
+
 .archiveLoadMore {
   margin: 0 10px 8px;
   padding: 5px 10px;

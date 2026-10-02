@@ -184,7 +184,9 @@ export async function gitReviewDiff(workspace: ReviewWorkspace, cwd: string, req
     const content = await untrackedText(repo.path, file.path)
     return { diffs: content.binary ? [] : [{ path: resolve(repo.path, file.path), oldText: null, newText: content.text, oldStart: 1, newStart: 1 }], binary: content.binary, note: '' }
   }
-  const patch = await git(repo.path, ['diff', ...diffFlags, ...changes.args, '--unified=3', '--', ...(file.oldPath ? [file.oldPath] : []), file.path])
+  // Keep the actual comparison's full context. The client displays three lines
+  // initially and reveals twenty at a time without reading a different version.
+  const patch = await git(repo.path, ['diff', ...diffFlags, ...changes.args, '--unified=2147483647', '--', ...(file.oldPath ? [file.oldPath] : []), file.path])
   const diffs = parsePatch(patch).flatMap(part => part.hunks.map(hunk => {
     const oldLines: string[] = []; const newLines: string[] = []
     let oldFinal = true; let newFinal = true; let previous = ''

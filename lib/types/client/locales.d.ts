@@ -105,6 +105,9 @@ export declare const zh: {
     readonly copied: "已复制";
     readonly showUnchanged: "显示 {count} 行未更改内容";
     readonly hideUnchanged: "隐藏 {count} 行未更改内容";
+    readonly expandContext: "展开 {count} 行未修改代码（剩余 {remaining} 行）";
+    readonly collapseContext: "收起展开的上下文";
+    readonly unavailableContext: "省略 {count} 行：历史记录未包含这些代码";
     readonly stats: "新增 {added} 行，删除 {removed} 行";
     readonly unavailable: "无法为此更改还原可审查的差异。";
     readonly refresh: "刷新状态";

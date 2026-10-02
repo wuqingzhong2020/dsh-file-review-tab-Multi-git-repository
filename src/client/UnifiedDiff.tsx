@@ -1,50 +1,24 @@
-import { useCallback, useMemo, useState } from 'react'
-import { diffArrays } from 'diff'
+import { useCallback, useMemo, useState, type CSSProperties } from 'react'
 import type { ProducedFileDiff as DiffHunk } from '../change-types.ts'
-import { diffContentLines } from './diff-text.ts'
+import {
+  buildUnifiedHunks, CONTEXT_EXPANSION_LINES, expandContextGap, unifiedDiffText,
+  unifiedHunkRange, unifiedVisibleBlocks, visibleHunkRows,
+  type ContextExpansion, type UnifiedGap, type UnifiedLine,
+} from './unified-diff-model.ts'
 import css from './UnifiedDiff.module.css'
 import { ReviewCommentLine, ReviewOutdatedComments } from './ReviewComments.tsx'
 import { lineCommentAnchor, reviewDiffRevision, type ReviewCommentTarget } from './review-comments.ts'
 
-/** Locale labels required by the review diff. */
+export { summarizeDiffs, unifiedDiffText } from './unified-diff-model.ts'
+export type { UnifiedDiffStats } from './unified-diff-model.ts'
+
 export interface UnifiedDiffLabels {
   readonly copy: string
   readonly copied: string
-  readonly showUnchanged: (count: number) => string
-  readonly hideUnchanged: (count: number) => string
+  readonly expandContext: (count: number, remaining: number) => string
+  readonly collapseContext: string
+  readonly unavailableContext: (count: number) => string
 }
-
-/** Added and removed line totals derived from the same hunks the viewer renders. */
-export interface UnifiedDiffStats {
-  readonly added: number
-  readonly removed: number
-}
-
-type UnifiedLineKind = 'context' | 'del' | 'add'
-
-interface UnifiedLine {
-  readonly kind: UnifiedLineKind
-  readonly oldNumber: number | null
-  readonly newNumber: number | null
-  readonly text: string
-}
-
-interface UnifiedGap {
-  readonly kind: 'gap'
-  readonly id: string
-  readonly lines: readonly UnifiedLine[]
-}
-
-type UnifiedRow = UnifiedLine | UnifiedGap
-
-interface UnifiedHunk {
-  readonly lines: readonly UnifiedLine[]
-  readonly rows: readonly UnifiedRow[]
-  readonly added: number
-  readonly removed: number
-  readonly unchangedBefore: number
-}
-
 interface UnifiedDiffProps {
   readonly diffs: readonly DiffHunk[]
   readonly contextLines: number
@@ -55,157 +29,30 @@ interface UnifiedDiffProps {
   readonly reviewTarget?: ReviewCommentTarget | undefined
 }
 
-function hunkLines(diff: DiffHunk): UnifiedLine[] {
-  const oldLines = diff.oldText === null ? [] : diffContentLines(diff.oldText)
-  const newLines = diffContentLines(diff.newText)
-  const changes = diffArrays(oldLines, newLines)
-  const lines: UnifiedLine[] = []
-  let oldNumber = diff.oldStart ?? 1
-  let newNumber = diff.newStart ?? 1
-
-  for (const change of changes) {
-    if (change.removed) {
-      for (const text of change.value) {
-        lines.push({ kind: 'del', oldNumber, newNumber: null, text })
-        oldNumber++
-      }
-    } else if (change.added) {
-      for (const text of change.value) {
-        lines.push({ kind: 'add', oldNumber: null, newNumber, text })
-        newNumber++
-      }
-    } else {
-      for (const text of change.value) {
-        lines.push({ kind: 'context', oldNumber, newNumber, text })
-        oldNumber++
-        newNumber++
-      }
-    }
-  }
-  return lines
+function ExpandIcon({ direction }: { direction: UnifiedGap['position'] }) {
+  return <svg viewBox="0 0 16 16" aria-hidden="true">
+    {direction !== 'trailing' && <path d="m4 5 4-3 4 3M8 2v4" />}
+    {direction !== 'leading' && <path d="m4 11 4 3 4-3M8 14v-4" />}
+    <path d="M2 8h1m3 0h1m3 0h1m3 0h1" />
+  </svg>
 }
 
-function collapsedRows(lines: readonly UnifiedLine[], contextLines: number, hunkIndex: number): UnifiedRow[] {
-  const rows: UnifiedRow[] = []
-  let cursor = 0
-  let gapIndex = 0
-  while (cursor < lines.length) {
-    const current = lines[cursor]
-    if (current?.kind !== 'context') {
-      if (current !== undefined) rows.push(current)
-      cursor++
-      continue
-    }
-
-    const start = cursor
-    while (cursor < lines.length && lines[cursor]?.kind === 'context') cursor++
-    const run = lines.slice(start, cursor)
-    const leading = start === 0
-    const trailing = cursor === lines.length
-    const hiddenStart = leading ? 0 : Math.min(contextLines, run.length)
-    const hiddenEnd = trailing
-      ? run.length
-      : Math.max(hiddenStart, run.length - contextLines)
-
-    rows.push(...run.slice(0, hiddenStart))
-    const hidden = run.slice(hiddenStart, hiddenEnd)
-    if (hidden.length > 0) {
-      rows.push({ kind: 'gap', id: `${hunkIndex}:${gapIndex}`, lines: hidden })
-      gapIndex++
-    }
-    rows.push(...run.slice(hiddenEnd))
-  }
-  return rows
-}
-
-function buildHunks(diffs: readonly DiffHunk[], contextLines: number): UnifiedHunk[] {
-  let previousPath: string | undefined
-  let previousOldEnd = 1
-  let previousNewEnd = 1
-  return diffs.map((diff, index) => {
-    const lines = hunkLines(diff)
-    const oldCount = lines.filter(line => line.oldNumber !== null).length
-    const newCount = lines.filter(line => line.newNumber !== null).length
-    const oldStart = diff.oldStart ?? 1
-    const newStart = diff.newStart ?? 1
-    const hasStarts = diff.oldStart !== undefined && diff.newStart !== undefined
-    const unchangedBefore = hasStarts
-      ? Math.max(0, Math.min(
-        oldStart - (diff.path === previousPath ? previousOldEnd : 1),
-        newStart - (diff.path === previousPath ? previousNewEnd : 1),
-      ))
-      : 0
-    previousPath = diff.path
-    previousOldEnd = oldStart + oldCount
-    previousNewEnd = newStart + newCount
-    return {
-      lines,
-      rows: collapsedRows(lines, contextLines, index),
-      added: lines.filter(line => line.kind === 'add').length,
-      removed: lines.filter(line => line.kind === 'del').length,
-      unchangedBefore,
-    }
-  })
-}
-
-/** Serialize recorded hunks as one plain-text unified diff. */
-export function unifiedDiffText(diffs: readonly DiffHunk[]): string {
-  let previousPath: string | undefined
-  const output: string[] = []
-  for (const diff of diffs) {
-    if (diff.path !== previousPath) output.push(diff.path)
-    else output.push(`@@ -${diff.oldStart ?? 1} +${diff.newStart ?? 1} @@`)
-    previousPath = diff.path
-    for (const line of hunkLines(diff)) {
-      const prefix = line.kind === 'del' ? '-' : line.kind === 'add' ? '+' : ' '
-      output.push(`${prefix} ${line.text}`)
-    }
-  }
-  return output.join('\n')
-}
-
-/** Count added and removed lines using the viewer's exact line-diff algorithm. */
-export function summarizeDiffs(diffs: readonly DiffHunk[]): UnifiedDiffStats {
-  let added = 0
-  let removed = 0
-  for (const diff of diffs) {
-    for (const line of hunkLines(diff)) {
-      if (line.kind === 'add') added++
-      if (line.kind === 'del') removed++
-    }
-  }
-  return { added, removed }
-}
-
-function lineNumbers(line: UnifiedLine): string {
-  const oldNumber = line.oldNumber === null ? '' : String(line.oldNumber)
-  const newNumber = line.newNumber === null ? '' : String(line.newNumber)
-  return `${oldNumber}, ${newNumber}`
-}
-
-function lineNumber(line: UnifiedLine): number | null {
-  return line.kind === 'del' ? line.oldNumber : line.newNumber
-}
-
-/**
- * Render line-aligned hunks with a single gutter and expandable context gaps.
- * @param props - Unified diff data, locale labels, and presentation options.
- * @returns The line-numbered unified diff surface.
- */
-export function UnifiedDiff({
-  diffs,
-  contextLines,
-  labels,
-  className,
-  showCopyButton = true,
-  showFileHeaders = true,
-  reviewTarget,
-}: UnifiedDiffProps) {
-  const hunks = useMemo(() => buildHunks(diffs, contextLines), [contextLines, diffs])
+/** GitHub-style unified view with two gutters and incremental context expansion. */
+export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton = true, showFileHeaders = true, reviewTarget }: UnifiedDiffProps) {
+  const hunks = useMemo(() => buildUnifiedHunks(diffs, contextLines), [contextLines, diffs])
   const revision = useMemo(() => reviewDiffRevision(diffs), [diffs])
-  const [expandedGaps, setExpandedGaps] = useState<ReadonlySet<string>>(() => new Set())
+  const [progress, setProgress] = useState<{ revision: string; gaps: ReadonlyMap<string, ContextExpansion> }>(() => ({ revision, gaps: new Map() }))
+  const expansions = progress.revision === revision ? progress.gaps : new Map<string, ContextExpansion>()
   const [copied, setCopied] = useState(false)
-
+  const expand = (gap: UnifiedGap) => {
+    setProgress(current => {
+      const gaps = new Map(current.revision === revision ? current.gaps : [])
+      // The control holds remaining lines; its id addresses the full gap.
+      const original = hunks.flatMap(hunk => hunk.rows).find((row): row is UnifiedGap => row.kind === 'gap' && row.id === gap.id)
+      if (original) gaps.set(gap.id, expandContextGap(original, gaps.get(gap.id)))
+      return { revision, gaps }
+    })
+  }
   const onCopy = useCallback(() => {
     if (copied) return
     void navigator.clipboard?.writeText(unifiedDiffText(diffs)).then(() => {
@@ -213,114 +60,60 @@ export function UnifiedDiff({
       window.setTimeout(() => { setCopied(false) }, 1000)
     }).catch(() => {})
   }, [copied, diffs])
+  if (!diffs.length) return null
 
-  if (diffs.length === 0) return null
-
+  const maxNumber = hunks.reduce((max, hunk) => hunk.lines.reduce((current, line) => Math.max(current, line.oldNumber ?? 0, line.newNumber ?? 0), max), 1)
+  const style = { '--diff-number-width': `${Math.max(4, String(maxNumber).length)}ch` } as CSSProperties
   const totals = new Map<string, { added: number; removed: number }>()
-  for (const [index, diff] of diffs.entries()) {
-    const hunk = hunks[index]
-    const previous = totals.get(diff.path) ?? { added: 0, removed: 0 }
-    totals.set(diff.path, {
-      added: previous.added + (hunk?.added ?? 0),
-      removed: previous.removed + (hunk?.removed ?? 0),
-    })
-  }
-
+  diffs.forEach((diff, index) => {
+    const total = totals.get(diff.path) ?? { added: 0, removed: 0 }
+    totals.set(diff.path, { added: total.added + (hunks[index]?.added ?? 0), removed: total.removed + (hunks[index]?.removed ?? 0) })
+  })
+  const renderLine = (row: UnifiedLine, key: string, lines: readonly UnifiedLine[]) => <ReviewCommentLine key={key} anchor={reviewTarget ? lineCommentAnchor(reviewTarget, row, lines, revision) : undefined}>
+    {button => <div className={`${css.unifiedLine} ${css[`unified_${row.kind}`] ?? ''}`} data-line-kind={row.kind} data-old-line={row.oldNumber ?? undefined} data-new-line={row.newNumber ?? undefined}>
+      <span className={`${css.unifiedLineNumber} ${css.unifiedOldNumber}`}>{button}{row.oldNumber}</span>
+      <span className={css.unifiedLineNumber}>{row.newNumber}</span>
+      <span className={css.unifiedSign}>{row.kind === 'del' ? '-' : row.kind === 'add' ? '+' : ' '}</span>
+      <span className={css.unifiedText}>{row.text}</span>
+    </div>}
+  </ReviewCommentLine>
   let previousPath: string | undefined
-  const renderLine = (row: UnifiedLine, key: string, lines: readonly UnifiedLine[]) => (
-    <ReviewCommentLine key={key} anchor={reviewTarget ? lineCommentAnchor(reviewTarget, row, lines, revision) : undefined}>
-      {button => <div
-        className={`${css.unifiedLine} ${css[`unified_${row.kind}`] ?? ''} ${reviewTarget ? css.commentEnabled : ''}`}
-        data-line-kind={row.kind} data-old-line={row.oldNumber ?? undefined} data-new-line={row.newNumber ?? undefined}
-      >
-        <span className={css.unifiedLineNumber}>{button}{lineNumber(row)}</span>
-        <span className={css.unifiedSign}>{row.kind === 'del' ? '-' : row.kind === 'add' ? '+' : ' '}</span>
-        <span className={css.unifiedText}>{row.text}</span>
-      </div>}
-    </ReviewCommentLine>
-  )
-  return (
-    <div
-      className={`${css.unifiedBlock} ${showFileHeaders ? '' : css.unifiedEmbedded} ${className ?? ''}`}
-      data-diff=""
-      data-diff-layout="unified"
-    >
-      {showCopyButton && (
-        <button type="button" className={css.unifiedCopyButton} onClick={onCopy}>
-          {copied ? labels.copied : labels.copy}
-        </button>
-      )}
-      {diffs.map((diff, hunkIndex) => {
-        const firstForPath = diff.path !== previousPath
-        previousPath = diff.path
-        const total = totals.get(diff.path) ?? { added: 0, removed: 0 }
-        const hunk = hunks[hunkIndex]
-        return (
-          <section key={`${diff.path}:${hunkIndex}`} className={css.unifiedFile}>
-            {showFileHeaders && firstForPath
-              ? (
-                <header className={css.unifiedHeader}>
-                  <span className={css.unifiedStatus}>M</span>
-                  <span className={css.unifiedPath}>{diff.path}</span>
-                  <span className={css.unifiedAdded}>+{total.added}</span>
-                  <span className={css.unifiedRemoved}>-{total.removed}</span>
-                </header>
-              )
-              : !firstForPath && (hunk?.unchangedBefore ?? 0) === 0
-                ? <div className={css.unifiedHunkHeader}>@@ -{diff.oldStart ?? 1} +{diff.newStart ?? 1} @@</div>
-                : null}
-            <div className={css.unifiedBody}>
-              {(hunk?.unchangedBefore ?? 0) > 0 && (
-                <div className={css.unifiedOmitted}>
-                  <span aria-hidden="true">↕</span>
-                  {labels.showUnchanged(hunk?.unchangedBefore ?? 0)}
-                </div>
-              )}
-              {(hunk?.rows ?? []).flatMap((row) => {
-                if (row.kind !== 'gap') {
-                  return [renderLine(row, `${row.kind}:${row.oldNumber ?? ''}:${row.newNumber ?? ''}`, hunk?.lines ?? [])]
-                }
-
-                const expanded = expandedGaps.has(row.id)
-                if (expanded) {
-                  return [
-                    <button
-                      key={`${row.id}:control`}
-                      type="button"
-                      className={css.unifiedGap}
-                      aria-expanded="true"
-                      onClick={() => {
-                        setExpandedGaps((current) => {
-                          const next = new Set(current)
-                          next.delete(row.id)
-                          return next
-                        })
-                      }}
-                    >
-                      {labels.hideUnchanged(row.lines.length)}
-                    </button>,
-                    ...row.lines.map(line => renderLine(line, `${row.id}:${lineNumbers(line)}`, hunk?.lines ?? [])),
-                  ]
-                }
-                return [(
-                  <button
-                    key={row.id}
-                    type="button"
-                    className={css.unifiedGap}
-                    aria-expanded="false"
-                    onClick={() => {
-                      setExpandedGaps(current => new Set([...current, row.id]))
-                    }}
-                  >
-                    {labels.showUnchanged(row.lines.length)}
-                  </button>
-                )]
-              })}
+  return <div className={`${css.unifiedBlock} ${showFileHeaders ? '' : css.unifiedEmbedded} ${reviewTarget ? css.commentEnabled : ''} ${className ?? ''}`} style={style} data-diff="" data-diff-layout="unified">
+    {(showCopyButton || expansions.size > 0) && <div className={css.unifiedToolbar}>
+      {expansions.size > 0 && <button type="button" onClick={() => { setProgress({ revision, gaps: new Map() }) }}>{labels.collapseContext}</button>}
+      {showCopyButton && <button type="button" className={css.unifiedCopyButton} onClick={onCopy}>{copied ? labels.copied : labels.copy}</button>}
+    </div>}
+    {diffs.map((diff, hunkIndex) => {
+      const firstForPath = diff.path !== previousPath
+      previousPath = diff.path
+      const hunk = hunks[hunkIndex]!
+      const total = totals.get(diff.path)!
+      const blocks = unifiedVisibleBlocks(visibleHunkRows(hunk, expansions))
+      return <section key={`${diff.path}:${hunkIndex}`} className={css.unifiedFile}>
+        {showFileHeaders && firstForPath && <header className={css.unifiedHeader}>
+          <span className={css.unifiedStatus}>M</span><span className={css.unifiedPath}>{diff.path}</span>
+          <span className={css.unifiedAdded}>+{total.added}</span><span className={css.unifiedRemoved}>-{total.removed}</span>
+        </header>}
+        {hunk.unchangedBefore > 0 && <div className={css.unifiedUnavailable} title={labels.unavailableContext(hunk.unchangedBefore)}>{labels.unavailableContext(hunk.unchangedBefore)}</div>}
+        <div className={css.unifiedBody}>
+          {blocks.map((block, blockIndex) => <div key={block.gap?.id ?? `block:${blockIndex}`}>
+            <div className={css.unifiedHunkHeader}>
+              {block.gap ? <button type="button" className={css.unifiedGapButton}
+                aria-label={labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}
+                title={labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}
+                data-context-gap={block.gap.position} data-hidden-lines={block.gap.lines.length}
+                onClick={() => { if (block.gap) expand(block.gap) }}><ExpandIcon direction={block.gap.position} /></button>
+                : <span className={css.unifiedHunkGutter} />}
+              <span className={css.unifiedHunkRange}>
+                {block.lines.length ? unifiedHunkRange(block.lines, diff) : ''}
+                {block.gap && block.lines.length === 0 && <small>{labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}</small>}
+              </span>
             </div>
-          </section>
-        )
-      })}
-      <ReviewOutdatedComments target={reviewTarget} revision={revision} />
-    </div>
-  )
+            {block.lines.map(row => renderLine(row, `${row.kind}:${row.oldNumber ?? ''}:${row.newNumber ?? ''}`, hunk.lines))}
+          </div>)}
+        </div>
+      </section>
+    })}
+    <ReviewOutdatedComments target={reviewTarget} revision={revision} />
+  </div>
 }

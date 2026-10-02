@@ -1,153 +1,94 @@
-/* The review layout follows a source-control diff: one content stream with a
-   single line-number gutter. It is deliberately separate from `.block`, so
-   existing inline tool cards keep their compact geometry. */
+/* GitHub-style unified geometry, using the host's light/dark theme colors. */
 .unifiedBlock {
-  position: relative;
+  --diff-number-width: 4ch;
+  --diff-comment-width: 0px;
+  --diff-gutter-width: calc(var(--diff-number-width) + 16px);
+  --diff-base: var(--dsw-alias-background-l1, #fff);
+  --diff-add: var(--dsw-alias-state-success-primary, #1a7f37);
+  --diff-del: var(--dsw-alias-state-error-primary, #cf222e);
+  --diff-link: var(--dsw-alias-state-link-primary, #0969da);
   margin: 16px 0;
   color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-markdown-code-block);
+  background: var(--diff-base);
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: hidden;
 }
-
-.unifiedEmbedded {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-}
-
-.unifiedCopyButton {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 2;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
-  font: var(--dsw-font-xs-13);
-}
-
-.unifiedFile + .unifiedFile {
-  border-top: 1px solid var(--dsw-alias-border-l2);
-}
-
-.unifiedHeader {
+.unifiedEmbedded { margin: 0; border: 0; border-radius: 0; }
+.commentEnabled { --diff-comment-width: 24px; }
+.unifiedToolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  min-height: 38px;
-  padding: 0 72px 0 12px;
+  min-height: 28px;
+  padding: 0 10px;
+  background: var(--dsw-alias-background-l2, #f6f8fa);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
-  font: var(--dsw-font-markdown-code-block);
+  font: var(--dsw-font-xs-13);
 }
-
-.unifiedStatus {
-  color: var(--dsw-alias-state-success-primary);
-  font-weight: 700;
+.unifiedToolbar button {
+  border: 0;
+  padding: 2px 0;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
 }
-
-.unifiedPath {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.unifiedAdded {
-  margin-left: auto;
-  color: var(--dsw-alias-state-success-primary);
-}
-
-.unifiedRemoved {
-  color: var(--dsw-alias-state-error-primary);
-}
-
-.unifiedHunkHeader {
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-markdown-code-block);
-}
-
-.unifiedBody {
-  overflow-x: auto;
-  overflow-y: hidden;
-  font: var(--dsw-font-markdown-code-block);
-}
-
+.unifiedToolbar button:hover { color: var(--diff-link); }
+.unifiedCopyButton { margin-left: auto; }
+.unifiedFile + .unifiedFile { border-top: 1px solid var(--dsw-alias-border-l2); }
+.unifiedHeader { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; border-bottom: 1px solid var(--dsw-alias-border-l2); font: var(--dsw-font-markdown-code-block); }
+.unifiedStatus { color: var(--diff-add); font-weight: 600; }
+.unifiedPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unifiedAdded { margin-left: auto; color: var(--diff-add); }
+.unifiedRemoved { color: var(--diff-del); }
+.unifiedBody { overflow-x: auto; overflow-y: hidden; font: var(--dsw-font-markdown-code-block); }
 .unifiedLine {
   display: grid;
-  grid-template-columns: 48px 24px minmax(max-content, 1fr);
+  grid-template-columns: calc(var(--diff-gutter-width) + var(--diff-comment-width)) var(--diff-gutter-width) 20px minmax(max-content, 1fr);
   min-width: max-content;
-  min-height: 23px;
-  line-height: 23px;
+  min-height: 22px;
+  line-height: 22px;
   white-space: pre;
 }
-
 .unifiedLineNumber {
   position: relative;
   padding: 0 8px;
-  border-right: 1px solid var(--dsw-alias-border-l2);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-align: right;
   user-select: none;
 }
-
-.commentEnabled { grid-template-columns: 64px 24px minmax(max-content, 1fr); }
-
-.unifiedSign {
-  text-align: center;
-  user-select: none;
-}
-
-.unifiedText {
-  padding-right: 14px;
-}
-
-.unified_del {
-  color: var(--dsw-alias-state-error-primary);
-  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 11%, transparent);
-}
-
-.unified_add {
-  color: var(--dsw-alias-state-success-primary);
-  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 11%, transparent);
-}
-
-.unified_context {
-  color: var(--dsw-alias-label-primary);
-}
-
-.unifiedGap {
-  display: block;
-  width: 100%;
-  min-height: 32px;
-  padding: 0 12px 0 72px;
-  border: 0;
-  border-top: 1px solid var(--dsw-alias-border-l1);
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-border-l1);
+.unifiedOldNumber { padding-left: calc(8px + var(--diff-comment-width)); }
+.unifiedSign { text-align: center; user-select: none; }
+.unifiedText { padding: 0 14px 0 6px; }
+.unified_del { background: color-mix(in srgb, var(--diff-del) 10%, var(--diff-base)); }
+.unified_add { background: color-mix(in srgb, var(--diff-add) 14%, var(--diff-base)); }
+.unified_del .unifiedLineNumber { background: color-mix(in srgb, var(--diff-del) 22%, var(--diff-base)); }
+.unified_add .unifiedLineNumber { background: color-mix(in srgb, var(--diff-add) 26%, var(--diff-base)); }
+.unifiedHunkHeader {
+  display: grid;
+  grid-template-columns: calc(var(--diff-gutter-width) * 2 + var(--diff-comment-width)) minmax(0, 1fr);
+  min-height: 30px;
   color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
-  font: var(--dsw-font-xs-13);
-  text-align: left;
+  background: color-mix(in srgb, var(--diff-link) 10%, var(--diff-base));
 }
-
-.unifiedGap:hover {
-  color: var(--dsw-alias-label-primary);
-}
-
-.unifiedOmitted {
+.unifiedHunkGutter { min-height: 30px; }
+.unifiedHunkRange { padding: 5px 8px; overflow-wrap: anywhere; line-height: 20px; }
+.unifiedHunkRange small { display: block; font: var(--dsw-font-xs-13); }
+.unifiedGapButton {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 32px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-border-l1);
+  justify-content: center;
+  align-self: stretch;
+  min-height: 30px;
+  border: 0;
+  padding: 0;
+  background: color-mix(in srgb, var(--diff-link) 22%, var(--diff-base));
   color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-xs-13);
+  cursor: pointer;
 }
+.unifiedGapButton:hover { color: var(--diff-link); background: color-mix(in srgb, var(--diff-link) 30%, var(--diff-base)); }
+.unifiedGapButton:focus-visible { outline: 2px solid var(--diff-link); outline-offset: -2px; }
+.unifiedGapButton svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.unifiedUnavailable { padding: 6px 12px; color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-background-l2); font: var(--dsw-font-xs-13); }

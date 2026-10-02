@@ -59,10 +59,30 @@ export function reviewDiffRevision(diffs: readonly ProducedFileDiff[]): string {
 export function fileCommentAnchor(target: ReviewCommentTarget): ReviewCommentAnchor {
   return { ...target, side: 'file', line: null, quote: '', before: '', after: '', revision: '' }
 }
+
+const referenceIndexes = new WeakMap<readonly ReviewCommentLine[], {
+  old: ReviewCommentLine[]; next: ReviewCommentLine[];
+  oldIndex: WeakMap<ReviewCommentLine, number>; newIndex: WeakMap<ReviewCommentLine, number>;
+}>()
+
+/** Full-file context must not be scanned again for every visible comment line. */
+function referenceIndex(lines: readonly ReviewCommentLine[]) {
+  let index = referenceIndexes.get(lines)
+  if (!index) {
+    index = { old: [], next: [], oldIndex: new WeakMap(), newIndex: new WeakMap() }
+    for (const row of lines) {
+      if (row.oldNumber !== null) { index.oldIndex.set(row, index.old.length); index.old.push(row) }
+      if (row.newNumber !== null) { index.newIndex.set(row, index.next.length); index.next.push(row) }
+    }
+    referenceIndexes.set(lines, index)
+  }
+  return index
+}
 export function lineCommentAnchor(target: ReviewCommentTarget, row: ReviewCommentLine, lines: readonly ReviewCommentLine[], revision: string): ReviewCommentAnchor {
   const side = row.kind === 'del' ? 'old' : 'new'
-  const sameSide = lines.filter(line => (side === 'old' ? line.oldNumber : line.newNumber) !== null)
-  const index = sameSide.indexOf(row)
+  const reference = referenceIndex(lines)
+  const sameSide = side === 'old' ? reference.old : reference.next
+  const index = (side === 'old' ? reference.oldIndex : reference.newIndex).get(row) ?? -1
   const excerpt = (items: readonly ReviewCommentLine[]) => items.map(line => line.text.slice(0, 1000)).join('\n')
   return {
     ...target, side, line: side === 'old' ? row.oldNumber : row.newNumber,

@@ -63,6 +63,7 @@ export function diffsFromBeforeAfter(
       const run = change.value
       if (hunk !== null) {
         const beforeLen = hunk.old.length
+        const beforeNewLen = hunk.new.length
         hunk.old.push(...run)
         hunk.new.push(...run)
         oldCursor += run.length
@@ -74,7 +75,7 @@ export function diffsFromBeforeAfter(
         if (run.length > CONTEXT_LINES * 2) {
           const target = beforeLen + CONTEXT_LINES
           hunk.old.length = target
-          hunk.new.length = target
+          hunk.new.length = beforeNewLen + CONTEXT_LINES
           contextBuffer = run.slice(-CONTEXT_LINES)
           hunk = null
         }

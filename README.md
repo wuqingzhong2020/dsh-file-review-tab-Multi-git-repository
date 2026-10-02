@@ -6,6 +6,8 @@
 
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
 - **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
+- **仓库分组**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。点击仓库标题可收起或展开全部文件；会话范围继续保留轮次分组及确认、撤销操作。
+- **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 20 行未修改代码；中间间隔从两端各展开 10 行，首尾间隔从改动处向外展开。点击「收起展开的上下文」恢复默认显示。
 - **会话「多代码仓管理」页签**：在「对话」「轨迹」旁边，直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换工程会自动显示对应配置；文件审查显示所属仓库及仓库内路径，可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
 - **删除文件可见**：dsh 没有删除文件的工具，删除发生在终端命令里——插件解析 `rm` 族命令（`rm` / `rmdir` / `unlink` / `Remove-Item` / `del` / `rd` 等）的字面路径参数，被删文件以「已删除」标记出现在两个入口（内容已不存在，故无行级 diff、不可撤销）。带通配符（`rm *.log`）或命令替换（`rm $(...)`）的删除不识别——受影响文件事后无法枚举。
 - **自动归档**：主列表只保留最近 5 轮（进行中的轮次永不归档），更早的已完成轮次沉入底部「已归档 N 轮」折叠区。折叠时归档内容零渲染，展开后每页加载 10 轮（「加载更多」续页），diff 行另有懒挂载——长会话不再一次性挂载几十个 diff 组。深链跳到已归档轮次会自动展开并定位；展开状态按会话记忆；角标只统计主列表。
@@ -31,10 +33,10 @@ dsh plugin --profile desktop add github:wuqingzhong2020/dsh-file-review-tab-Mult
 dsh plugin --profile web add dsh-file-review-tab-multi-git-repository
 ```
 
-对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-pending-review.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
+对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-github-diff.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-pending-review.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-github-diff.tgz"
 ```
 
 桌面版安装后请重启应用，让 Host 与 Web 插件重新加载。确认 `package.json` 使用 `dsh-better-sidebar` **0.24.1**；在会话顶部打开「多代码仓管理」，在侧边栏打开「文件审查」。
@@ -64,6 +66,8 @@ node scripts/patch-desktop-directory-picker.mjs "D:\app\DeepSeekHarnessDesktop\r
 - **分支**：查看当前 HEAD 相对指定分支共同祖先的已提交差异。选择具体仓库后可选择本地或远程分支；全部仓库分别自动选择默认分支或其他可比较分支。没有比较分支时会提示。
 
 Git 范围沿用当前工程的仓库配置和当前会话临时仓库，可筛选具体仓库、展开逐行差异或在编辑器中打开文件。支持新建、删除、重命名，二进制、符号链接或超过 2 MiB 的未跟踪文件显示说明。Git 范围只读，不执行暂存、提交、切换分支或撤销；点击右上角刷新重新读取磁盘状态。
+
+Git 范围的上下文来自所选比较的真实版本，查看历史提交时也使用当时的代码。PTC / Code Mode 可展开实际记录的完整 before/after；标准工具的历史轮次若只记录了局部差异，缺失内容显示为「历史记录未包含这些代码」，不会用当前磁盘内容替代历史版本。展开上下文不改变撤销所用的原始差异或评论定位；「复制差异」仍复制带 3 行上下文的精简差异。
 
 ## 提交文件审查意见
 

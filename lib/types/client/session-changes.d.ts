@@ -16,6 +16,8 @@ import type { ProducedFileDiff, RecordedMutation } from '../change-types.ts';
 export interface SessionFileChange {
     readonly path: string;
     readonly diffs: readonly ProducedFileDiff[];
+    /** Full recorded versions for display only; safe undo keeps the original hunks. */
+    readonly reviewDiffs?: readonly ProducedFileDiff[];
     /** Terminal commands deleted this path in this turn (display-only). */
     readonly deleted?: true;
 }
