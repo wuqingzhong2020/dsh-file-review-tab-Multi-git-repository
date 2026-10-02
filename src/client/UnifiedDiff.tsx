@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type CSSProperties } from 'react'
 import type { ProducedFileDiff as DiffHunk } from '../change-types.ts'
 import {
-  buildUnifiedHunks, CONTEXT_EXPANSION_LINES, expandContextGap, unifiedDiffText,
+  buildUnifiedHunks, expandAllContextGap, expandContextGap, unifiedDiffText,
   splitDiffRows, unifiedHunkRange, unifiedVisibleBlocks, visibleHunkRows,
   type ContextExpansion, type UnifiedGap, type UnifiedLine,
 } from './unified-diff-model.ts'
@@ -39,6 +39,18 @@ function ExpandIcon({ direction }: { direction: UnifiedGap['position'] }) {
   </svg>
 }
 
+function ExpandAllIcon({ direction }: { direction: 'up' | 'down' }) {
+  return <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path d={direction === 'up' ? 'm4 8 4-4 4 4m-8 4 4-4 4 4M3 2h10' : 'm4 4 4 4 4-4m-8 4 4 4 4-4M3 14h10'} />
+  </svg>
+}
+
+function CollapseContextIcon() {
+  return <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path d="m4 2 4 4 4-4M8 2v4m-4 8 4-4 4 4M8 14v-4M2 8h12" />
+  </svg>
+}
+
 /** Two presentations share the original rows, context expansion, and anchors. */
 export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton = true, showFileHeaders = true, reviewTarget }: UnifiedDiffProps) {
   const preferences = useDiffViewPreferences()
@@ -48,12 +60,21 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
   const [progress, setProgress] = useState<{ revision: string; gaps: ReadonlyMap<string, ContextExpansion> }>(() => ({ revision, gaps: new Map() }))
   const expansions = progress.revision === revision ? progress.gaps : new Map<string, ContextExpansion>()
   const [copied, setCopied] = useState(false)
-  const expand = (gap: UnifiedGap) => {
+  const expand = (gap: UnifiedGap, direction?: 'up' | 'down') => {
     setProgress(current => {
       const gaps = new Map(current.revision === revision ? current.gaps : [])
       // The control holds remaining lines; its id addresses the full gap.
       const original = hunks.flatMap(hunk => hunk.rows).find((row): row is UnifiedGap => row.kind === 'gap' && row.id === gap.id)
-      if (original) gaps.set(gap.id, expandContextGap(original, gaps.get(gap.id)))
+      if (original) gaps.set(gap.id, direction
+        ? expandAllContextGap(original, direction, gaps.get(gap.id))
+        : expandContextGap(original, gaps.get(gap.id), preferences.contextExpansionLines))
+      return { revision, gaps }
+    })
+  }
+  const collapseGap = (gap: UnifiedGap) => {
+    setProgress(current => {
+      const gaps = new Map(current.revision === revision ? current.gaps : [])
+      gaps.delete(gap.id)
       return { revision, gaps }
     })
   }
@@ -104,7 +125,7 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
       previousPath = diff.path
       const hunk = hunks[hunkIndex]!
       const total = totals.get(diff.path)!
-      const blocks = unifiedVisibleBlocks(visibleHunkRows(hunk, expansions))
+      const blocks = unifiedVisibleBlocks(visibleHunkRows(hunk, expansions, true))
       return <section key={`${diff.path}:${hunkIndex}`} className={css.unifiedFile}>
         {showFileHeaders && firstForPath && <header className={css.unifiedHeader}>
           <span className={css.unifiedStatus}>M</span><span className={css.unifiedPath}>{diff.path}</span>
@@ -115,17 +136,30 @@ export function UnifiedDiff({ diffs, contextLines, labels, className, showCopyBu
         <div className={`${css.unifiedBody} ${isSplit ? css.splitBody : ''}`}>
           {blocks.map((block, blockIndex) => {
             const splitRows = isSplit ? splitDiffRows(block.lines) : []
+            const expansion = block.gap ? expansions.get(block.gap.id) : undefined
+            const expandedLines = (expansion?.before ?? 0) + (expansion?.after ?? 0)
             return <div key={block.gap?.id ?? `block:${blockIndex}`}>
             <div className={css.unifiedHunkHeader}>
-              {block.gap ? <button type="button" className={css.unifiedGapButton}
-                aria-label={labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}
-                title={labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}
+              {block.gap ? <div className={css.unifiedGapControls}>
+                {expandedLines > 0 && <button type="button" className={css.unifiedGapButton}
+                  aria-label={t('collapseContextGap', { count: expandedLines })} title={t('collapseContextGap', { count: expandedLines })}
+                  data-context-collapse={block.gap.id} onClick={() => { if (block.gap) collapseGap(block.gap) }}><CollapseContextIcon /></button>}
+                {block.gap.lines.length > 0 && block.gap.position !== 'trailing' && <button type="button" className={css.unifiedGapButton}
+                  aria-label={t('expandAllContextUp', { count: block.gap.lines.length })} title={t('expandAllContextUp', { count: block.gap.lines.length })}
+                  data-context-expand-all="up" onClick={() => { if (block.gap) expand(block.gap, 'up') }}><ExpandAllIcon direction="up" /></button>}
+                {block.gap.lines.length > 0 && <button type="button" className={css.unifiedGapButton}
+                aria-label={labels.expandContext(Math.min(preferences.contextExpansionLines, block.gap.lines.length), block.gap.lines.length)}
+                title={labels.expandContext(Math.min(preferences.contextExpansionLines, block.gap.lines.length), block.gap.lines.length)}
                 data-context-gap={block.gap.position} data-hidden-lines={block.gap.lines.length}
-                onClick={() => { if (block.gap) expand(block.gap) }}><ExpandIcon direction={block.gap.position} /></button>
+                onClick={() => { if (block.gap) expand(block.gap) }}><ExpandIcon direction={block.gap.position} /></button>}
+                {block.gap.lines.length > 0 && block.gap.position !== 'leading' && <button type="button" className={css.unifiedGapButton}
+                  aria-label={t('expandAllContextDown', { count: block.gap.lines.length })} title={t('expandAllContextDown', { count: block.gap.lines.length })}
+                  data-context-expand-all="down" onClick={() => { if (block.gap) expand(block.gap, 'down') }}><ExpandAllIcon direction="down" /></button>}
+              </div>
                 : <span className={css.unifiedHunkGutter} />}
               <span className={css.unifiedHunkRange}>
                 {block.lines.length ? unifiedHunkRange(block.lines, diff) : ''}
-                {block.gap && block.lines.length === 0 && <small>{labels.expandContext(Math.min(CONTEXT_EXPANSION_LINES, block.gap.lines.length), block.gap.lines.length)}</small>}
+                {block.gap && block.lines.length === 0 && block.gap.lines.length > 0 && <small>{labels.expandContext(Math.min(preferences.contextExpansionLines, block.gap.lines.length), block.gap.lines.length)}</small>}
               </span>
             </div>
             {isSplit ? splitRows.length > 0 && <div className={css.splitGrid} style={{ gridTemplateRows: `repeat(${splitRows.length}, minmax(22px, auto))` }}>

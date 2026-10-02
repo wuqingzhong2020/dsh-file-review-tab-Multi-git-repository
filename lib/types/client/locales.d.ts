@@ -106,6 +106,13 @@ export declare const zh: {
     readonly showUnchanged: "显示 {count} 行未更改内容";
     readonly hideUnchanged: "隐藏 {count} 行未更改内容";
     readonly expandContext: "展开 {count} 行未修改代码（剩余 {remaining} 行）";
+    readonly expandAllContextUp: "向上展开全部 {count} 行未修改代码";
+    readonly expandAllContextDown: "向下展开全部 {count} 行未修改代码";
+    readonly collapseContextGap: "收起这段已展开的未修改代码（{count} 行）";
+    readonly diffSettings: "设置";
+    readonly diffSettingsSave: "保存";
+    readonly diffContextExpansionLines: "每次展开的未修改代码行数";
+    readonly diffContextExpansionHint: "请输入正整数，默认 20 行。设置保存在本地，适用于统一和并排视图。";
     readonly collapseContext: "收起展开的上下文";
     readonly unavailableContext: "省略 {count} 行：历史记录未包含这些代码";
     readonly diffLayout: "差异布局";

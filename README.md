@@ -1,5 +1,7 @@
 # dsh-file-review-tab-multi-git-repository
 
+当前版本：**v0.1.1**。
+
 **dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并适配 DeepSeek Harness Desktop 0.2.0-rc.2 与 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1。**
 
 在原有文件审查侧边栏 Tab 和对话尾部审查行的基础上，扩展工程级多仓库配置、跨仓库差异审查、修改意见与轮次确认等功能。宿主自带的改动摘要、审查页及文件提及功能保持启用。
@@ -15,7 +17,8 @@
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
 - **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
 - **仓库分组与内容展开**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。仓库标题旁的图标批量展开或收起该仓库内文件的差异内容；轮次标题旁的图标控制该轮全部仓库的文件内容，Git 范围的文件数标题旁图标控制当前显示的全部文件内容。收起内容后仍显示文件名，点击仓库名称或左侧箭头则隐藏、显示整个文件列表。部分文件已展开时，图标先展开剩余内容，再次点击全部收起；操作只影响当前作用范围。Git 差异按需加载并缓存，批量展开最多同时请求 4 个文件。
-- **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 20 行未修改代码；中间间隔从两端各展开 10 行，首尾间隔从改动处向外展开。点击「收起展开的上下文」恢复默认显示。
+- **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 N 行未修改代码（默认 20）；中间间隔将 N 行分配到两端，首尾间隔从改动处向外展开。蓝色条另有向上、向下双箭头图标，一次展开该方向相邻间隔内的全部未修改代码；首尾展开至记录的开头或结尾，中间展开至相邻修改块。展开后蓝色条保留「收起这段」图标，只收起该间隔的未修改代码；全部展开后仍可点击，其他间隔不受影响。点击「收起展开的上下文」恢复全部间隔的默认显示。
+- **审查设置**：顶部「设置」按钮位于差异布局选择框左侧，点击弹出设置界面，可设置每次展开未修改代码的行数 N（正整数，默认 20）。点击「保存」立即生效并保存在应用本地；「取消」或 Esc 放弃本次编辑。该设置适用于会话和 Git 范围，以及统一和并排视图。
 - **两种差异布局**：顶部选择「统一」或「并排」。统一视图上下列出删除与新增行；并排视图左侧旧版、右侧新版，对齐对应的改动行。支持「自动换行」开关，关闭后横向滚动查看长行；布局与换行选择保存在应用本地，切换布局保留已展开的上下文和评论。并排视图两侧都可对实际代码行评论，引用各自的新旧行号。
 - **会话「多代码仓管理」页签**：在「对话」「轨迹」旁边，直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换工程会自动显示对应配置；文件审查显示所属仓库及仓库内路径，可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
 - **删除文件可见**：dsh 没有删除文件的工具，删除发生在终端命令里——插件解析 `rm` 族命令（`rm` / `rmdir` / `unlink` / `Remove-Item` / `del` / `rd` 等）的字面路径参数，被删文件以「已删除」标记出现在两个入口（内容已不存在，故无行级 diff、不可撤销）。带通配符（`rm *.log`）或命令替换（`rm $(...)`）的删除不识别——受影响文件事后无法枚举。
@@ -32,14 +35,14 @@
 
 适配版本：**DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.1.0.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.1.1.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.0.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.1.tgz"
 ```
 
 维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；在会话顶部打开「多代码仓管理」，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。
@@ -49,7 +52,7 @@ pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-r
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.0/dsh-file-review-tab-multi-git-repository-0.1.0.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.1/dsh-file-review-tab-multi-git-repository-0.1.1.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -74,7 +77,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供 `v0.1.0` 的打包、推送与 Release 发布步骤；另有 [本版本发布说明](docs/releases/v0.1.0.md) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供 `v0.1.1` 的打包、推送与 Release 发布步骤；另有 [本版本发布说明](docs/releases/v0.1.1.md) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 

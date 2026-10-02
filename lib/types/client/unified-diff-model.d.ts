@@ -41,10 +41,12 @@ export interface SplitDiffRow {
 export declare function splitDiffRows(lines: readonly UnifiedLine[]): SplitDiffRow[];
 export declare function hunkLines(diff: ProducedFileDiff): UnifiedLine[];
 export declare function buildUnifiedHunks(diffs: readonly ProducedFileDiff[], contextLines: number): UnifiedHunk[];
-/** Reveal exactly 20 available lines, starting next to the visible changes. */
-export declare function expandContextGap(gap: UnifiedGap, previous?: ContextExpansion): ContextExpansion;
+/** Reveal up to the configured number of lines next to the visible changes. */
+export declare function expandContextGap(gap: UnifiedGap, previous?: ContextExpansion, lines?: number): ContextExpansion;
+/** Reveal the whole remaining interval from the selected neighboring change. */
+export declare function expandAllContextGap(gap: UnifiedGap, direction: 'up' | 'down', previous?: ContextExpansion): ContextExpansion;
 /** Expansion never changes the recorded hunks, line anchors, or change totals. */
-export declare function visibleHunkRows(hunk: UnifiedHunk, expansions: ReadonlyMap<string, ContextExpansion>): UnifiedRow[];
+export declare function visibleHunkRows(hunk: UnifiedHunk, expansions: ReadonlyMap<string, ContextExpansion>, preserveExpandedGaps?: boolean): UnifiedRow[];
 /** Each blue separator describes the actual contiguous block below it. */
 export declare function unifiedVisibleBlocks(rows: readonly UnifiedRow[]): UnifiedVisibleBlock[];
 export declare function unifiedHunkRange(lines: readonly UnifiedLine[], diff: ProducedFileDiff): string;

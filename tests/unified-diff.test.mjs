@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildUnifiedHunks, expandContextGap, hunkLines, splitDiffRows, summarizeDiffs, unifiedDiffText, unifiedHunkRange, unifiedVisibleBlocks, visibleHunkRows } from '../src/client/unified-diff-model.ts'
+import { buildUnifiedHunks, expandAllContextGap, expandContextGap, hunkLines, splitDiffRows, summarizeDiffs, unifiedDiffText, unifiedHunkRange, unifiedVisibleBlocks, visibleHunkRows } from '../src/client/unified-diff-model.ts'
 import { groupReviewFiles } from '../src/client/review-repository-groups.ts'
 import { commentAnchorKey, lineCommentAnchor, reviewDiffRevision } from '../src/client/review-comments.ts'
 import { mergeRecordedTurns } from '../src/client/session-changes.ts'
@@ -160,11 +160,11 @@ test('only split and unified preferences are accepted and display choices surviv
   const values = new Map()
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value) } }
   const store = new DiffViewStore(storage)
-  assert.deepEqual(store.getSnapshot(), { layout: 'unified', wrap: true })
+  assert.deepEqual(store.getSnapshot(), { layout: 'unified', wrap: true, contextExpansionLines: 20 })
   let notifications = 0; const unsubscribe = store.subscribe(() => { notifications++ })
   store.set({ layout: 'split' }); store.set({ wrap: false }); store.set({ wrap: false })
   assert.equal(notifications, 2)
-  assert.deepEqual(new DiffViewStore(storage).getSnapshot(), { layout: 'split', wrap: false })
+  assert.deepEqual(new DiffViewStore(storage).getSnapshot(), { layout: 'split', wrap: false, contextExpansionLines: 20 })
   assert.ok(values.has(DIFF_VIEW_STORAGE_KEY))
   unsubscribe(); store.set({ layout: 'unified' }); assert.equal(notifications, 2)
   for (const raw of [null, '{', '{}', '{"layout":"auto","wrap":true}', '{"layout":"split","wrap":"false"}']) assert.deepEqual(parseDiffViewPreferences(raw), DEFAULT_DIFF_VIEW)
@@ -173,5 +173,87 @@ test('only split and unified preferences are accepted and display choices surviv
 test('unavailable local storage does not prevent changing the display in memory', () => {
   const store = new DiffViewStore({ getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
   store.set({ layout: 'split', wrap: false })
-  assert.deepEqual(store.getSnapshot(), { layout: 'split', wrap: false })
+  assert.deepEqual(store.getSnapshot(), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+})
+
+test('configured expansion handles odd counts, single lines and counts beyond the remaining interval', () => {
+  const hunk = buildUnifiedHunks([diff], 3)[0]
+  for (const gap of gaps(hunk)) {
+    const shown = new Map()
+    let previousCount = lines(hunk, shown).length
+    for (const count of [1, 7, 1000]) {
+      const previous = shown.get(gap.id)
+      const remaining = gap.lines.length - (previous?.before ?? 0) - (previous?.after ?? 0)
+      const expanded = expandContextGap(gap, previous, count)
+      shown.set(gap.id, expanded)
+      const rows = lines(hunk, shown)
+      assert.equal(rows.length - previousCount, Math.min(count, remaining))
+      assert.equal(new Set(rows).size, rows.length)
+      if (gap.position === 'leading') assert.equal(expanded.before, 0)
+      if (gap.position === 'trailing') assert.equal(expanded.after, 0)
+      previousCount = rows.length
+    }
+    assert.ok(!visibleHunkRows(hunk, shown).some(row => row.kind === 'gap' && row.id === gap.id))
+  }
+})
+
+test('directional full expansion reveals only the selected gap after partial expansion and preserves line identity', () => {
+  const hunk = buildUnifiedHunks([diff], 3)[0]
+  for (const gap of gaps(hunk)) for (const direction of ['up', 'down']) {
+    const partial = expandContextGap(gap, undefined, 7)
+    const expanded = expandAllContextGap(gap, direction, partial)
+    assert.equal(expanded.before + expanded.after, gap.lines.length)
+    assert.equal(direction === 'up' ? expanded.before : expanded.after, direction === 'up' ? partial.before : partial.after)
+    assert.deepEqual(expandAllContextGap(gap, direction, expanded), expanded)
+    const shown = new Map([[gap.id, expanded]])
+    const rows = visibleHunkRows(hunk, shown)
+    assert.deepEqual(rows.filter(row => row.kind === 'gap'), gaps(hunk).filter(row => row.id !== gap.id))
+    assert.deepEqual(lines(hunk, shown).filter(row => gap.lines.includes(row)), gap.lines)
+    assert.equal(new Set(lines(hunk, shown)).size, lines(hunk, shown).length)
+  }
+})
+
+test('expanded intervals keep local collapse controls after partial or full expansion without duplicating code', () => {
+  const hunk = buildUnifiedHunks([diff], 3)[0]
+  const shown = new Map()
+  for (const gap of gaps(hunk)) {
+    shown.set(gap.id, expandContextGap(gap, undefined, 7))
+    assert.deepEqual(visibleHunkRows(hunk, shown, true), visibleHunkRows(hunk, shown))
+  }
+  for (const gap of gaps(hunk)) shown.set(gap.id, expandAllContextGap(gap, gap.position === 'leading' ? 'up' : 'down', shown.get(gap.id)))
+  const rows = visibleHunkRows(hunk, shown, true)
+  assert.deepEqual(rows.filter(row => row.kind !== 'gap'), hunk.lines)
+  assert.deepEqual(rows.filter(row => row.kind === 'gap').map(row => [row.id, row.lines.length]), gaps(hunk).map(gap => [gap.id, 0]))
+  const blocks = unifiedVisibleBlocks(rows)
+  assert.deepEqual(blocks.flatMap(block => block.lines), hunk.lines)
+  assert.equal(blocks.filter(block => block.gap).length, gaps(hunk).length)
+  // Collapse one interval while the other two remain fully revealed.
+  const middle = gaps(hunk).find(gap => gap.position === 'middle')
+  shown.delete(middle.id)
+  const collapsed = visibleHunkRows(hunk, shown, true)
+  assert.deepEqual(collapsed.filter(row => row.kind !== 'gap'), hunk.lines.filter(row => !middle.lines.includes(row)))
+  assert.equal(collapsed.find(row => row.kind === 'gap' && row.id === middle.id).lines.length, middle.lines.length)
+  assert.ok(collapsed.filter(row => row.kind === 'gap' && row.id !== middle.id).every(row => row.lines.length === 0))
+  assert.deepEqual(visibleHunkRows(hunk, new Map(), true), hunk.rows)
+})
+
+test('context line settings migrate old preferences, reject invalid counts, persist and notify open views', () => {
+  assert.deepEqual(parseDiffViewPreferences('{"layout":"split","wrap":false}'), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+  for (const count of [0, -1, 1.5, '30', null, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.deepEqual(parseDiffViewPreferences(JSON.stringify({ layout: 'split', wrap: false, contextExpansionLines: count })), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+  }
+  const values = new Map()
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value) } }
+  const store = new DiffViewStore(storage)
+  let notifications = 0
+  store.subscribe(() => { notifications++ })
+  store.set({ contextExpansionLines: 7 })
+  store.set({ contextExpansionLines: 7 })
+  assert.equal(notifications, 1)
+  assert.equal(new DiffViewStore(storage).getSnapshot().contextExpansionLines, 7)
+  store.set({ layout: 'split', wrap: false })
+  assert.deepEqual(store.getSnapshot(), { layout: 'split', wrap: false, contextExpansionLines: 7 })
+  const unavailable = new DiffViewStore({ getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
+  unavailable.set({ contextExpansionLines: 5 })
+  assert.equal(unavailable.getSnapshot().contextExpansionLines, 5)
 })

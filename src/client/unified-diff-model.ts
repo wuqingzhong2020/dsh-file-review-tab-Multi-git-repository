@@ -107,23 +107,34 @@ export function buildUnifiedHunks(diffs: readonly ProducedFileDiff[], contextLin
   })
 }
 
-/** Reveal exactly 20 available lines, starting next to the visible changes. */
-export function expandContextGap(gap: UnifiedGap, previous: ContextExpansion = { before: 0, after: 0 }): ContextExpansion {
+/** Reveal up to the configured number of lines next to the visible changes. */
+export function expandContextGap(gap: UnifiedGap, previous: ContextExpansion = { before: 0, after: 0 }, lines = CONTEXT_EXPANSION_LINES): ContextExpansion {
   const remaining = Math.max(0, gap.lines.length - previous.before - previous.after)
-  const count = Math.min(CONTEXT_EXPANSION_LINES, remaining)
+  const count = Math.min(Number.isSafeInteger(lines) && lines > 0 ? lines : CONTEXT_EXPANSION_LINES, remaining)
   if (gap.position === 'leading') return { before: previous.before, after: previous.after + count }
   if (gap.position === 'trailing') return { before: previous.before + count, after: previous.after }
   return { before: previous.before + Math.ceil(count / 2), after: previous.after + Math.floor(count / 2) }
 }
 
+/** Reveal the whole remaining interval from the selected neighboring change. */
+export function expandAllContextGap(gap: UnifiedGap, direction: 'up' | 'down', previous: ContextExpansion = { before: 0, after: 0 }): ContextExpansion {
+  const remaining = Math.max(0, gap.lines.length - previous.before - previous.after)
+  return direction === 'up'
+    ? { before: previous.before, after: previous.after + remaining }
+    : { before: previous.before + remaining, after: previous.after }
+}
+
 /** Expansion never changes the recorded hunks, line anchors, or change totals. */
-export function visibleHunkRows(hunk: UnifiedHunk, expansions: ReadonlyMap<string, ContextExpansion>): UnifiedRow[] {
+export function visibleHunkRows(hunk: UnifiedHunk, expansions: ReadonlyMap<string, ContextExpansion>, preserveExpandedGaps = false): UnifiedRow[] {
   return hunk.rows.flatMap(row => {
     if (row.kind !== 'gap') return [row]
     const expansion = expansions.get(row.id)
     const before = Math.min(row.lines.length, expansion?.before ?? 0)
     const after = Math.min(row.lines.length - before, expansion?.after ?? 0)
     const remaining = row.lines.slice(before, row.lines.length - after)
+    // Keep a local collapse control before a fully revealed interval. The
+    // recorded stream and callers that only need code rows stay unchanged.
+    if (!remaining.length && preserveExpandedGaps) return [{ ...row, lines: [] }, ...row.lines]
     return [
       ...row.lines.slice(0, before),
       ...(remaining.length ? [{ ...row, lines: remaining }] : []),

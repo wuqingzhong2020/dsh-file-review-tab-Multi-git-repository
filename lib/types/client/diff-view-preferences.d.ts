@@ -2,6 +2,7 @@ export type DiffLayout = 'split' | 'unified';
 export interface DiffViewPreferences {
     readonly layout: DiffLayout;
     readonly wrap: boolean;
+    readonly contextExpansionLines: number;
 }
 export declare const DEFAULT_DIFF_VIEW: DiffViewPreferences;
 export declare const DIFF_VIEW_STORAGE_KEY = "dsh-file-review-tab-multi-git-repository:diff-view";

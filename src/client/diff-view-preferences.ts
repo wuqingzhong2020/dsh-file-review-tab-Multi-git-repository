@@ -1,13 +1,15 @@
 export type DiffLayout = 'split' | 'unified'
-export interface DiffViewPreferences { readonly layout: DiffLayout; readonly wrap: boolean }
-export const DEFAULT_DIFF_VIEW: DiffViewPreferences = Object.freeze({ layout: 'unified', wrap: true })
+export interface DiffViewPreferences { readonly layout: DiffLayout; readonly wrap: boolean; readonly contextExpansionLines: number }
+export const DEFAULT_DIFF_VIEW: DiffViewPreferences = Object.freeze({ layout: 'unified', wrap: true, contextExpansionLines: 20 })
 export const DIFF_VIEW_STORAGE_KEY = 'dsh-file-review-tab-multi-git-repository:diff-view'
 
 export function parseDiffViewPreferences(raw: string | null): DiffViewPreferences {
   try {
     const value: unknown = raw === null ? null : JSON.parse(raw)
     if (value && typeof value === 'object' && 'layout' in value && ['split', 'unified'].includes(String(value.layout)) && 'wrap' in value && typeof value.wrap === 'boolean') {
-      return { layout: value.layout as DiffLayout, wrap: value.wrap }
+      const count = 'contextExpansionLines' in value ? value.contextExpansionLines : undefined
+      return { layout: value.layout as DiffLayout, wrap: value.wrap,
+        contextExpansionLines: typeof count === 'number' && Number.isSafeInteger(count) && count > 0 ? count : DEFAULT_DIFF_VIEW.contextExpansionLines }
     }
   } catch { /* An invalid display preference must not block file review. */ }
   return DEFAULT_DIFF_VIEW
@@ -28,7 +30,7 @@ export class DiffViewStore {
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   set(patch: Partial<DiffViewPreferences>): void {
     const next = parseDiffViewPreferences(JSON.stringify({ ...this.value, ...patch }))
-    if (next.layout === this.value.layout && next.wrap === this.value.wrap) return
+    if (next.layout === this.value.layout && next.wrap === this.value.wrap && next.contextExpansionLines === this.value.contextExpansionLines) return
     this.value = next
     try { this.storage?.setItem(DIFF_VIEW_STORAGE_KEY, JSON.stringify(next)) } catch { /* Keep the current display usable in memory. */ }
     for (const listener of this.listeners) listener()

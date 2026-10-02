@@ -2,7 +2,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.1.0**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.1.1**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
 
@@ -115,7 +115,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、[repository-paths.ts](../src/client/repository-paths.ts) | 文件所属仓库、组标题、列表折叠和批量内容展开 |
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
 | 评论 | [ReviewComments.tsx](../src/client/ReviewComments.tsx)、[review-comments.ts](../src/client/review-comments.ts)、[review-comments-send.ts](../src/client/review-comments-send.ts) | 评论编辑、定位、存储和发送 |
-| 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行 |
+| 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
 | 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](../src/client/repository-events.ts) | 深链定位和配置变化通知 |
 | 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts) | Tab/管理页及对话审查行的中英文文案 |
 | Desktop 兼容适配 | [patch-desktop-directory-picker.mjs](../scripts/patch-desktop-directory-picker.mjs) | 为特定 Desktop 构建的目录选择桥增加起始目录参数 |
@@ -274,7 +274,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 - **统一**：删除与新增按行上下排列，显示新旧两列行号。
 - **并排**：左旧右新；替换行对齐，数量不等时以空单元格补齐。换行后的两侧行高同步。
 
-默认显示改动附近 3 行上下文。首尾间隔每次向外展开 20 行，中间间隔从两端各展开 10 行。布局、换行和上下文展开都不修改实际差异内容；复制差异仍输出精简的 3 行上下文。
+默认显示改动附近 3 行上下文。顶部「设置」弹窗可配置每次展开的行数 N（正整数，默认 20），保存在 `diff-view` 偏好的 `contextExpansionLines` 字段；旧偏好缺少此字段时自动使用默认值。首尾间隔每次向外展开 N 行，中间间隔从两端分别展开 ceil(N/2) 和 floor(N/2) 行。向上、向下双箭头可一次展开相邻间隔的全部剩余代码，首尾展开至记录边界，中间展开至相邻修改块。渲染调用 `visibleHunkRows` 时保留已全部展开间隔的空标记，以继续显示局部收起图标；收起只删除该间隔的展开状态。设置弹窗使用宿主真实的 `--dsw-alias-bg-base` 实体背景色，并提供白色备用值。布局、换行和上下文展开都不修改实际差异内容；复制差异仍输出精简的 3 行上下文。
 
 完整文本来源只可能是原始历史记录、Host 保存的 before/after 或 Git 的实际比较。缺失历史正文不允许通过读取当前文件补齐。
 
@@ -313,7 +313,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | 评论草稿 | localStorage 的 `…:comments:<sessionId>` | 按会话持久化 |
 | 轮次确认 | localStorage 的 `…:confirmations:<sessionId>` | 按会话持久化 |
 | 归档展开状态 | localStorage 的 `…:archive:<sessionId>` | 按会话持久化，兼容旧前缀迁移 |
-| 差异布局与换行 | localStorage 的 `…:diff-view` | 同一浏览器环境下共享的显示偏好 |
+| 差异布局、换行与每次展开行数 | localStorage 的 `…:diff-view` | 同一浏览器环境下共享的显示偏好 |
 | 文件内容、仓库列表、上下文展开 | React/组件内存 | 页面状态，不写工程 JSON |
 | Git 文件差异缓存 | `GitReviewPanel` 内存 | 模式/引用/刷新等变化时失效 |
 | 审查深链目标 | `deep-link.ts` 模块内存 | 按会话保存最新目标，带 nonce 支持重复点击 |
@@ -400,7 +400,7 @@ node --test tests/*.test.mjs
 pnpm pack --pack-destination dist
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.0.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
+默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.1.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 

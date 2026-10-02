@@ -91,7 +91,10 @@
 .unifiedHunkGutter { min-height: 30px; }
 .unifiedHunkRange { padding: 5px 8px; overflow-wrap: anywhere; line-height: 20px; }
 .unifiedHunkRange small { display: block; font: var(--dsw-font-xs-13); }
+.unifiedGapControls { display: flex; }
 .unifiedGapButton {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
