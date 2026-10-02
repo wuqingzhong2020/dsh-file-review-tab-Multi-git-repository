@@ -1,4 +1,5 @@
 import type { ProducedFileDiff as DiffHunk } from '../change-types.ts';
+import { type ReviewCommentTarget } from './review-comments.ts';
 /** Locale labels required by the review diff. */
 export interface UnifiedDiffLabels {
     readonly copy: string;
@@ -18,6 +19,7 @@ interface UnifiedDiffProps {
     readonly className?: string | undefined;
     readonly showCopyButton?: boolean | undefined;
     readonly showFileHeaders?: boolean | undefined;
+    readonly reviewTarget?: ReviewCommentTarget | undefined;
 }
 /** Serialize recorded hunks as one plain-text unified diff. */
 export declare function unifiedDiffText(diffs: readonly DiffHunk[]): string;
@@ -28,6 +30,6 @@ export declare function summarizeDiffs(diffs: readonly DiffHunk[]): UnifiedDiffS
  * @param props - Unified diff data, locale labels, and presentation options.
  * @returns The line-numbered unified diff surface.
  */
-export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, }: UnifiedDiffProps): import("react").JSX.Element | null;
+export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, reviewTarget, }: UnifiedDiffProps): import("react").JSX.Element | null;
 export {};
 //# sourceMappingURL=UnifiedDiff.d.ts.map

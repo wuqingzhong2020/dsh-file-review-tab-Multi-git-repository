@@ -28,6 +28,8 @@ export interface TurnFileChanges {
 }
 /** Derive per-turn produced-file changes for one session snapshot. */
 export declare function deriveSessionChanges(snapshot: ConversationSnapshot | null): TurnFileChanges[];
+/** Latest actual conversation turn, including a turn that changed no files. */
+export declare function lastTurnChanges(snapshot: ConversationSnapshot | null, turns: readonly TurnFileChanges[]): readonly TurnFileChanges[];
 /**
  * One Code Mode (`run_code`) root visible in the snapshot, with the turn it
  * settles into. The snapshot now carries settled `subCalls` with their own

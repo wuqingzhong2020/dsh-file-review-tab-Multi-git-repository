@@ -1,22 +1,13 @@
 /** Read repository manifests without executing project scripts or changing Git state. */
 import { lstat, readFile, realpath, stat } from 'node:fs/promises'
-import { basename, isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, isAbsolute, resolve } from 'node:path'
 import type { ReviewProject, ReviewRepository, ReviewWorkspace } from './repository-types.ts'
 import { findProjectFile, PROJECT_FILE_NAME } from './repository-project-file.ts'
-
-export function inside(root: string, candidate: string): boolean {
-  const child = relative(root, candidate)
-  return child === '' || (child !== '..' && !child.startsWith(`..${sep}`) && !isAbsolute(child))
-}
+import { canonicalRepositoryPath, inside, projectRepositoryPath as projectPath } from './repository-path-policy.ts'
+export { inside } from './repository-path-policy.ts'
 
 export function pathKey(path: string): string {
   return process.platform === 'win32' ? path.toLowerCase() : path
-}
-
-/** Keep saved source paths portable when the project and target share a volume. */
-function projectPath(root: string, path: string): string {
-  const result = relative(root, resolve(root, path)) || '.'
-  return result.split(sep).join('/')
 }
 
 function unquote(value: string): string {
@@ -76,7 +67,9 @@ export async function previewProject(project: ReviewProject): Promise<ReviewWork
     ...project, root,
     configFiles: project.configFiles.map(file => projectPath(root, file)),
     repositories: project.repositories.map(path => projectPath(root, path)),
-    namedRepositories: project.namedRepositories?.map(entry => ({ ...entry, path: projectPath(root, entry.path) })),
+    namedRepositories: project.namedRepositories === undefined ? undefined : await Promise.all(
+      project.namedRepositories.map(async entry => ({ ...entry, path: await canonicalRepositoryPath(root, entry.path) })),
+    ),
   }
   const result: ReviewWorkspace = { project: normalized, repositories: [], warnings: [], roots: [] }
   const candidates = normalized.repositories.map(path => ({ name: basename(path), path, source: 'manual' }))

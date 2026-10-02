@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
+import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from '../repository-types.ts'
 import { repositoriesChanged } from './repository-events.ts'
-import { absoluteReviewPath, normalizeReviewPath, relativeProjectDirectory } from './repository-paths.ts'
+import { pickRepositoryDirectory } from './directory-picker.ts'
+import { absoluteReviewPath, normalizeReviewPath, relativeProjectDirectory, repositoryProjectPath } from './repository-paths.ts'
 import { t } from './locales.ts'
 import css from './RepositorySettings.module.css'
 
 interface ProjectRemote {
+  directoryStart(path: string): Promise<RemoteResult<string>>
   project(): Promise<RemoteResult<ReviewProjectPage>>
   saveProject(request: SaveReviewProject): Promise<RemoteResult<ReviewProjectPage>>
   setTemporaryRepositories(entries: NamedReviewRepository[]): Promise<RemoteResult<ReviewWorkspace>>
 }
-
-interface DirectoryPickerRemote { pick(): Promise<RemoteResult<string | null>> }
 
 async function unwrap<T>(promise: Promise<RemoteResult<T>>): Promise<T> {
   const result = await promise
@@ -32,23 +33,27 @@ function clean(project: ReviewProject): ReviewProject {
     repositories: [],
     namedRepositories: (project.namedRepositories ?? [])
       .filter(entry => entry.name.trim() !== '' && entry.path.trim() !== '')
-      .map(entry => ({ name: entry.name.trim(), path: normalizeReviewPath(entry.path.trim()) })),
+      .map(entry => ({ name: entry.name.trim(), path: repositoryProjectPath(project.root, entry.path) })),
   }
 }
 
-function editable(project: ReviewProject, workspace: ReviewWorkspace): ReviewProject {
+function editable(project: ReviewProject, workspace: ReviewWorkspace, temporary: NamedReviewRepository[]): ReviewProject {
+  const entries = workspace.repositories.filter(repo => repo.source !== 'project')
+    .map(repo => ({ name: repo.name, path: repo.relativePath }))
+  for (const entry of temporary) {
+    if (!entries.some(current => normalizeReviewPath(current.path).toLowerCase() === normalizeReviewPath(entry.path).toLowerCase())) entries.push(entry)
+  }
   return {
     ...project,
     enabled: project.enabled ?? true,
     configFiles: [], repositories: [],
-    namedRepositories: workspace.repositories
-      .filter(repo => repo.source !== 'project')
-      .map(repo => ({ name: repo.name, path: repo.relativePath })),
+    namedRepositories: entries,
   }
 }
 
 function temporaryEntries(project: ReviewProject): NamedReviewRepository[] {
   return (project.namedRepositories ?? [])
+    .map(entry => ({ ...entry, path: repositoryProjectPath(project.root, entry.path) }))
     .filter(entry => entry.name.trim() && absoluteReviewPath(entry.path) && relativeProjectDirectory(project.root, entry.path) === null)
     .map(entry => ({ name: entry.name.trim(), path: normalizeReviewPath(entry.path.trim()) }))
 }
@@ -68,17 +73,19 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
   const [dirty, setDirty] = useState(false)
   const [message, setMessage] = useState('')
   const [pendingDelete, setPendingDelete] = useState<number | null>(null)
+  const [pickerError, setPickerError] = useState<{ index: number; message: string } | null>(null)
   const requestVersion = useRef(0)
 
   const load = async () => {
     const version = ++requestVersion.current
     setBusy(true)
     setMessage('')
+    setPickerError(null)
     try {
       const result = await unwrap(remote().project())
       if (requestVersion.current !== version) return
       setPage(result)
-      setDraft(editable(result.project, result.workspace))
+      setDraft(editable(result.project, result.workspace, result.temporaryRepositories))
       setPreview(result.workspace)
       setDirty(false)
     } catch (error) { if (requestVersion.current === version) setMessage(error instanceof Error ? error.message : String(error)) }
@@ -99,6 +106,7 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
     setPreview(null)
     setDirty(true)
     setMessage('')
+    setPickerError(null)
   }
 
   useEffect(() => {
@@ -114,22 +122,14 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
 
   const chooseDirectory = async (index: number) => {
     if (draft === null) return
-    const desktop = (globalThis as unknown as { __DSH_DIRECTORY_PICKER__?: { pick(): Promise<string | null> } }).__DSH_DIRECTORY_PICKER__
-    const picker = (ctx.remote as unknown as { directoryPicker?: DirectoryPickerRemote }).directoryPicker
-    const uiWorkspace = (ctx as unknown as { uiWorkspace?: { pickDirectory(): Promise<string | null> } }).uiWorkspace
-    if (desktop?.pick === undefined && picker?.pick === undefined && uiWorkspace?.pickDirectory === undefined) {
-      setMessage(t('projectPickerUnavailable'))
-      return
-    }
     const version = requestVersion.current
     setBusy(true)
     setMessage('')
+    setPickerError(null)
     try {
-      const selected = desktop?.pick !== undefined
-        ? await desktop.pick()
-        : picker?.pick !== undefined
-          ? await unwrap(picker.pick())
-          : await uiWorkspace!.pickDirectory()
+      const defaultPath = await unwrap(remote().directoryStart(draft.namedRepositories?.[index]?.path ?? ''))
+      if (requestVersion.current !== version) return
+      const selected = await pickRepositoryDirectory(ctx, t('projectPickerUnavailable'), defaultPath)
       if (selected === null || requestVersion.current !== version) return
       if (!absoluteReviewPath(selected)) throw new Error(t('projectPickerInvalid'))
       const normalizedSelected = normalizeReviewPath(selected)
@@ -142,7 +142,9 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
         path,
       }
       edit({ namedRepositories: next })
-    } catch (error) { if (requestVersion.current === version) setMessage(error instanceof Error ? error.message : String(error)) }
+    } catch (error) {
+      if (requestVersion.current === version) setPickerError({ index, message: error instanceof Error ? error.message : String(error) })
+    }
     finally { if (requestVersion.current === version) setBusy(false) }
   }
 
@@ -159,7 +161,7 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
       const result = await unwrap(remote().project())
       if (requestVersion.current !== version) return
       setPage(result)
-      setDraft(editable(result.project, result.workspace))
+      setDraft(editable(result.project, result.workspace, result.temporaryRepositories))
       setPreview(result.workspace)
       setDirty(false)
       repositoriesChanged()
@@ -172,9 +174,9 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
     <header className={css.pageHeader}>
       <div><h2>{t('projectTab')}</h2><p className={css.hint}>{t('projectIntro')}</p></div>
       <div className={css.actions}>
-        <button type="button" disabled={busy} onClick={() => { void load() }}>{t('projectReload')}</button>
+        <button type="button" disabled={busy || !page?.configured} onClick={() => { void load() }}>{t('projectReload')}</button>
         <button type="button" className={css.primary} disabled={busy || draft === null || (!dirty && page?.configured)} onClick={() => { void save() }}>
-          {busy ? t('projectWorking') : t('projectSave')}
+          {busy ? t('projectWorking') : page?.configured ? t('projectSave') : t('projectGenerate')}
         </button>
       </div>
     </header>
@@ -196,16 +198,22 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
           <input aria-label={`${t('repository')} ${index + 1}`} value={entry.name} onChange={event => {
             const next = [...(draft.namedRepositories ?? [])]; next[index] = { ...entry, name: event.target.value }; edit({ namedRepositories: next })
           }} />
-          <div className={css.pathCell}>
+          <div className={`${css.pathCell} ${absoluteReviewPath(repositoryProjectPath(draft.root, entry.path)) ? css.temporaryPath : ''}`}>
             <input aria-label={`${t('projectPath')} ${index + 1}`} value={entry.path} placeholder="project/PluginManager" onChange={event => {
               const next = [...(draft.namedRepositories ?? [])]; next[index] = { ...entry, path: event.target.value }; edit({ namedRepositories: next })
+            }} onBlur={() => {
+              const path = repositoryProjectPath(draft.root, entry.path)
+              if (path !== entry.path) {
+                const next = [...(draft.namedRepositories ?? [])]; next[index] = { ...entry, path }; edit({ namedRepositories: next })
+              }
             }} />
-            {absoluteReviewPath(entry.path) && relativeProjectDirectory(draft.root, entry.path) === null && <small title={t('projectTemporaryHint')}>{t('projectTemporary')}</small>}
+            {absoluteReviewPath(repositoryProjectPath(draft.root, entry.path)) && <span className={css.temporaryBadge} title={t('projectTemporaryHint')} aria-label={t('projectTemporary')}>{t('projectTemporaryShort')}</span>}
           </div>
           <div className={css.repoActions}>
             <button type="button" onClick={() => { void chooseDirectory(index) }}>{t('projectOpenRepo')}</button>
             <button type="button" aria-label={`${t('projectRemoveRepo')} ${entry.name || index + 1}`} onClick={() => { setPendingDelete(index) }}>{t('projectRemoveRepo')}</button>
           </div>
+          {pickerError?.index === index && <p className={css.pickerError} role="alert">{pickerError.message}</p>}
         </div>)}
       </div>
       <button type="button" onClick={() => { edit({ namedRepositories: [...(draft.namedRepositories ?? []), { name: '', path: '' }] }) }}>{t('projectAddRepo')}</button>
@@ -220,18 +228,16 @@ export function RepositorySettings({ ctx, sessionId }: { ctx: Context; sessionId
         </tr>)}</tbody>
       </table>
     </div>}
-    {pendingDelete !== null && draft !== null && <div className={css.dialogBackdrop}>
-      <div className={css.dialog} role="dialog" aria-modal="true" aria-labelledby="file-review-delete-title">
+    {pendingDelete !== null && draft !== null && <Modal open onClose={() => { setPendingDelete(null) }} title={t('projectDeleteTitle')} className={css.dialog ?? ''} headless>
         <h3 id="file-review-delete-title">{t('projectDeleteTitle')}</h3>
         <p>{t('projectDeleteDescription', { name: draft.namedRepositories?.[pendingDelete]?.name || String(pendingDelete + 1) })}</p>
         <div className={css.dialogActions}>
-          <button type="button" autoFocus onClick={() => { setPendingDelete(null) }}>{t('projectCancel')}</button>
+          <button type="button" data-modal-autofocus onClick={() => { setPendingDelete(null) }}>{t('projectCancel')}</button>
           <button type="button" onClick={() => {
             edit({ namedRepositories: (draft.namedRepositories ?? []).filter((_, index) => index !== pendingDelete) })
             setPendingDelete(null)
           }}>{t('projectRemoveRepo')}</button>
         </div>
-      </div>
-    </div>}
+    </Modal>}
   </div></div>
 }

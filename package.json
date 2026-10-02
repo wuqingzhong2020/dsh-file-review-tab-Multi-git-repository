@@ -41,6 +41,7 @@
     "lib/client.js.map",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
+    "scripts/patch-desktop-directory-picker.mjs",
     "README.md"
   ],
   "dsh": {
@@ -56,6 +57,7 @@
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-primitives",
         "dsh-better-sidebar"
       ],
       "platform": "web"

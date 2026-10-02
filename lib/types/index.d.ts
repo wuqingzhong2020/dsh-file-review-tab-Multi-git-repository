@@ -8,6 +8,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { FileReviewConfig } from './repository-config.ts';
 export type * from './change-types.ts';
 export type * from './repository-types.ts';
+export type * from './git-review-types.ts';
 export { Config } from './repository-config.ts';
 export { FileReviewService, transformFile } from './file-review-service.ts';
 /** Services required for the model guidance paired with the browser renderer. */

@@ -63,6 +63,7 @@ export const inject = [
   'remote',
   'slots',
   'uiConversation',
+  'conversation',
 ]
 
 /** The tab icon: a modest line-diff glyph drawn at the host-given size. */

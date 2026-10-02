@@ -1,5 +1,5 @@
 import type { ReviewProject, ReviewWorkspace } from './repository-types.ts';
-export declare function inside(root: string, candidate: string): boolean;
+export { inside } from './repository-path-policy.ts';
 export declare function pathKey(path: string): string;
 /** ConfigParser-style INI, Git's .gitmodules, or JSON repository lists. */
 export declare function parseRepositoryManifest(text: string, filename: string): {

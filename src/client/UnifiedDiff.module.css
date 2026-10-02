@@ -88,12 +88,15 @@
 }
 
 .unifiedLineNumber {
+  position: relative;
   padding: 0 8px;
   border-right: 1px solid var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-tertiary);
   text-align: right;
   user-select: none;
 }
+
+.commentEnabled { grid-template-columns: 64px 24px minmax(max-content, 1fr); }
 
 .unifiedSign {
   text-align: center;

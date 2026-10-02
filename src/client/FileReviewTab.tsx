@@ -20,7 +20,7 @@ import type {
 } from '../change-types.ts'
 import {
   ARCHIVE_PAGE_TURNS, basename, deriveSessionChanges, deriveSessionRoots,
-  mergeRecordedTurns, resolveSessionPath, splitArchivedTurns,
+  lastTurnChanges, mergeRecordedTurns, resolveSessionPath, splitArchivedTurns,
   type SessionFileChange, type TurnFileChanges,
 } from './session-changes.ts'
 import { summarizeDiffs, UnifiedDiff, type UnifiedDiffStats } from './UnifiedDiff.tsx'
@@ -28,8 +28,13 @@ import { t } from './locales.ts'
 import { currentFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
 import css from './FileReviewTab.module.css'
 import type { ReviewWorkspace } from '../repository-types.ts'
-import { fileRepository, repositoryRelativePath } from './repository-paths.ts'
+import { fileRepository, repositoryRelativePath, relativeProjectDirectory } from './repository-paths.ts'
 import { subscribeRepositories } from './repository-events.ts'
+import { GitReviewPanel } from './GitReviewPanel.tsx'
+import type { GitReviewMode } from '../git-review-types.ts'
+import { ReviewCommentsProvider, ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
+import type { ReviewCommentTarget } from './review-comments.ts'
+type ReviewMode = 'session' | 'last-turn' | GitReviewMode
 
 const SUCCESS_NOTICE_DURATION = 3000
 const ERROR_NOTICE_DURATION = 8000
@@ -200,6 +205,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const [tick, setTick] = useState(0)
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
+  const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
+  const isGitMode = reviewMode !== 'session' && reviewMode !== 'last-turn'
   const noticeSeqRef = useRef(0)
   const noticeTimerRef = useRef<number | null>(null)
 
@@ -207,6 +214,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   useEffect(() => {
     setWorkspace(null)
     setRepositoryFilter('*')
+    setReviewMode('last-turn')
   }, [sessionId])
   useEffect(() => {
     if (!visible) return
@@ -285,10 +293,11 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   )
   const repositories = workspace?.repositories ?? []
   const ownerOf = (path: string) => fileRepository(resolveSessionPath(cwd, path), repositories)
-  const filteredTurns = useMemo(() => repositoryFilter === '*' ? turns : turns.map(turn => ({
+  const scopeTurns = useMemo(() => reviewMode === 'last-turn' ? lastTurnChanges(snapshot, turns) : turns, [snapshot, turns, reviewMode])
+  const filteredTurns = useMemo(() => repositoryFilter === '*' ? scopeTurns : scopeTurns.map(turn => ({
     ...turn,
     files: turn.files.filter(file => (fileRepository(resolveSessionPath(cwd, file.path), workspace?.repositories ?? [])?.path ?? '?') === repositoryFilter),
-  })).filter(turn => turn.files.length > 0), [turns, repositoryFilter, workspace, cwd])
+  })).filter(turn => turn.files.length > 0), [scopeTurns, repositoryFilter, workspace, cwd])
   // Auto-archive (issue #5): only the newest turns stay in the main list;
   // older completed turns collapse into the tab's bottom section, which
   // renders nothing until opened and then only ARCHIVE_PAGE_TURNS groups
@@ -383,6 +392,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   // queues a scroll that lands the link's target at the top of the tab body.
   const replayLink = useCallback((paths: readonly string[], targetTurn: number | undefined) => {
     if (paths.length === 0) return
+    setReviewMode('session')
     setRepositoryFilter('*')
     // A link into an auto-archived turn must first make that turn render:
     // open the archive section and page to the owning group. The rows then
@@ -517,7 +527,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   // Host-side state inspection: which recorded changes are still applied,
   // already undone, or in conflict. Paused while the tab is not visible.
   useEffect(() => {
-    if (!visible || flat.length === 0) return
+    if (!visible || isGitMode || flat.length === 0) return
     let active = true
     setStatusPending(true)
     // Debounce trailing-edge: streaming turns keep bumping flatKey per hunk;
@@ -549,7 +559,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
       window.clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, flatKey, tick, invoke])
+  }, [visible, isGitMode, flatKey, tick, invoke])
 
   const mergeResultStates = useCallback((
     items: readonly FlatChange[],
@@ -674,6 +684,13 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     const fileBusy = busyKey === key
     const stats = summarizeDiffs(file.diffs)
     const repository = ownerOf(file.path)
+    const absolutePath = resolveSessionPath(cwd, file.path)
+    const commentTarget: ReviewCommentTarget = {
+      scope: reviewMode === 'last-turn' ? 'last-turn' : 'session', turn: turn.turn,
+      repository: repository?.path ?? cwd ?? '', repositoryName: repository?.name ?? basename(cwd ?? ''),
+      path: repository ? repositoryRelativePath(absolutePath, repository) : relativeProjectDirectory(cwd ?? '', absolutePath) ?? file.path,
+      absolutePath,
+    }
     return (
       <li
         key={file.path}
@@ -704,6 +721,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
             ? <span className={css.deletedBadge}>{t('deleted')}</span>
             : <Stats stats={stats} />}
           {file.deleted !== true && <StateBadge state={state} />}
+          <ReviewFileCommentButton target={commentTarget} />
           {file.deleted !== true && (
             <button
               type="button"
@@ -733,6 +751,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
               : t(fileAction === 'undo' ? 'undo' : 'redo')}
           </button>
         </div>
+        <ReviewFileCommentThread target={commentTarget} />
         {isOpen && (
           <div className={css.diffWrap}>
             <LazyDiff>
@@ -753,6 +772,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
                       hideUnchanged: count => t('hideUnchanged', { count }),
                     }}
                     className={css.reviewDiff}
+                    reviewTarget={commentTarget}
                   />
                 )}
             </LazyDiff>
@@ -766,18 +786,24 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     <div className={css.root}>
       <header className={css.header}>
         <span className={css.headerTitle}>{t('tabTitle')}</span>
-        {flat.length > 0 && <Stats stats={totalStats} />}
+        <select className={css.scopeSelect} aria-label={t('reviewScope')} value={reviewMode} onChange={event => { setReviewMode(event.target.value as ReviewMode) }}>
+          <option value="last-turn">{t('reviewLastTurn')}</option><option value="session">{t('reviewSession')}</option>
+          <option value="uncommitted">{t('reviewUncommitted')}</option><option value="unstaged">{t('reviewUnstaged')}</option><option value="staged">{t('reviewStaged')}</option>
+          <option value="commit">{t('reviewCommit')}</option><option value="branch">{t('reviewBranch')}</option>
+        </select>
+        {!isGitMode && flat.length > 0 && <Stats stats={totalStats} />}
         <button
           type="button"
           className={css.refreshButton}
-          disabled={statusPending}
+          disabled={!isGitMode && statusPending}
           title={t('refresh')}
           onClick={() => { setTick(value => value + 1) }}
         >
           ⟳
         </button>
       </header>
-      {workspace?.project !== null && workspace?.project !== undefined && <div className={css.repositoryBar}>
+      <ReviewCommentsProvider key={sessionId} ctx={ctx} sessionId={sessionId}>
+      {!isGitMode && workspace?.project !== null && workspace?.project !== undefined && <div className={css.repositoryBar}>
         <span title={workspace.project.root}>{t('repoScope', { name: workspace.project.name || basename(workspace.project.root), count: repositories.filter(repo => repo.state === 'ready').length })}</span>
         <select aria-label={t('repository')} value={repositoryFilter} onChange={event => { setRepositoryFilter(event.target.value) }}>
           <option value="*">{t('repoAll')}</option>
@@ -794,7 +820,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           {notice.text}
         </div>
       )}
-      <div className={css.body} ref={bodyRef}>
+      {isGitMode ? <GitReviewPanel ctx={ctx} sessionId={sessionId} mode={reviewMode} visible={visible} tick={tick} /> : <div className={css.body} ref={bodyRef}>
         {filteredTurns.length === 0
           ? <div className={css.empty}>{t(repositoryFilter === '*' ? 'empty' : 'repoFilterEmpty')}</div>
           : (
@@ -834,7 +860,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
               )}
             </>
           )}
-      </div>
+      </div>}
+      </ReviewCommentsProvider>
     </div>
   )
 }

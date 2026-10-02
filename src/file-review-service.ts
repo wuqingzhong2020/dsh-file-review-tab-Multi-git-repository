@@ -1,7 +1,7 @@
 /** Host-side, workspace-contained undo / redo service for produced text diffs. */
 
 import { readFile, lstat, realpath } from 'node:fs/promises'
-import { basename, isAbsolute, relative, resolve } from 'node:path'
+import { basename, isAbsolute, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -13,7 +13,11 @@ import type {
 import type { RepositorySettings } from './repository-settings.ts'
 import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts'
 import { inside, pathKey, previewProject, resolveReviewWorkspace } from './repository-workspace.ts'
-import { PROJECT_FILE_NAME, readProjectFile, writeProjectFile } from './repository-project-file.ts'
+import { findProjectFile, PROJECT_FILE_NAME, readProjectFile, writeProjectFile } from './repository-project-file.ts'
+import { canonicalRepositoryPath } from './repository-path-policy.ts'
+import { resolveDirectoryStart } from './repository-directory.ts'
+import { gitReview, gitReviewDiff } from './git-review.ts'
+import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts'
 
 type InspectState = Exclude<FileReviewFileResult['state'], 'error'>
 
@@ -270,17 +274,31 @@ export class FileReviewService extends TypertRemoteService {
     const settings = this.projectSettings?.get() ?? { projects: [], revision: 0 }
     const cwd = sessionCwd(agent)
     const root = await realpath(cwd)
-    const localFile = await readProjectFile(root)
+    const localFile = await findProjectFile(root)
     const matched = await resolveReviewWorkspace(cwd, settings.projects)
-    const project = localFile !== null ? { ...localFile.project, name: basename(root) }
+    const project = localFile !== null ? localFile.project
       : matched.project !== null ? { ...matched.project, name: basename(matched.project.root) }
       : { name: basename(root), root, includeProjectRoot: true, configFiles: [], repositories: [], enabled: true }
-    const workspace = await previewProject(project)
+    const workspace = localFile !== null && project.enabled !== false ? await this.workspace(agent) : await previewProject(project)
     return {
       project, revision: settings.revision, configured: localFile !== null,
       workspace, fileRevision: localFile?.revision ?? '',
-      temporaryRepositories: localFile !== null ? this.temporaryRepositories.get(agentKey(agent)) ?? [] : [],
+      temporaryRepositories: localFile !== null ? this.temporaryRepositories.get(agentKey(agent)) ?? localFile.temporaryRepositories : [],
     }
+  }
+
+  /** Read Git differences only in repositories belonging to this session. */
+  async gitReview(agent: Agent, request: GitReviewRequest): Promise<GitReviewResult> {
+    return gitReview(await this.workspace(agent), sessionCwd(agent), request)
+  }
+
+  async gitReviewDiff(agent: Agent, request: GitReviewFileRequest): Promise<GitReviewDiff> {
+    return gitReviewDiff(await this.workspace(agent), sessionCwd(agent), request)
+  }
+
+  async directoryStart(agent: Agent, path: string): Promise<string> {
+    const current = await this.project(agent)
+    return resolveDirectoryStart(current.project.root, path)
   }
 
   /** Preview and save cannot choose another project's root through the wire. */
@@ -310,8 +328,7 @@ export class FileReviewService extends TypertRemoteService {
       }
       if (index === -1) projects.push(indexEntry)
       else projects[index] = indexEntry
-      // The project-local file is authoritative. A profile index only keeps
-      // direct sessions in explicitly configured external repositories working.
+      // The project-local file is authoritative; the profile keeps its index.
       try { await this.projectSettings.save({ projects, revision: settings.revision }) } catch { /* local file remains usable */ }
     }
     return this.project(agent)
@@ -324,7 +341,7 @@ export class FileReviewService extends TypertRemoteService {
       if (!project.configFiles.includes(PROJECT_FILE_NAME) || project.enabled === false) continue
       try {
         const local = await readProjectFile(project.root)
-        if (local !== null && local.project.enabled !== false) active.push(project)
+        if (local !== null && local.project.enabled !== false) active.push(local.project)
       } catch {
         // Invalid or unavailable project files never expand another session's scope.
       }
@@ -349,17 +366,20 @@ export class FileReviewService extends TypertRemoteService {
     }
   }
 
-  /** Cross-volume repositories live only for the receiving agent's session. */
+  /** All repositories outside the project live only in this agent's session. */
   async setTemporaryRepositories(agent: Agent, entries: NamedReviewRepository[]): Promise<ReviewWorkspace> {
     const current = await this.project(agent)
     if (!current.configured) throw new Error('Enable this project before adding temporary repositories')
     const root = current.project.root
+    const normalized: NamedReviewRepository[] = []
     for (const entry of entries) {
-      if (!isAbsolute(entry.path) || !isAbsolute(relative(root, entry.path))) {
-        throw new Error('Temporary repositories must use absolute paths on another volume')
+      const path = await canonicalRepositoryPath(root, entry.path)
+      if (!isAbsolute(entry.path) || !isAbsolute(path)) {
+        throw new Error('Temporary repositories must use absolute paths outside the project')
       }
+      normalized.push({ ...entry, path })
     }
-    this.temporaryRepositories.set(agentKey(agent), entries)
+    this.temporaryRepositories.set(agentKey(agent), normalized)
     return this.workspace(agent)
   }
 

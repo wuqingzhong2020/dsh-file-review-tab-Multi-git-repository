@@ -1,10 +1,11 @@
 /** Portable repository configuration owned by each project directory. */
 import { createHash } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { z } from 'zod'
-import type { ReviewProject } from './repository-types.ts'
+import type { NamedReviewRepository, ReviewProject } from './repository-types.ts'
+import { canonicalRepositoryPath } from './repository-path-policy.ts'
 
 export const PROJECT_FILE_NAME = 'dsh-file-review-repositories.json'
 
@@ -22,7 +23,7 @@ function revision(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
-export async function readProjectFile(root: string): Promise<{ project: ReviewProject; revision: string } | null> {
+export async function readProjectFile(root: string): Promise<{ project: ReviewProject; revision: string; temporaryRepositories: NamedReviewRepository[] } | null> {
   const filename = join(root, PROJECT_FILE_NAME)
   const marker = await lstat(filename).catch((error: NodeJS.ErrnoException) => {
     if (error.code === 'ENOENT') return null
@@ -33,18 +34,24 @@ export async function readProjectFile(root: string): Promise<{ project: ReviewPr
   if (marker.size > 1024 * 1024) throw new Error(`${PROJECT_FILE_NAME} exceeds 1 MiB`)
   const bytes = await readFile(filename)
   const data = fileSchema.parse(JSON.parse(bytes.toString('utf8')))
+  const canonicalRoot = await realpath(root)
+  const entries = await Promise.all(data.repositories.map(async entry => ({
+    ...entry, path: await canonicalRepositoryPath(canonicalRoot, entry.path),
+  })))
   return {
     project: {
-      name: basename(root), root,
+      name: basename(canonicalRoot), root: canonicalRoot,
       enabled: data.enabled ?? true,
       includeProjectRoot: data.includeProjectRoot,
-      configFiles: [], repositories: [], namedRepositories: data.repositories,
+      configFiles: [], repositories: [], namedRepositories: entries.filter(entry => !isAbsolute(entry.path)),
     },
     revision: revision(bytes),
+    // Legacy external entries are offered for migration only by the editor.
+    temporaryRepositories: entries.filter(entry => isAbsolute(entry.path)),
   }
 }
 
-export async function findProjectFile(cwd: string): Promise<{ project: ReviewProject; revision: string } | null> {
+export async function findProjectFile(cwd: string): ReturnType<typeof readProjectFile> {
   let directory = await realpath(cwd)
   while (true) {
     const found = await readProjectFile(directory)
@@ -58,11 +65,15 @@ export async function findProjectFile(cwd: string): Promise<{ project: ReviewPro
 export async function writeProjectFile(project: ReviewProject, expectedRevision: string): Promise<string> {
   const current = await readProjectFile(project.root)
   if ((current?.revision ?? '') !== expectedRevision) throw new Error('Project configuration file changed; reload before saving')
+  const root = await realpath(project.root)
+  const entries = await Promise.all((project.namedRepositories ?? []).map(async entry => ({
+    ...entry, path: await canonicalRepositoryPath(root, entry.path),
+  })))
   const data = fileSchema.parse({
     version: 1,
     enabled: project.enabled ?? true,
     includeProjectRoot: project.includeProjectRoot,
-    repositories: project.namedRepositories ?? [],
+    repositories: entries.filter(entry => !isAbsolute(entry.path)),
   })
   const filename = join(project.root, PROJECT_FILE_NAME)
   const bytes = Buffer.from(`${JSON.stringify(data, null, 2)}\n`, 'utf8')

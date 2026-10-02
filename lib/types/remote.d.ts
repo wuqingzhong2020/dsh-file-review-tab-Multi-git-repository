@@ -3,9 +3,13 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types';
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol';
 import type { FileReviewRequest, FileReviewResult, RecordedRequest, RecordedResult } from './change-types.ts';
 import type { NamedReviewRepository, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts';
+import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts';
 declare module '@deepseek-ai/dsh-typert-protocol' {
     interface TypertRemoteNamespaceMap {
         fileReview: {
+            gitReview: (agentId: SessionId, request: GitReviewRequest) => Promise<RemoteResult<GitReviewResult>>;
+            gitReviewDiff: (agentId: SessionId, request: GitReviewFileRequest) => Promise<RemoteResult<GitReviewDiff>>;
+            directoryStart: (agentId: SessionId, path: string) => Promise<RemoteResult<string>>;
             project: (agentId: SessionId) => Promise<RemoteResult<ReviewProjectPage>>;
             saveProject: (agentId: SessionId, request: SaveReviewProject) => Promise<RemoteResult<ReviewProjectPage>>;
             setTemporaryRepositories: (agentId: SessionId, entries: NamedReviewRepository[]) => Promise<RemoteResult<ReviewWorkspace>>;
@@ -16,6 +20,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
         };
     }
     interface TypertRemoteMap {
+        'fileReview/gitReview': (agentId: SessionId, request: GitReviewRequest) => Promise<RemoteResult<GitReviewResult>>;
+        'fileReview/gitReviewDiff': (agentId: SessionId, request: GitReviewFileRequest) => Promise<RemoteResult<GitReviewDiff>>;
+        'fileReview/directoryStart': (agentId: SessionId, path: string) => Promise<RemoteResult<string>>;
         'fileReview/project': (agentId: SessionId) => Promise<RemoteResult<ReviewProjectPage>>;
         'fileReview/saveProject': (agentId: SessionId, request: SaveReviewProject) => Promise<RemoteResult<ReviewProjectPage>>;
         'fileReview/setTemporaryRepositories': (agentId: SessionId, entries: NamedReviewRepository[]) => Promise<RemoteResult<ReviewWorkspace>>;
@@ -25,6 +32,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
         'fileReview/recorded': (agentId: SessionId, request: RecordedRequest) => Promise<RemoteResult<RecordedResult>>;
     }
     interface TypertRemoteScopeMap {
+        'agent:fileReview/gitReview': (request: GitReviewRequest) => Promise<RemoteResult<GitReviewResult>>;
+        'agent:fileReview/gitReviewDiff': (request: GitReviewFileRequest) => Promise<RemoteResult<GitReviewDiff>>;
+        'agent:fileReview/directoryStart': (path: string) => Promise<RemoteResult<string>>;
         'agent:fileReview/project': () => Promise<RemoteResult<ReviewProjectPage>>;
         'agent:fileReview/saveProject': (request: SaveReviewProject) => Promise<RemoteResult<ReviewProjectPage>>;
         'agent:fileReview/setTemporaryRepositories': (entries: NamedReviewRepository[]) => Promise<RemoteResult<ReviewWorkspace>>;

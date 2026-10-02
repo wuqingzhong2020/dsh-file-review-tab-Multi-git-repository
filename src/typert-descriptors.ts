@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol'
 import { namedReviewRepositorySchema, reviewProjectPageSchema, reviewWorkspaceSchema, saveReviewProjectSchema } from './repository-schemas.ts'
+import { gitReviewDiffSchema, gitReviewFileRequestSchema, gitReviewRequestSchema, gitReviewResultSchema } from './git-review-schemas.ts'
 
 export const PACKAGE_NAME = 'dsh-file-review-tab-multi-git-repository'
 
@@ -109,6 +110,24 @@ function recordedDescriptor(): InvocationDescriptor {
 }
 
 export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
+  ...(['gitReview', 'gitReviewDiff'] as const).map(method => ({
+    id: `${PACKAGE_NAME}#fileReview/${method}`, service: 'fileReview', namespace: 'fileReview', method,
+    invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'request', wire: 'request', source: 'json', codec: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#${method === 'gitReview' ? 'GitReviewRequest' : 'GitReviewFileRequest'}`, create: () => method === 'gitReview' ? gitReviewRequestSchema : gitReviewFileRequestSchema } },
+    ],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#${method === 'gitReview' ? 'GitReviewResult' : 'GitReviewDiff'}`, create: () => method === 'gitReview' ? gitReviewResultSchema : gitReviewDiffSchema },
+  } satisfies InvocationDescriptor)),
+  {
+    id: `${PACKAGE_NAME}#fileReview/directoryStart`, service: 'fileReview', namespace: 'fileReview',
+    method: 'directoryStart', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'path', wire: 'path', source: 'json', codec: { mode: 'strict', typeSymbol: 'string', create: () => z.string().max(4096) } },
+    ],
+    result: { mode: 'strict', typeSymbol: 'string', create: () => z.string() },
+  },
   descriptor('status'),
   descriptor('apply'),
   recordedDescriptor(),

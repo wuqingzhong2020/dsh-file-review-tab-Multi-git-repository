@@ -3,6 +3,8 @@ import { diffArrays } from 'diff'
 import type { ProducedFileDiff as DiffHunk } from '../change-types.ts'
 import { diffContentLines } from './diff-text.ts'
 import css from './UnifiedDiff.module.css'
+import { ReviewCommentLine, ReviewOutdatedComments } from './ReviewComments.tsx'
+import { lineCommentAnchor, reviewDiffRevision, type ReviewCommentTarget } from './review-comments.ts'
 
 /** Locale labels required by the review diff. */
 export interface UnifiedDiffLabels {
@@ -36,6 +38,7 @@ interface UnifiedGap {
 type UnifiedRow = UnifiedLine | UnifiedGap
 
 interface UnifiedHunk {
+  readonly lines: readonly UnifiedLine[]
   readonly rows: readonly UnifiedRow[]
   readonly added: number
   readonly removed: number
@@ -49,6 +52,7 @@ interface UnifiedDiffProps {
   readonly className?: string | undefined
   readonly showCopyButton?: boolean | undefined
   readonly showFileHeaders?: boolean | undefined
+  readonly reviewTarget?: ReviewCommentTarget | undefined
 }
 
 function hunkLines(diff: DiffHunk): UnifiedLine[] {
@@ -135,6 +139,7 @@ function buildHunks(diffs: readonly DiffHunk[], contextLines: number): UnifiedHu
     previousOldEnd = oldStart + oldCount
     previousNewEnd = newStart + newCount
     return {
+      lines,
       rows: collapsedRows(lines, contextLines, index),
       added: lines.filter(line => line.kind === 'add').length,
       removed: lines.filter(line => line.kind === 'del').length,
@@ -194,8 +199,10 @@ export function UnifiedDiff({
   className,
   showCopyButton = true,
   showFileHeaders = true,
+  reviewTarget,
 }: UnifiedDiffProps) {
   const hunks = useMemo(() => buildHunks(diffs, contextLines), [contextLines, diffs])
+  const revision = useMemo(() => reviewDiffRevision(diffs), [diffs])
   const [expandedGaps, setExpandedGaps] = useState<ReadonlySet<string>>(() => new Set())
   const [copied, setCopied] = useState(false)
 
@@ -220,6 +227,18 @@ export function UnifiedDiff({
   }
 
   let previousPath: string | undefined
+  const renderLine = (row: UnifiedLine, key: string, lines: readonly UnifiedLine[]) => (
+    <ReviewCommentLine key={key} anchor={reviewTarget ? lineCommentAnchor(reviewTarget, row, lines, revision) : undefined}>
+      {button => <div
+        className={`${css.unifiedLine} ${css[`unified_${row.kind}`] ?? ''} ${reviewTarget ? css.commentEnabled : ''}`}
+        data-line-kind={row.kind} data-old-line={row.oldNumber ?? undefined} data-new-line={row.newNumber ?? undefined}
+      >
+        <span className={css.unifiedLineNumber}>{button}{lineNumber(row)}</span>
+        <span className={css.unifiedSign}>{row.kind === 'del' ? '-' : row.kind === 'add' ? '+' : ' '}</span>
+        <span className={css.unifiedText}>{row.text}</span>
+      </div>}
+    </ReviewCommentLine>
+  )
   return (
     <div
       className={`${css.unifiedBlock} ${showFileHeaders ? '' : css.unifiedEmbedded} ${className ?? ''}`}
@@ -259,20 +278,7 @@ export function UnifiedDiff({
               )}
               {(hunk?.rows ?? []).flatMap((row) => {
                 if (row.kind !== 'gap') {
-                  const sign = row.kind === 'del' ? '-' : row.kind === 'add' ? '+' : ' '
-                  return [(
-                    <div
-                      key={`${row.kind}:${row.oldNumber ?? ''}:${row.newNumber ?? ''}`}
-                      className={`${css.unifiedLine} ${css[`unified_${row.kind}`] ?? ''}`}
-                      data-line-kind={row.kind}
-                      data-old-line={row.oldNumber ?? undefined}
-                      data-new-line={row.newNumber ?? undefined}
-                    >
-                      <span className={css.unifiedLineNumber}>{lineNumber(row)}</span>
-                      <span className={css.unifiedSign}>{sign}</span>
-                      <span className={css.unifiedText}>{row.text}</span>
-                    </div>
-                  )]
+                  return [renderLine(row, `${row.kind}:${row.oldNumber ?? ''}:${row.newNumber ?? ''}`, hunk?.lines ?? [])]
                 }
 
                 const expanded = expandedGaps.has(row.id)
@@ -293,19 +299,7 @@ export function UnifiedDiff({
                     >
                       {labels.hideUnchanged(row.lines.length)}
                     </button>,
-                    ...row.lines.map(line => (
-                      <div
-                        key={`${row.id}:${lineNumbers(line)}`}
-                        className={`${css.unifiedLine} ${css.unified_context}`}
-                        data-line-kind="context"
-                        data-old-line={line.oldNumber ?? undefined}
-                        data-new-line={line.newNumber ?? undefined}
-                      >
-                        <span className={css.unifiedLineNumber}>{lineNumber(line)}</span>
-                        <span className={css.unifiedSign}> </span>
-                        <span className={css.unifiedText}>{line.text}</span>
-                      </div>
-                    )),
+                    ...row.lines.map(line => renderLine(line, `${row.id}:${lineNumbers(line)}`, hunk?.lines ?? [])),
                   ]
                 }
                 return [(
@@ -326,6 +320,7 @@ export function UnifiedDiff({
           </section>
         )
       })}
+      <ReviewOutdatedComments target={reviewTarget} revision={revision} />
     </div>
   )
 }

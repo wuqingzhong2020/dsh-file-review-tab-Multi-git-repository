@@ -1,0 +1,23 @@
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--dsw-alias-border-l2); flex-shrink: 0; font: var(--dsw-font-xs-13); }
+.toolbar small, .meta, .cardHeader small, .summary > small, .thread > small { color: var(--dsw-alias-label-secondary); }
+.button, .fileButton { padding: 5px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-background-l1); color: var(--dsw-alias-label-primary); font: inherit; cursor: pointer; white-space: nowrap; }
+.button:hover, .fileButton:hover { background: var(--dsw-alias-background-l2); }
+.button:disabled, .fileButton:disabled, .lineAdd:disabled { opacity: .45; cursor: default; }
+.primary { background: var(--dsw-alias-state-link-primary, #4d6bfe); color: white; border-color: transparent; }
+.primary:hover { background: var(--dsw-alias-state-link-primary, #4d6bfe); filter: brightness(.94); }
+.fileButton { padding: 3px 7px; font: var(--dsw-font-xs-13); flex-shrink: 0; }
+.notice { margin: 0; padding: 8px 12px; color: var(--dsw-alias-label-secondary); font: var(--dsw-font-xs-13); overflow-wrap: anywhere; flex-shrink: 0; }
+.summary { padding: 10px 12px; overflow-y: auto; max-height: 45%; min-height: 80px; flex-shrink: 0; border-bottom: 1px solid var(--dsw-alias-border-l2); font: var(--dsw-font-xs-13); }
+.thread { position: sticky; left: 0; box-sizing: border-box; width: 100%; min-width: 0; padding: 8px 12px; white-space: normal; font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-primary); }
+.card { box-sizing: border-box; margin: 8px 0; padding: 12px; min-width: 0; border: 1px solid var(--dsw-alias-border-l2, #ddd); border-radius: 12px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-background-l1, #fff); box-shadow: 0 2px 8px #00000008; }
+.cardHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cardHeader small { margin-left: auto; }
+.card textarea { display: block; box-sizing: border-box; width: 100%; min-height: 80px; margin: 10px 0; padding: 6px 0; border: 0; resize: vertical; outline: none; background: transparent; color: var(--dsw-alias-label-primary); font: inherit; line-height: 1.6; }
+.card textarea:focus-visible { outline: 1px solid var(--dsw-alias-state-link-primary, #4d6bfe); outline-offset: 3px; border-radius: 4px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.commentText { margin: 10px 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.meta { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.quote { margin: 8px 0; padding: 6px 8px; border-radius: 4px; background: var(--dsw-alias-background-l2); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 90px; overflow: auto; font: var(--dsw-font-markdown-code-block); }
+.lineAdd { position: absolute; left: 3px; top: 2px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; opacity: 0; color: white; background: var(--dsw-alias-state-link-primary, #4d6bfe); cursor: pointer; font: 18px/20px sans-serif; }
+:global([data-line-kind]):hover .lineAdd, :global([data-line-kind]):focus-within .lineAdd, .lineAdd:focus-visible { opacity: 1; }
+@media (hover: none) { .lineAdd { opacity: 1; } }

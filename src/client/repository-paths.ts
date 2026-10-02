@@ -23,7 +23,7 @@ export function absoluteReviewPath(path: string): boolean {
   return /^[A-Za-z]:(?:\/|$)/.test(normalized) || normalized.startsWith('//') || normalized.startsWith('/')
 }
 
-/** Return a portable path when both absolute paths share a volume/share. */
+/** Return a portable path only for the project itself or its descendants. */
 export function relativeProjectDirectory(root: string, selected: string): string | null {
   const parse = (value: string): { volume: string; parts: string[]; insensitive: boolean } | null => {
     const path = normalizeReviewPath(value)
@@ -41,7 +41,15 @@ export function relativeProjectDirectory(root: string, selected: string): string
   while (shared < from.parts.length && shared < to.parts.length && (
     from.insensitive ? from.parts[shared]!.toLowerCase() === to.parts[shared]!.toLowerCase() : from.parts[shared] === to.parts[shared]
   )) shared += 1
-  return [...Array(from.parts.length - shared).fill('..'), ...to.parts.slice(shared)].join('/') || '.'
+  if (shared !== from.parts.length) return null
+  return to.parts.slice(shared).join('/') || '.'
+}
+
+/** Normalize manual ../ entries to absolute temporary paths outside the project. */
+export function repositoryProjectPath(root: string, input: string): string {
+  if (input.trim() === '') return ''
+  const target = absoluteReviewPath(input.trim()) ? normalizeReviewPath(input.trim()) : normalizeReviewPath(`${root}/${input.trim()}`)
+  return relativeProjectDirectory(root, target) ?? target
 }
 
 export function fileRepository(path: string, repositories: readonly ReviewRepository[]): ReviewRepository | undefined {

@@ -185,6 +185,14 @@ export function deriveSessionChanges(snapshot: ConversationSnapshot | null): Tur
   return derived
 }
 
+/** Latest actual conversation turn, including a turn that changed no files. */
+export function lastTurnChanges(snapshot: ConversationSnapshot | null, turns: readonly TurnFileChanges[]): readonly TurnFileChanges[] {
+  const view = normalizeSnapshot(snapshot)
+  const completed = [...(view?.turnEnds.entries() ?? [])].sort((a, b) => a[1] - b[1]).at(-1)?.[0]
+  const latest = view?.partial?.turn ?? view?.runningCalls[0]?.turn ?? completed ?? turns.at(-1)?.turn
+  return turns.filter(turn => turn.turn === latest)
+}
+
 /**
  * One Code Mode (`run_code`) root visible in the snapshot, with the turn it
  * settles into. The snapshot now carries settled `subCalls` with their own
