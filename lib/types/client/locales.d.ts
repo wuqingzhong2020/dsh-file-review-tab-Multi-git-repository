@@ -42,6 +42,17 @@ export declare const zh: {
     readonly reviewScope: "审查范围";
     readonly reviewLastTurn: "上一轮";
     readonly reviewSession: "本会话";
+    readonly reviewPending: "待确认";
+    readonly reviewPendingHint: "仅显示未确认轮次；确认后隐藏，可在“本会话”中取消确认。";
+    readonly pendingEmpty: "本会话暂无待确认的文件改动";
+    readonly pendingRepoEmpty: "此仓库暂无待确认的文件改动";
+    readonly confirmTurn: "确认本轮";
+    readonly unconfirmTurn: "取消确认";
+    readonly turnConfirmed: "已确认";
+    readonly confirmTurnHint: "确认本轮全部仓库的改动（{count} 个文件），从“待确认”中隐藏";
+    readonly unconfirmTurnHint: "将本轮重新放回“待确认”";
+    readonly confirmTurnLive: "本轮仍在修改代码，结束后才能确认";
+    readonly confirmationStorageError: "确认状态目前仅保留在内存中，本地存储不可用或已损坏；重启后需重新确认。";
     readonly reviewUncommitted: "未提交";
     readonly reviewUnstaged: "未暂存";
     readonly reviewStaged: "已暂存";

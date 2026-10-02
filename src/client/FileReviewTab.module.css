@@ -133,6 +133,29 @@
   white-space: nowrap;
 }
 
+.confirmedBadge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--dsw-alias-state-success-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent);
+  white-space: nowrap;
+}
+
+.turnActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.pendingHint {
+  margin: 0 10px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
 .stats {
   display: inline-flex;
   gap: 6px;
@@ -153,7 +176,6 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
   padding: 3px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
@@ -349,6 +371,22 @@
 
 .archiveTitle {
   font-size: 12px;
+}
+
+.archiveLoadMore {
+  margin: 0 10px 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.archiveLoadMore:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-border-l1);
 }
 
 .archiveSection .turnGroup {

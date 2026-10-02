@@ -1,5 +1,5 @@
 import type { ProducedFileDiff } from '../change-types.ts';
-export type CommentScope = 'last-turn' | 'session' | 'uncommitted' | 'unstaged';
+export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged';
 export interface ReviewCommentTarget {
     readonly scope: CommentScope;
     readonly turn?: number | undefined;
@@ -28,7 +28,7 @@ export interface ReviewComment {
     readonly text: string;
 }
 export declare const COMMENT_TEXT_LIMIT = 6000;
-/** Last turn and this session address the same recorded turn, regardless of the filter. */
+/** Session review scopes address the same recorded turn, regardless of the filter. */
 export declare function commentFileKey(target: ReviewCommentTarget): string;
 export declare function commentAnchorKey(anchor: ReviewCommentAnchor): string;
 /** A deterministic snapshot tag: comments never silently move to another diff revision. */

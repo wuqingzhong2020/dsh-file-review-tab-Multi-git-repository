@@ -22,7 +22,7 @@ function storeFor(sessionId: string): ReviewCommentStore {
   return store
 }
 export function commentScopeLabel(scope: CommentScope): string {
-  return t(scope === 'last-turn' ? 'reviewLastTurn' : scope === 'session' ? 'reviewSession' : scope === 'uncommitted' ? 'reviewUncommitted' : 'reviewUnstaged')
+  return t(scope === 'last-turn' ? 'reviewLastTurn' : scope === 'session' ? 'reviewSession' : scope === 'pending' ? 'reviewPending' : scope === 'uncommitted' ? 'reviewUncommitted' : 'reviewUnstaged')
 }
 function position(anchor: ReviewCommentAnchor): string {
   return t(anchor.side === 'file' ? 'commentWholeFile' : anchor.side === 'old' ? 'commentOldLine' : 'commentNewLine', { line: anchor.line ?? '' })

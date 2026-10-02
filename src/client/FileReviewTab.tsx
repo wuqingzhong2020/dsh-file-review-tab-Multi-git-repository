@@ -34,7 +34,9 @@ import { GitReviewPanel } from './GitReviewPanel.tsx'
 import type { GitReviewMode } from '../git-review-types.ts'
 import { ReviewCommentsProvider, ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
-type ReviewMode = 'session' | 'last-turn' | GitReviewMode
+import { confirmationStoreFor, isTurnConfirmed, pendingTurnChanges } from './review-confirmations.ts'
+
+type ReviewMode = 'session' | 'last-turn' | 'pending' | GitReviewMode
 
 const SUCCESS_NOTICE_DURATION = 3000
 const ERROR_NOTICE_DURATION = 8000
@@ -206,7 +208,10 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
   const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
-  const isGitMode = reviewMode !== 'session' && reviewMode !== 'last-turn'
+  const isGitMode = reviewMode !== 'session' && reviewMode !== 'last-turn' && reviewMode !== 'pending'
+  const confirmationStore = useMemo(() => confirmationStoreFor(sessionId), [sessionId])
+  const confirmationSnapshot = useSyncExternalStore(confirmationStore.subscribe, confirmationStore.getSnapshot, confirmationStore.getSnapshot)
+  const [pendingPages, setPendingPages] = useState(1)
   const noticeSeqRef = useRef(0)
   const noticeTimerRef = useRef<number | null>(null)
 
@@ -215,6 +220,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     setWorkspace(null)
     setRepositoryFilter('*')
     setReviewMode('last-turn')
+    setPendingPages(1)
   }, [sessionId])
   useEffect(() => {
     if (!visible) return
@@ -293,7 +299,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   )
   const repositories = workspace?.repositories ?? []
   const ownerOf = (path: string) => fileRepository(resolveSessionPath(cwd, path), repositories)
-  const scopeTurns = useMemo(() => reviewMode === 'last-turn' ? lastTurnChanges(snapshot, turns) : turns, [snapshot, turns, reviewMode])
+  const scopeTurns = useMemo(() => reviewMode === 'last-turn' ? lastTurnChanges(snapshot, turns)
+    : reviewMode === 'pending' ? pendingTurnChanges(turns, confirmationSnapshot.confirmed) : turns,
+  [snapshot, turns, reviewMode, confirmationSnapshot.confirmed])
   const filteredTurns = useMemo(() => repositoryFilter === '*' ? scopeTurns : scopeTurns.map(turn => ({
     ...turn,
     files: turn.files.filter(file => (fileRepository(resolveSessionPath(cwd, file.path), workspace?.repositories ?? [])?.path ?? '?') === repositoryFilter),
@@ -303,9 +311,13 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   // renders nothing until opened and then only ARCHIVE_PAGE_TURNS groups
   // per loaded page — long sessions no longer mount dozens of diff groups.
   const { main: mainTurns, archived: archivedTurns } = useMemo(
-    () => splitArchivedTurns(filteredTurns),
-    [filteredTurns],
+    // Pending turns stay in the review queue, rather than a collapsed archive.
+    () => reviewMode === 'pending'
+      ? { main: [...filteredTurns].sort((left, right) => right.turn - left.turn).slice(0, pendingPages * ARCHIVE_PAGE_TURNS), archived: [] }
+      : splitArchivedTurns(filteredTurns),
+    [filteredTurns, reviewMode, pendingPages],
   )
+  const pendingRemaining = reviewMode === 'pending' ? filteredTurns.length - mainTurns.length : 0
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archivePages, setArchivePages] = useState(1)
   // Archive UI state persists per session, so reopening a long session
@@ -527,7 +539,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   // Host-side state inspection: which recorded changes are still applied,
   // already undone, or in conflict. Paused while the tab is not visible.
   useEffect(() => {
-    if (!visible || isGitMode || flat.length === 0) return
+    if (!visible || isGitMode || flat.length === 0) { setStatusPending(false); return }
     let active = true
     setStatusPending(true)
     // Debounce trailing-edge: streaming turns keep bumping flatKey per hunk;
@@ -624,6 +636,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
 
   /** Render one turn group (latest turn first). */
   const renderTurn = (turn: TurnFileChanges) => {
+    const fullTurn = turns.find(item => item.turn === turn.turn) ?? turn
+    const confirmed = isTurnConfirmed(fullTurn, confirmationSnapshot.confirmed)
     const turnStats = turn.files.reduce<UnifiedDiffStats>(
       (total, file) => addStats(total, summarizeDiffs(file.diffs)),
       { added: 0, removed: 0 },
@@ -646,26 +660,38 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         <header className={css.turnHeader}>
           <span className={css.turnTitle}>{t('turn', { n: turn.turn })}</span>
           {turn.live && <span className={css.liveBadge}>{t('turnLive')}</span>}
+          {confirmed && <span className={css.confirmedBadge}>{t('turnConfirmed')}</span>}
           <span className={css.turnCount}>
             {turn.files.length === 1 ? t('filesOne') : t('files', { count: turn.files.length })}
           </span>
           <Stats stats={turnStats} />
-          <button
-            type="button"
-            className={css.actionButton}
-            disabled={statusPending || busyKey !== null || reversible.length === 0}
-            title={reversible.length === 0 ? t('toggleUnavailable') : undefined}
-            onClick={() => {
-              runToggle(turnKey, turn.files.filter(file => file.deleted !== true).map(file => ({
-                turn: turn.turn, path: file.path, diffs: file.diffs,
-              })), turnAction)
-            }}
-          >
-            {turnAction === 'undo' ? <UndoIcon /> : <RedoIcon />}
-            {turnBusy
-              ? t(turnAction === 'undo' ? 'undoing' : 'redoing')
-              : t(turnAction === 'undo' ? 'undoTurn' : 'redoTurn')}
-          </button>
+          <div className={css.turnActions}>
+            <button
+              type="button"
+              className={css.actionButton}
+              disabled={fullTurn.live || busyKey !== null}
+              title={fullTurn.live ? t('confirmTurnLive') : confirmed ? t('unconfirmTurnHint') : t('confirmTurnHint', { count: fullTurn.files.length })}
+              onClick={() => { confirmationStore.setConfirmed(fullTurn, !confirmed) }}
+            >
+              {t(confirmed ? 'unconfirmTurn' : 'confirmTurn')}
+            </button>
+            <button
+              type="button"
+              className={css.actionButton}
+              disabled={statusPending || busyKey !== null || reversible.length === 0}
+              title={reversible.length === 0 ? t('toggleUnavailable') : undefined}
+              onClick={() => {
+                runToggle(turnKey, turn.files.filter(file => file.deleted !== true).map(file => ({
+                  turn: turn.turn, path: file.path, diffs: file.diffs,
+                })), turnAction)
+              }}
+            >
+              {turnAction === 'undo' ? <UndoIcon /> : <RedoIcon />}
+              {turnBusy
+                ? t(turnAction === 'undo' ? 'undoing' : 'redoing')
+                : t(turnAction === 'undo' ? 'undoTurn' : 'redoTurn')}
+            </button>
+          </div>
         </header>
         <ul className={css.fileList}>
           {turn.files.map(file => renderFile(turn, file))}
@@ -686,7 +712,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     const repository = ownerOf(file.path)
     const absolutePath = resolveSessionPath(cwd, file.path)
     const commentTarget: ReviewCommentTarget = {
-      scope: reviewMode === 'last-turn' ? 'last-turn' : 'session', turn: turn.turn,
+      scope: reviewMode === 'last-turn' ? 'last-turn' : reviewMode === 'pending' ? 'pending' : 'session', turn: turn.turn,
       repository: repository?.path ?? cwd ?? '', repositoryName: repository?.name ?? basename(cwd ?? ''),
       path: repository ? repositoryRelativePath(absolutePath, repository) : relativeProjectDirectory(cwd ?? '', absolutePath) ?? file.path,
       absolutePath,
@@ -788,6 +814,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         <span className={css.headerTitle}>{t('tabTitle')}</span>
         <select className={css.scopeSelect} aria-label={t('reviewScope')} value={reviewMode} onChange={event => { setReviewMode(event.target.value as ReviewMode) }}>
           <option value="last-turn">{t('reviewLastTurn')}</option><option value="session">{t('reviewSession')}</option>
+          <option value="pending">{t('reviewPending')}</option>
           <option value="uncommitted">{t('reviewUncommitted')}</option><option value="unstaged">{t('reviewUnstaged')}</option><option value="staged">{t('reviewStaged')}</option>
           <option value="commit">{t('reviewCommit')}</option><option value="branch">{t('reviewBranch')}</option>
         </select>
@@ -812,6 +839,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         </select>
         <small title={workspace.warnings.join('\n')}>{t('repoSettingsHint')}{workspace.warnings.length > 0 ? ' ⚠' : ''}</small>
       </div>}
+      {!isGitMode && confirmationSnapshot.storageError && <div className={`${css.notice} ${css.noticeError}`} role="alert">{t('confirmationStorageError')}</div>}
       {notice !== null && (
         <div
           className={`${css.notice} ${notice.tone === 'success' ? css.noticeSuccess : css.noticeError}`}
@@ -821,11 +849,13 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         </div>
       )}
       {isGitMode ? <GitReviewPanel ctx={ctx} sessionId={sessionId} mode={reviewMode} visible={visible} tick={tick} /> : <div className={css.body} ref={bodyRef}>
+        {reviewMode === 'pending' && <p className={css.pendingHint}>{t('reviewPendingHint')}</p>}
         {filteredTurns.length === 0
-          ? <div className={css.empty}>{t(repositoryFilter === '*' ? 'empty' : 'repoFilterEmpty')}</div>
+          ? <div className={css.empty}>{t(reviewMode === 'pending' ? (repositoryFilter === '*' ? 'pendingEmpty' : 'pendingRepoEmpty') : repositoryFilter === '*' ? 'empty' : 'repoFilterEmpty')}</div>
           : (
             <>
               {mainTurns.map(renderTurn)}
+              {pendingRemaining > 0 && <button type="button" className={css.archiveLoadMore} onClick={() => { setPendingPages(current => current + 1) }}>{t('loadMore', { n: pendingRemaining })}</button>}
               {archivedTurns.length > 0 && (
                 <div className={css.archiveSection}>
                   <button

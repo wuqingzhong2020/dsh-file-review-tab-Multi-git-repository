@@ -1,7 +1,7 @@
 import type { ProducedFileDiff } from '../change-types.ts'
 import { normalizeReviewPath } from './repository-paths.ts'
 
-export type CommentScope = 'last-turn' | 'session' | 'uncommitted' | 'unstaged'
+export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged'
 export interface ReviewCommentTarget {
   readonly scope: CommentScope
   readonly turn?: number | undefined
@@ -35,9 +35,9 @@ function pathKey(path: string): string {
   const normalized = normalizeReviewPath(path)
   return /^[A-Za-z]:/.test(normalized) || normalized.startsWith('//') ? normalized.toLowerCase() : normalized
 }
-/** Last turn and this session address the same recorded turn, regardless of the filter. */
+/** Session review scopes address the same recorded turn, regardless of the filter. */
 export function commentFileKey(target: ReviewCommentTarget): string {
-  const source = target.scope === 'session' || target.scope === 'last-turn' ? `turn:${target.turn}` : target.scope
+  const source = target.scope === 'session' || target.scope === 'last-turn' || target.scope === 'pending' ? `turn:${target.turn}` : target.scope
   return JSON.stringify([pathKey(target.repository), pathKey(target.absolutePath), source])
 }
 export function commentAnchorKey(anchor: ReviewCommentAnchor): string {
@@ -82,10 +82,10 @@ export function parseReviewComments(raw: string): readonly ReviewComment[] {
     const anchor = value.anchor as Record<string, unknown> | undefined
     if (typeof value.id !== 'string' || ids.has(value.id) || typeof value.text !== 'string' || !value.text.trim() || value.text.length > COMMENT_TEXT_LIMIT || !anchor) throw new Error('Invalid review comment')
     ids.add(value.id)
-    if (!['last-turn', 'session', 'uncommitted', 'unstaged'].includes(String(anchor.scope)) || !['old', 'new', 'file'].includes(String(anchor.side))) throw new Error('Invalid review anchor')
+    if (!['last-turn', 'session', 'pending', 'uncommitted', 'unstaged'].includes(String(anchor.scope)) || !['old', 'new', 'file'].includes(String(anchor.side))) throw new Error('Invalid review anchor')
     for (const field of ['repository', 'repositoryName', 'path', 'absolutePath', 'quote', 'before', 'after', 'revision']) if (typeof anchor[field] !== 'string') throw new Error('Invalid review anchor')
     if (anchor.side === 'file' ? anchor.line !== null : typeof anchor.line !== 'number' || !Number.isInteger(anchor.line) || anchor.line < 1) throw new Error('Invalid review line')
-    if (anchor.scope === 'session' || anchor.scope === 'last-turn') {
+    if (anchor.scope === 'session' || anchor.scope === 'last-turn' || anchor.scope === 'pending') {
       if (typeof anchor.turn !== 'number' || !Number.isInteger(anchor.turn) || anchor.turn < 1) throw new Error('Invalid review turn')
     }
     return { id: value.id, text: value.text, anchor: anchor as unknown as ReviewCommentAnchor }
