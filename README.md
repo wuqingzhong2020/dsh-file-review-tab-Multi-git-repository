@@ -1,12 +1,18 @@
 # dsh-file-review-tab-multi-git-repository
 
-把 [dsh-file-review](https://github.com/left0ver/dsh-file-review)（作者 [left0ver](https://github.com/left0ver)）的「改动审查」能力移植为 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 的侧边栏 Tab，并保留对话尾部的审查行。适配 DeepSeek Harness 桌面版 0.2.0-rc.2 与 dsh-better-sidebar 0.24.1；宿主自带的改动摘要、审查页及文件提及功能保持启用。
+**dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并适配 DeepSeek Harness Desktop 0.2.0-rc.2 与 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1。**
+
+在原有文件审查侧边栏 Tab 和对话尾部审查行的基础上，扩展工程级多仓库配置、跨仓库差异审查、修改意见与轮次确认等功能。宿主自带的改动摘要、审查页及文件提及功能保持启用。
+
+## 开发文档
+
+开始开发或排查问题前，请先阅读 [整体架构与开发接入指南](docs/ARCHITECTURE.md)。该文档说明 Host/Client 边界、两条差异数据链路、多仓库配置、通信契约、状态存储、文件操作边界以及常见修改入口；本文作为工程入口，后续引用 README 时也请一并参考架构文档。
 
 ## 功能
 
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
 - **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
-- **仓库分组**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。点击仓库标题可收起或展开全部文件；会话范围继续保留轮次分组及确认、撤销操作。
+- **仓库分组与内容展开**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。仓库标题旁的图标批量展开或收起该仓库内文件的差异内容；轮次标题旁的图标控制该轮全部仓库的文件内容，Git 范围的文件数标题旁图标控制当前显示的全部文件内容。收起内容后仍显示文件名，点击仓库名称或左侧箭头则隐藏、显示整个文件列表。部分文件已展开时，图标先展开剩余内容，再次点击全部收起；操作只影响当前作用范围。Git 差异按需加载并缓存，批量展开最多同时请求 4 个文件。
 - **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 20 行未修改代码；中间间隔从两端各展开 10 行，首尾间隔从改动处向外展开。点击「收起展开的上下文」恢复默认显示。
 - **两种差异布局**：顶部选择「统一」或「并排」。统一视图上下列出删除与新增行；并排视图左侧旧版、右侧新版，对齐对应的改动行。支持「自动换行」开关，关闭后横向滚动查看长行；布局与换行选择保存在应用本地，切换布局保留已展开的上下文和评论。并排视图两侧都可对实际代码行评论，引用各自的新旧行号。
 - **会话「多代码仓管理」页签**：在「对话」「轨迹」旁边，直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换工程会自动显示对应配置；文件审查显示所属仓库及仓库内路径，可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
@@ -19,7 +25,6 @@
 - **窄容器自适应**：侧栏半宽分屏下，轮次头部自动换行、次要信息（行数统计、「在编辑器中打开」）让位，撤销操作与文件名始终完整。
 - **样式隔离**：全部 CSS Module + 宿主 `--dsw-alias-*` 主题令牌，不与对话区或其他插件冲突。
 
-![对话尾部的审查行：已编辑 N 个文件、撤销与审查按钮、文件名列表](docs/screenshot.png)
 
 ## 安装
 
@@ -34,10 +39,10 @@ dsh plugin --profile desktop add github:wuqingzhong2020/dsh-file-review-tab-Mult
 dsh plugin --profile web add dsh-file-review-tab-multi-git-repository
 ```
 
-对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-diff-layouts.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
+对于安装在 `D:\app\DeepSeekHarnessDesktop` 的 DeepSeek Harness Desktop 0.2.0-rc.2，本仓库会生成可安装包 `dist/dsh-file-review-tab-multi-git-repository-0.1.0-file-contents.tgz`。桌面应用独占 `desktop` Profile，不能通过普通 `dsh plugin --profile desktop` 命令修改；在 PowerShell 中运行以下命令，把包直接安装到桌面的 Profile：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-diff-layouts.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "<本仓库路径>\dist\dsh-file-review-tab-multi-git-repository-0.1.0-file-contents.tgz"
 ```
 
 桌面版安装后请重启应用，让 Host 与 Web 插件重新加载。确认 `package.json` 使用 `dsh-better-sidebar` **0.24.1**；在会话顶部打开「多代码仓管理」，在侧边栏打开「文件审查」。
@@ -119,7 +124,9 @@ node --test tests/*.test.mjs
 
 ## 致谢
 
-核心 diff 渲染器与撤销服务移植自 [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review)（MIT 许可证，© ZhangWenChao）。侧边栏集成基于 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 开放的 `ctx.betterSidebar` 注册 API。
+本插件基于 [Lzh3070/dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 修改和扩展，感谢原作者提供文件审查侧边栏 Tab、对话审查行及相关基础能力。
+
+上游核心 diff 渲染器与撤销服务源自 [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review)（MIT 许可证，© ZhangWenChao）。侧边栏集成基于 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 开放的 `ctx.betterSidebar` 注册 API。
 
 ## 许可证
 

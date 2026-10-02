@@ -114,6 +114,12 @@ export declare const zh: {
     readonly diffWrap: "自动换行";
     readonly diffOld: "旧版";
     readonly diffNew: "新版";
+    readonly collapseRepositoryFiles: "收起 {name} 的文件内容";
+    readonly expandRepositoryFiles: "展开 {name} 的文件内容";
+    readonly collapseTurnRepositories: "收起本轮全部仓库的文件内容";
+    readonly expandTurnRepositories: "展开本轮全部仓库的文件内容";
+    readonly collapseAllRepositories: "收起全部仓库的文件内容";
+    readonly expandAllRepositories: "展开全部仓库的文件内容";
     readonly stats: "新增 {added} 行，删除 {removed} 行";
     readonly unavailable: "无法为此更改还原可审查的差异。";
     readonly refresh: "刷新状态";

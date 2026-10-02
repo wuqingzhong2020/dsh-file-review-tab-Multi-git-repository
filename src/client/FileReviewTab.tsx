@@ -35,8 +35,8 @@ import type { GitReviewMode } from '../git-review-types.ts'
 import { ReviewCommentsProvider, ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
 import { confirmationStoreFor, isTurnConfirmed, pendingTurnChanges } from './review-confirmations.ts'
-import { groupReviewFiles } from './review-repository-groups.ts'
-import { ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
+import { allFileContentsExpanded, groupReviewFiles, repositoryGroupId, setFileContentsExpanded, setRepositoryGroupsCollapsed } from './review-repository-groups.ts'
+import { FileContentsButton, ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
 import { DiffViewControls } from './DiffViewControls.tsx'
 
 type ReviewMode = 'session' | 'last-turn' | 'pending' | GitReviewMode
@@ -206,6 +206,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const [statusPending, setStatusPending] = useState(false)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const [collapsedRepositories, setCollapsedRepositories] = useState<ReadonlySet<string>>(() => new Set())
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tick, setTick] = useState(0)
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
@@ -224,6 +225,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     setRepositoryFilter('*')
     setReviewMode('last-turn')
     setPendingPages(1)
+    setCollapsedRepositories(new Set())
+    setExpanded(new Set())
   }, [sessionId])
   useEffect(() => {
     if (!visible) return
@@ -429,6 +432,11 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     const matches = (item: { turn: number; path: string }): boolean =>
       paths.includes(item.path) && (targetTurn === undefined || item.turn === targetTurn)
     const allFiles = turnsRef.current.flatMap(turn => turn.files.map(file => ({ turn: turn.turn, path: file.path })))
+    const linkedTurns = new Set(allFiles.filter(matches).map(item => item.turn))
+    setCollapsedRepositories(current => new Set([...current].filter(key => {
+      const [ownerSession, ownerTurn] = JSON.parse(key) as [string, number, string]
+      return ownerSession !== sessionId || !linkedTurns.has(ownerTurn)
+    })))
     setExpanded((current) => {
       const next = new Set(current)
       for (const item of allFiles) {
@@ -444,7 +452,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
       rowKey: stateKey(first.turn, first.path),
       turn: paths.length > 1 ? first.turn : null,
     }
-  }, [])
+  }, [sessionId])
 
   useEffect(() => {
     const replay = (seed: FileReviewSeed): void => {
@@ -645,6 +653,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         : workspace?.project ? { key: '?', name: t('repoOther'), path: '' }
           : { key: cwd ?? '?', name: basename(cwd ?? '') || t('repoOther'), path: cwd ?? '' }
     })
+    const groupKeys = repositoryGroups.map(group => repositoryGroupId(sessionId, turn.turn, group.key))
+    const fileKeys = turn.files.map(file => stateKey(turn.turn, file.path))
+    const allExpanded = allFileContentsExpanded(expanded, fileKeys) && groupKeys.every(key => !collapsedRepositories.has(key))
     const fullTurn = turns.find(item => item.turn === turn.turn) ?? turn
     const confirmed = isTurnConfirmed(fullTurn, confirmationSnapshot.confirmed)
     const turnStats = turn.files.reduce<UnifiedDiffStats>(
@@ -675,6 +686,11 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           </span>
           <Stats stats={turnStats} />
           <div className={css.turnActions}>
+            <FileContentsButton expanded={allExpanded} label={t(allExpanded ? 'collapseTurnRepositories' : 'expandTurnRepositories')}
+              onClick={() => {
+                setExpanded(current => setFileContentsExpanded(current, fileKeys, !allExpanded))
+                if (!allExpanded) setCollapsedRepositories(current => setRepositoryGroupsCollapsed(current, groupKeys, false))
+              }} />
             <button
               type="button"
               className={css.actionButton}
@@ -702,7 +718,13 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
             </button>
           </div>
         </header>
-        {repositoryGroups.map(group => <ReviewRepositoryGroup key={`${sessionId}:${turn.turn}:${group.key}`} name={group.name} path={group.path} count={group.files.length}>
+        {repositoryGroups.map(group => <ReviewRepositoryGroup key={`${sessionId}:${turn.turn}:${group.key}`} name={group.name} path={group.path} count={group.files.length}
+          collapsed={collapsedRepositories.has(repositoryGroupId(sessionId, turn.turn, group.key))}
+          onCollapsedChange={collapsed => { setCollapsedRepositories(current => setRepositoryGroupsCollapsed(current, [repositoryGroupId(sessionId, turn.turn, group.key)], collapsed)) }}
+          contentsExpanded={allFileContentsExpanded(expanded, group.files.map(file => stateKey(turn.turn, file.path)))}
+          onContentsExpandedChange={open => {
+            setExpanded(current => setFileContentsExpanded(current, group.files.map(file => stateKey(turn.turn, file.path)), open))
+          }}>
           <ul className={css.fileList}>{group.files.map(file => renderFile(turn, file))}</ul>
         </ReviewRepositoryGroup>)}
       </section>

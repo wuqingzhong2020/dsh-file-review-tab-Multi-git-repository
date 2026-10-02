@@ -10,8 +10,9 @@ import { resolveSessionPath } from './session-changes.ts'
 import css from './FileReviewTab.module.css'
 import { ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
-import { groupReviewFiles } from './review-repository-groups.ts'
-import { ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
+import { allFileContentsExpanded, groupReviewFiles, repositoryGroupId, setFileContentsExpanded, setRepositoryGroupsCollapsed } from './review-repository-groups.ts'
+import { FileContentsButton, ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
+import { loadMissingReviewDiffs } from './git-review-diff-loader.ts'
 
 interface GitRemote {
   gitReview(request: GitReviewRequest): Promise<RemoteResult<GitReviewResult>>
@@ -34,15 +35,18 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
   const [data, setData] = useState<GitReviewResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const [collapsedRepositories, setCollapsedRepositories] = useState<ReadonlySet<string>>(() => new Set())
   const [diffs, setDiffs] = useState<Map<string, GitReviewDiff | string | null>>(new Map())
   const version = useRef(0)
+  const requestedDiffs = useRef(new Set<string>())
   const keyOf = (file: GitReviewFile) => `${file.repository}\0${file.path}`
   const request = (): GitReviewRequest => ({ mode, ...(repository !== '*' ? { repository } : {}), ...(ref ? { ref } : {}) })
-  useEffect(() => { setRepository('*'); setRef('') }, [sessionId, mode])
+  useEffect(() => { setRepository('*'); setRef(''); setCollapsedRepositories(new Set()) }, [sessionId, mode])
   useEffect(() => {
     if (!visible) return
     const current = ++version.current
+    requestedDiffs.current = new Set()
     setLoading(true); setError(''); setExpanded(new Set()); setDiffs(new Map())
     void Promise.resolve().then(() => unwrap(remote().gitReview(request()))).then(result => {
       if (version.current !== current) return
@@ -51,16 +55,26 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
       .finally(() => { if (version.current === current) setLoading(false) })
     return () => { version.current++ }
   }, [sessionId, mode, repository, ref, visible, tick])
-  const toggle = (file: GitReviewFile) => {
-    const key = keyOf(file)
-    setExpanded(current => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next })
-    if (diffs.has(key)) return
+  const loadDiffs = (files: readonly GitReviewFile[]) => {
     const current = version.current
-    setDiffs(value => new Map(value).set(key, null))
-    void Promise.resolve().then(() => unwrap(remote().gitReviewDiff({ ...request(), repository: file.repository, path: file.path }))).then(result => {
-      if (version.current === current) setDiffs(value => new Map(value).set(key, result))
-    }).catch(cause => { if (version.current === current) setDiffs(value => new Map(value).set(key, cause instanceof Error ? cause.message : String(cause))) })
+    const comparison = request()
+    void loadMissingReviewDiffs(files, keyOf, requestedDiffs.current, async file => {
+      if (version.current !== current) return
+      const key = keyOf(file)
+      setDiffs(value => new Map(value).set(key, null))
+      try {
+        const result = await unwrap(remote().gitReviewDiff({ ...comparison, repository: file.repository, path: file.path }))
+        if (version.current === current) setDiffs(value => new Map(value).set(key, result))
+      } catch (cause) {
+        if (version.current === current) setDiffs(value => new Map(value).set(key, cause instanceof Error ? cause.message : String(cause)))
+      }
+    })
   }
+  const setContents = (files: readonly GitReviewFile[], open: boolean) => {
+    setExpanded(current => setFileContentsExpanded(current, files.map(keyOf), open))
+    if (open) loadDiffs(files)
+  }
+  const toggle = (file: GitReviewFile) => { setContents([file], !expanded.has(keyOf(file))) }
   const selected = data?.repositories.find(repo => repo.path === repository)
   const totals = data?.files.reduce((stats, file) => ({ added: stats.added + file.added, removed: stats.removed + file.removed }), { added: 0, removed: 0 })
   const refsMode = mode === 'commit' || mode === 'branch'
@@ -68,6 +82,8 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
     key: file.repository, path: file.repository,
     name: data?.repositories.find(repo => repo.path === file.repository)?.name ?? file.repository,
   }))
+  const groupKeys = repositoryGroups.map(group => repositoryGroupId(sessionId, mode, group.key))
+  const allExpanded = allFileContentsExpanded(expanded, (data?.files ?? []).map(keyOf)) && groupKeys.every(key => !collapsedRepositories.has(key))
   return <div className={css.gitPanel}>
     <div className={css.repositoryBar}>
       <select aria-label={t('repository')} value={repository} onChange={event => { setRepository(event.target.value); setRef('') }}>
@@ -89,8 +105,18 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
       {loading ? <p className={css.empty} role="status">{t('reviewLoading')}</p>
         : !error && data && !data.files.length ? <p className={css.empty}>{t(data.repositories.length ? 'reviewGitEmpty' : 'reviewNoGit')}</p> : null}
       {!loading && !error && data && data.files.length > 0 && <section className={css.turnGroup}>
-        <header className={css.turnHeader}><span className={css.turnTitle}>{t('reviewFiles', { count: data.files.length })}</span></header>
-        {repositoryGroups.map(group => <ReviewRepositoryGroup key={`${sessionId}:${mode}:${group.key}`} name={group.name} path={group.path} count={group.files.length}>
+        <header className={css.turnHeader}><span className={css.turnTitle}>{t('reviewFiles', { count: data.files.length })}</span>
+          <span className={css.gitVisibility}><FileContentsButton expanded={allExpanded} label={t(allExpanded ? 'collapseAllRepositories' : 'expandAllRepositories')}
+            onClick={() => {
+              setContents(data.files, !allExpanded)
+              if (!allExpanded) setCollapsedRepositories(current => setRepositoryGroupsCollapsed(current, groupKeys, false))
+            }} /></span>
+        </header>
+        {repositoryGroups.map(group => <ReviewRepositoryGroup key={`${sessionId}:${mode}:${group.key}`} name={group.name} path={group.path} count={group.files.length}
+          collapsed={collapsedRepositories.has(repositoryGroupId(sessionId, mode, group.key))}
+          onCollapsedChange={collapsed => { setCollapsedRepositories(current => setRepositoryGroupsCollapsed(current, [repositoryGroupId(sessionId, mode, group.key)], collapsed)) }}
+          contentsExpanded={allFileContentsExpanded(expanded, group.files.map(keyOf))}
+          onContentsExpandedChange={open => { setContents(group.files, open) }}>
         <ul className={css.fileList}>{group.files.map(file => {
           const key = keyOf(file); const open = expanded.has(key); const diff = diffs.get(key)
           const repo = data.repositories.find(item => item.path === file.repository)

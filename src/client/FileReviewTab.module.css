@@ -388,15 +388,14 @@
   background: var(--dsw-alias-background-l2, #f6f8fa);
   color: var(--dsw-alias-label-primary);
   text-align: left;
-  cursor: pointer;
   font: inherit;
 }
 
-.repositoryGroupHeader:hover {
+.repositoryGroupTitle:hover {
   background: var(--dsw-alias-border-l1);
 }
 
-.repositoryGroupHeader:focus-visible {
+.repositoryGroupTitle:focus-visible {
   outline: 2px solid var(--dsw-alias-state-link-primary, #4d6bfe);
   outline-offset: -2px;
 }
@@ -410,8 +409,14 @@
 }
 
 .repositoryGroupHeader .turnCount {
-  margin-left: auto;
+  flex: none;
 }
+.repositoryGroupTitle { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; border-radius: 4px; padding: 2px 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.repositoryVisibilityButton { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 26px; padding: 3px; border: 1px solid transparent; border-radius: 5px; color: var(--dsw-alias-label-secondary); background: transparent; cursor: pointer; }
+.repositoryVisibilityButton svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.repositoryVisibilityButton:hover { color: var(--dsw-alias-state-link-primary, #0969da); background: var(--dsw-alias-border-l1); border-color: var(--dsw-alias-border-l2); }
+.repositoryVisibilityButton:focus-visible { outline: 2px solid var(--dsw-alias-state-link-primary, #0969da); outline-offset: 1px; }
+.gitVisibility { margin-left: auto; }
 
 .archiveLoadMore {
   margin: 0 10px 8px;
