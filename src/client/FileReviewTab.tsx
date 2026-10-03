@@ -27,6 +27,7 @@ import { summarizeDiffs, UnifiedDiff, type UnifiedDiffStats } from './UnifiedDif
 import { t, type CopyKey } from './locales.ts'
 import { useReviewLocale } from './use-review-locale.ts'
 import { followReviewTabTitle } from './sidebar-title.ts'
+import { openUserGuide } from './user-guide.ts'
 import { localizeReviewMessage } from './message-locales.ts'
 import { currentFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
 import css from './FileReviewTab.module.css'
@@ -214,6 +215,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const [collapsedRepositories, setCollapsedRepositories] = useState<ReadonlySet<string>>(() => new Set())
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [guideBusy, setGuideBusy] = useState(false)
   const [tick, setTick] = useState(0)
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
@@ -856,6 +858,18 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           <option value="uncommitted">{t('reviewUncommitted')}</option><option value="unstaged">{t('reviewUnstaged')}</option><option value="staged">{t('reviewStaged')}</option>
           <option value="commit">{t('reviewCommit')}</option><option value="branch">{t('reviewBranch')}</option>
         </select>
+        <button type="button" className={css.guideButton} disabled={guideBusy} title={t('userGuideHint')}
+          onClick={async () => {
+            setGuideBusy(true)
+            try { await openUserGuide(ctx, sessionId) }
+            catch (error) { showNotice('error', 'userGuideFailed', error instanceof Error ? error.message : undefined) }
+            finally { setGuideBusy(false) }
+          }}>
+          <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 4v13M10 5C7 3 4 3 2 4v12c3-1 5-1 8 1 3-2 5-2 8-1V4c-2-1-5-1-8 1Z" />
+          </svg>
+          {t(guideBusy ? 'userGuideOpening' : 'userGuide')}
+        </button>
         {!isGitMode && flat.length > 0 && <Stats stats={totalStats} />}
         <button
           type="button"

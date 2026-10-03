@@ -1,3 +1,4 @@
-export declare function useDiffViewPreferences(): import("./diff-view-preferences.ts").DiffViewPreferences;
+import { type DiffViewPreferences } from './diff-view-preferences.ts';
+export declare function useDiffViewPreferences(): DiffViewPreferences;
 export declare function DiffViewControls(): import("react").JSX.Element;
 //# sourceMappingURL=DiffViewControls.d.ts.map

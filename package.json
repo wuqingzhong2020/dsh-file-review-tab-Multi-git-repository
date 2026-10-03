@@ -1,7 +1,7 @@
 {
   "name": "dsh-file-review-tab-multi-git-repository",
   "description": "DeepSeek Harness file-review tab for tool-produced diffs and safe undo across multi-repository workspaces.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",

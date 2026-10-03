@@ -2,7 +2,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.1.2**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.2.0**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
 
@@ -120,6 +120,8 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
 | 差异阅读 | [diff-search.ts](../src/client/diff-search.ts)、[diff-navigation.ts](../src/client/diff-navigation.ts)、[diff-highlight.ts](../src/client/diff-highlight.ts)、[DiffCode.tsx](../src/client/DiffCode.tsx) | 原始行搜索、修改块索引、有限语言词法着色与匹配标记 |
 | 评论 | [ReviewComments.tsx](../src/client/ReviewComments.tsx)、[review-comments.ts](../src/client/review-comments.ts)、[review-comments-send.ts](../src/client/review-comments-send.ts) | 评论编辑、定位、存储和发送 |
+| 范围引用与外部定位 | [review-reference.ts](../src/client/review-reference.ts)、[review-file-opener.ts](../src/client/review-file-opener.ts)、[review-location.ts](../src/review-location.ts)、[editor-launch.ts](../src/editor-launch.ts) | 完整行范围、来源、磁盘唯一匹配、受限编辑器启动 |
+| 讨论与大文件窗口 | [review-discussions.ts](../src/client/review-discussions.ts)、[VirtualDiffRows.tsx](../src/client/VirtualDiffRows.tsx)、[virtual-diff-model.ts](../src/client/virtual-diff-model.ts) | 持久化请求／轮次关联、已读／解决状态、可变高度渲染 |
 | 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
 | 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](../src/client/repository-events.ts) | 深链定位和配置变化通知 |
 | 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts)、[use-review-locale.ts](../src/client/use-review-locale.ts)、[message-locales.ts](../src/client/message-locales.ts) | 中英文词典、宿主语言订阅、界面实时刷新及已识别的错误说明翻译 |
@@ -258,13 +260,21 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | `saveProject(request)` | 保存工程配置并返回管理页数据 | 写工程 JSON、更新 Profile 索引 |
 | `setTemporaryRepositories(entries)` | 设置当前会话的临时外部仓库 | 更新 Host 内存 |
 | `directoryStart(path)` | 解析目录选择器起始目录 | 读取 |
+| `userGuide(language)` | 按 `zh` / `en` 返回插件安装目录中的使用手册绝对路径 | 读取插件文件；不依赖会话工程目录 |
+| `userGuideDocument(language)` | 返回固定语言手册的 Markdown 与 12 张随包截图的 JPEG data URL | 只读取固定文档和图片白名单；不接受调用方文件路径 |
 | `gitReview(request)` | 查询仓库、比较引用及改动文件列表 | 读取 Git |
 | `gitReviewDiff(request)` | 查询一个文件的具体差异 | 读取 Git/工作区 |
 | `recorded(request)` | 按根调用 ID 获取嵌套工具修改记录 | 读取 Host 内存 |
 | `status(request)` | 检查原始差异与当前文件的关系 | 读取文件 |
 | `apply(request)` | 安全撤销或重新应用差异 | 写文件 |
+| `locateReference(request)` | 核对当前磁盘引用位置 | 读取，结果含原位置／移动／歧义／失配 |
+| `openEditor(request)` | 再次校验后向 VS Code 兼容程序传递文件与行号 | 启动外部编辑器，不写工程文件 |
 
 客户端先获取 `sessions.scope(sessionId)`，再用 `scope.get('remote.fileReview')` 获取动态服务。响应为 `RemoteResult`：先检查 `ok`，失败读取 `error.message`，成功读取 `value`。异步挂载未完成或插件服务缺失时必须提供可见错误，不能在组件渲染期间无条件访问会抛异常的动态服务 getter。
+
+文件审查标题行的「操作指南」由 [user-guide.ts](../src/client/user-guide.ts) 读取宿主当前语言，调用 `userGuide(language)` 验证随包手册路径，然后通过 `betterSidebar.openTab` 打开单例 `file-review-guide` 页签。[UserGuideTab.tsx](../src/client/UserGuideTab.tsx) 通过 Agent 作用域 `userGuideDocument(language)` 读取手册和截图，复用宿主 `MarkdownText` 排版及 `MarkdownDelegateProvider` 的点击放大能力。打开后跟随宿主语言变化，也可手动刷新；请求失效后不会覆盖新语言的文档。
+
+Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_GUIDE.en.md`，只接受两种语言值和 12 张固定命名的 JPEG 截图；不会把当前工程里的同名文件当作插件手册。截图转换为 data URL，经 `pathImages` / `fileImages` 的显式图片解析器交给宿主渲染，避免 Desktop 的 `dsh-app://` 地址被普通 Markdown 图片协议白名单拒绝。RPC 对内容长度、图片键和媒体类型作校验，不接受调用方的任意本地路径；图片数据只保留在页签内存中，不写入页签持久化元数据。未新增 Markdown 渲染运行时依赖；差异视图保持原有代码展示方式。
 
 新增远程方法时，应同时修改领域类型、Zod schema、描述符、Host 方法、`remote.ts` 类型扩展和调用页面。仅给 service 增加一个方法不会自动使它成为可调用 RPC。
 
@@ -301,11 +311,15 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 ### 7.3 评论与提交
 
-`ReviewCommentAnchor` 包含仓库身份、文件绝对路径、范围/轮次、旧/新侧、行号、引用代码和差异修订标识。删除行引用旧版行号，新增行引用新版行号；并排上下文行按实际点击的一侧定位。引用附近代码用于帮助 Agent 核对位置。
+`ReviewCommentAnchor` 包含仓库身份、文件绝对路径、范围/轮次、比较引用 `ref`、旧/新侧、起止行、引用代码、差异修订及片段来源 `sourceKey`。删除行引用旧版行号，新增行引用新版行号；并排上下文行按实际点击的一侧定位。单行旧草稿的可选新增字段自动兼容。`rangeReference` 只选择同一片段中同一侧连续的实际行，引用及相邻上下文各限 UTF-8 64 KiB；不把可视索引当作真实行号。
 
 「上一轮」「本会话」「待确认」同一轮共用评论身份，不能因为切换筛选重复生成一套评论。差异变动后旧评论保留原引用，并显示修订不匹配提示，不自动挪到其他行。整文件评论不依赖具体行。
 
-`ReviewCommentStore` 按会话保存草稿，单条文字上限为 6000 字符。`review-comments-send.ts` 调用该会话的 `conversation.send` 发送整理后的意见，不增加插件 RPC，也不覆盖输入框现有草稿。发送期间防止重复提交；成功只清除已发送批次，失败保留。Agent 忙碌时由宿主处理消息排队。
+`ReviewCommentStore` 按会话保存草稿，单条文字上限为 6000 字符。启用讨论时，`review-comments-send.ts` 通过宿主公开 `beginSubmission` 取得请求身份，在调用 `prompt(..., 'queue', ..., requestId)` 前保存批次；缺少此能力时退回会话的 `conversation.send`，明确显示不能关联答复。关闭讨论时继续沿用原发送入口。两种方式都不覆盖输入草稿。发送期间防止重复提交；成功或明确入队后只清除已接受草稿，迟到的确认按 ID、文字及锚点核对，不清除后来改写的草稿。
+
+`ReviewDiscussionStore` 与草稿分别持久化。订阅该会话 binding 的 `eventSource`，从 `user/message.source.rpcId` 查实际入轮，再读取相同轮次且在用户消息之后的 `assistant/message` 文字内容。`agent/inbox/spliced` 用于排队／取消，`turn/end` 用于结束状态；不读取推理或工具结果，也不猜测最后一条 Agent 消息的归属。多条评论一批发送，共享批次答复，解决状态由用户手动记录。追加意见保留父批次上下文及链接，生成新的提交请求。
+
+重启时未完成提交标为待核对，不自动重发；已建立的请求／轮次身份及已收到回复在历史窗口截断后仍保留。八种审查范围都可评论，Git 范围仍不新增文件写入。过期草稿仅在当前工作区新版提供显式重定位：Host 引用唯一匹配且加载中的差异模型也匹配，用户确认后更新；历史和已提交锚点保持原文。
 
 ### 7.4 搜索、导航与语法高亮
 
@@ -313,11 +327,23 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 `diff-search.ts` 按字面匹配 Unicode 文本，支持大小写、整词与旧／新侧过滤；共有上下文只计一次，删除行属于旧侧。每次最多返回 10,000 个匹配。搜索可访问折叠行，但不访问缺失的历史代码。定位只在原间隔增加命中附近的小范围 `revealed` 区段，`visibleHunkRows` 合并区段并保留原始行对象，局部展开和收起继续使用原间隔身份。
 
-快捷键绑定在差异组件内：Ctrl/Cmd+F、Enter/F3、Shift+Enter/Shift+F3、Esc、Ctrl/Cmd+↑/↓。除搜索框外的输入控件不处理这些快捷键。语言和布局切换不重建搜索选择或评论草稿；新查询、筛选或修订变化重新定位到第一处匹配。关闭搜索去除其临时定位窗口，手动展开仍保留。
+快捷键绑定在差异组件内：默认 Ctrl/Cmd+F、Enter/F3、Shift+Enter/Shift+F3、Esc、Ctrl/Cmd+↑/↓。设置可改搜索为 Ctrl/Cmd+Shift+F 或 Ctrl/Cmd+Alt+F、改导航为 Alt+↑/↓；不注册系统全局快捷键。除搜索框外的输入控件不处理这些快捷键。语言和布局切换不重建搜索选择或评论草稿；新查询、筛选或修订变化重新定位到第一处匹配。关闭搜索去除其临时定位窗口，手动展开仍保留。
 
 宿主当前公开渲染接口未提供可直接复用的高亮服务，因此 `diff-highlight.ts` 使用有限词法着色，不增加高亮依赖。支持 C/C++、JS、TS、Python 3、JSON、Markdown；旧／新侧分别维护多行注释和字符串状态。状态只能从已记录片段开头推导，未知片段前的语法状态不可恢复。`DiffCode` 用 React 文本节点和范围跨度着色，不注入 HTML，不修改源文本；主题颜色在 CSS 中跟随宿主变量，高亮缓存不因主题变更重新计算。
 
-单行超过 16,000 字符或片段超过当前组件剩余的 500,000 字符预算时降级纯文本；未知语言同样降级。预算只限制着色，不截断内容、搜索、行号和评论。Markdown 为源码着色，不渲染文档预览。词级 diff、语言全量包与行虚拟化不属于当前实现。
+单行超过 16,000 字符或片段超过当前组件剩余的 500,000 字符预算时降级纯文本；未知语言同样降级。预算只限制着色，不截断内容、搜索、行号和评论。Markdown 为源码着色，不渲染文档预览。词级 diff 与语言全量包不属于当前实现。
+
+### 7.5 外部定位、外观与可变高度虚拟化
+
+`review-location.ts` 对完整版本一致的引用使用原位置，其他引用只接受全文中的唯一引用及相邻上下文匹配；移动与歧义分开返回。`FileReviewService` 使用当前会话权威根目录和真实路径，拒绝越界、符号链接、非普通／非 UTF-8／二进制及超过 16 MiB 的文件。外部启动前再次检查内容。旧侧不会把历史行号传给当前文件，新侧的历史比较也必须核对磁盘，位置移动必须有显式确认。
+
+`editor-launch.ts` 自动探测推荐的 VS Code，或接受「外部 IDE」设置中的绝对 `Code.exe`／`Antigravity IDE.exe` 路径（Windows）。通过 `spawn(executable, ['--reuse-window', '--goto', 'file:line:1'])`、独立参数和 `shell:false` 启动；其他 IDE 需适配其行定位参数。OS 接受进程不是 GUI 光标／焦点确认；内置文件预览始终保留作为回退。
+
+选区操作由 `UnifiedDiff` 的代码／行号右键菜单提供，复用宿主 `Menu`／`MenuItemButton` 并通过 portal 避免被差异列表裁切。`review-context-selection.ts` 保证范围内右键保留原范围，范围外、另一侧、另一片段或修订右键改为单行引用。键盘菜单键或 Shift+F10 可从行号打开；移动列表、切换布局、变更修订时关闭。复制与外部定位反馈在菜单内显示；异步结果须匹配请求时的引用身份。
+
+`diff-view-preferences.ts` 迁移旧偏好并校验字体预设、字号 10–24、行高 1.2–2.5、Tab 宽度 1–8、配色和背景强度 5–40%。字体使用本机字体并提供系统等宽回退，不打包字体文件。设置弹窗具有实体主题背景、滚动正文和固定操作栏。
+
+`VirtualDiffRows` 对单个可见块超过 400 行时启用内部滚动窗口，使用实际测量高度构造前缀偏移及 250 px 预渲染范围。每个并排行对是同一个测量单位；换行和完整评论卡片纳入高度。编辑行即使离开窗口也保留挂载，避免失去光标及草稿。搜索／修改导航先展开必要区段，再按同一行索引定位窗口。布局、正文和外观变化重置高度缓存；设置可恢复全部行挂载。原始行模型、搜索、统计、复制及撤销数据不虚拟化。
 
 ## 8. 状态存储与生命周期
 
@@ -328,9 +354,10 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | PTC 嵌套修改全文 | `FileReviewService` 的 `recordLog` | 按 Agent 隔离，最多保留 4000 条；Host 重启/重载后丢失 |
 | 临时外部仓库 | Host `temporaryRepositories` | 当前 Agent/会话内有效，Host 重启后丢失 |
 | 评论草稿 | localStorage 的 `…:comments:<sessionId>` | 按会话持久化 |
+| 已提交意见／讨论 | localStorage 的 `…:discussions:<sessionId>` | 按会话保存请求／轮次、答复、已读／解决状态 |
 | 轮次确认 | localStorage 的 `…:confirmations:<sessionId>` | 按会话持久化 |
 | 归档展开状态 | localStorage 的 `…:archive:<sessionId>` | 按会话持久化，兼容旧前缀迁移 |
-| 差异布局、换行与每次展开行数 | localStorage 的 `…:diff-view` | 同一浏览器环境下共享的显示偏好 |
+| 差异布局、换行、每次展开行数、外观、编辑器路径、快捷键和讨论／虚拟化开关 | localStorage 的 `…:diff-view` | 同一浏览器环境下共享的显示偏好 |
 | 文件内容、仓库列表、上下文展开 | React/组件内存 | 页面状态，不写工程 JSON |
 | 搜索条件、匹配位置、修改块选择 | `UnifiedDiff` 内存 | 来源／修订隔离，不持久化；布局与语言切换保留 |
 | Git 文件差异缓存 | `GitReviewPanel` 内存 | 模式/引用/刷新等变化时失效 |
@@ -368,7 +395,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 - 未跟踪文件如果是符号链接、二进制、非 UTF-8 或超过 2 MiB，不渲染文本差异。
 - 工程配置最大 1 MiB，最多 512 条仓库记录，配置文件必须是普通文件。
 - 搜索索引与语法 token 按差异模型缓存；命中折叠区域只增加附近行的 DOM。高亮有字符预算，搜索有匹配数量上限。
-- 差异正文尚未行虚拟化，全部展开大文件仍需挂载每行及评论控件。v0.1.2 的 [验证记录](releases/v0.1.2-validation.md) 给出与 v0.1.1 的组件预览测量，不能代替实际 Desktop 或跨平台性能验收。
+- 超过 400 行的可见块默认可变高度虚拟化，较小块完整挂载。v0.2.0 的 [验证记录](releases/version.md#v020-验证记录) 给出与 v0.1.2 的组件预览测量；不能代替实际 Desktop 或跨平台性能验收。
 
 修改这些限制时，要同时考虑 Host 负载、浏览器渲染和 RPC 数据量，而不只增加一个常量。
 
@@ -420,7 +447,7 @@ node --test tests/*.test.mjs
 pnpm pack --pack-destination dist
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.2.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
+默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.2.0.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 

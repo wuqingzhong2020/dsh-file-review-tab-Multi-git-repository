@@ -1,5 +1,5 @@
 import type { ProducedFileDiff } from '../change-types.ts';
-export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged';
+export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged' | 'staged' | 'commit' | 'branch';
 export interface ReviewCommentTarget {
     readonly scope: CommentScope;
     readonly turn?: number | undefined;
@@ -7,6 +7,7 @@ export interface ReviewCommentTarget {
     readonly repositoryName: string;
     readonly path: string;
     readonly absolutePath: string;
+    readonly ref?: string | undefined;
 }
 export interface ReviewCommentLine {
     readonly kind: 'context' | 'add' | 'del';
@@ -21,11 +22,14 @@ export interface ReviewCommentAnchor extends ReviewCommentTarget {
     readonly before: string;
     readonly after: string;
     readonly revision: string;
+    readonly endLine?: number | undefined;
+    readonly sourceKey?: string | undefined;
 }
 export interface ReviewComment {
     readonly id: string;
     readonly anchor: ReviewCommentAnchor;
     readonly text: string;
+    readonly discussionId?: string | undefined;
 }
 export declare const COMMENT_TEXT_LIMIT = 6000;
 /** Session review scopes address the same recorded turn, regardless of the filter. */
@@ -67,8 +71,11 @@ export declare class ReviewCommentStore {
     getSnapshot: () => ReviewCommentSnapshot;
     subscribe: (listener: () => void) => (() => void);
     private publish;
-    save(anchor: ReviewCommentAnchor, text: string, id?: string): void;
+    save(anchor: ReviewCommentAnchor, text: string, id?: string, discussionId?: string): void;
     remove(id: string): void;
+    /** Explicitly accepted draft relocation; submitted/history records keep the original anchor. */
+    relocate(id: string, anchor: ReviewCommentAnchor): void;
+    acknowledge(batch: readonly ReviewComment[]): void;
     submit(send: (comments: readonly ReviewComment[]) => Promise<void>): Promise<boolean>;
 }
 export {};

@@ -9,10 +9,18 @@
 
 /** The dictionary namespace this plugin owns in the DSH locale registry. */
 export const LOCALE_NS = 'fileReviewTab'
+import { readingZh, readingEn } from './reading-locales.ts'
 
 /** The zh dictionary (the key-set source of truth). */
 export const zh = {
+  ...readingZh,
   tabTitle: '文件审查',
+  userGuide: '操作指南', userGuideOpening: '正在打开…', userGuideHint: '打开支持图片预览的使用手册',
+  userGuideFailed: '无法打开操作指南。',
+  userGuideServiceUnavailable: '使用手册服务不可用；安装或更新插件后，请完整退出并重启 Desktop，再重试。',
+  userGuideViewerUnavailable: '操作指南页签不可用，请检查 dsh-better-sidebar 是否启用。',
+  userGuideImageOpen: '查看图片', userGuideImageDialog: '截图预览', userGuideImageClose: '关闭图片',
+  userGuideImageLoading: '正在加载图片…', userGuideImageFailed: '图片加载失败', userGuideCodeCopy: '复制代码', userGuideFootnotes: '脚注',
   commentAddLine: '添加行评论', commentAddFile: '评论', commentWholeFile: '整个文件',
   commentOldLine: '旧版第 {line} 行', commentNewLine: '新版第 {line} 行',
   commentYou: '你', commentPlaceholder: '添加一条修改意见…', commentAdd: '评论', commentSave: '保存评论', commentEdit: '编辑',
@@ -148,7 +156,14 @@ export type CopyKey = keyof typeof zh
 
 /** The en dictionary. */
 export const en: Record<CopyKey, string> = {
+  ...readingEn,
   tabTitle: 'File Review',
+  userGuide: 'User guide', userGuideOpening: 'Opening…', userGuideHint: 'Open the user guide with screenshot previews',
+  userGuideFailed: 'Failed to open the user guide.',
+  userGuideServiceUnavailable: 'The user guide service is unavailable. Fully quit and restart Desktop after installing or updating the plugin, then try again.',
+  userGuideViewerUnavailable: 'The user guide tab is unavailable. Check that dsh-better-sidebar is enabled.',
+  userGuideImageOpen: 'View image', userGuideImageDialog: 'Screenshot preview', userGuideImageClose: 'Close image',
+  userGuideImageLoading: 'Loading image…', userGuideImageFailed: 'Failed to load image', userGuideCodeCopy: 'Copy code', userGuideFootnotes: 'Footnotes',
   commentAddLine: 'Add line comment', commentAddFile: 'Comment', commentWholeFile: 'Entire file',
   commentOldLine: 'Old line {line}', commentNewLine: 'New line {line}',
   commentYou: 'You', commentPlaceholder: 'Add a review comment…', commentAdd: 'Comment', commentSave: 'Save comment', commentEdit: 'Edit',

@@ -5,7 +5,7 @@
 .controls button:hover { border-color: var(--dsw-alias-state-link-primary, #0969da); }
 .controls svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 .controls :focus-visible { outline: 2px solid var(--dsw-alias-state-link-primary, #0969da); outline-offset: 1px; }
-.settingsDialog { box-sizing: border-box; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 20px; border: 1px solid var(--dsw-alias-border-l2, #d0d7de); border-radius: 10px; color: var(--dsw-alias-label-primary, #1f2328); background: var(--dsw-alias-bg-base, #fff); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); font: inherit; }
+.settingsDialog { box-sizing: border-box; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 20px; border: 1px solid var(--dsw-alias-border-l2, #d0d7de); border-radius: 10px; color: var(--dsw-alias-label-primary, #1f2328); background: var(--dsw-alias-bg-base, #fff); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); font: inherit; }
 .settingsDialog::backdrop { background: rgb(0 0 0 / 35%); }
 .settingsDialog h2 { margin: 0 0 20px; font-size: 16px; }
 .settingsDialog label { display: block; margin-bottom: 8px; }
@@ -13,3 +13,11 @@
 .settingsDialog p { margin: 8px 0 20px; color: var(--dsw-alias-label-secondary, #656d76); font-size: 12px; line-height: 1.6; }
 .settingsActions { display: flex; justify-content: flex-end; gap: 8px; }
 .settingsActions .settingsSave { color: #fff; background: var(--dsw-alias-state-link-primary, #0969da); }
+.settingsDialog fieldset { margin: 16px 0; padding: 12px; border: 1px solid var(--dsw-alias-border-l2, #d0d7de); border-radius: 6px; }
+.settingsDialog legend { padding: 0 6px; font-weight: 600; }
+.settingsDialog label { margin: 8px 0; }
+.settingsDialog select { width: 100%; margin-top: 4px; }
+.settingsDialog small { color: var(--dsw-alias-label-secondary, #656d76); line-height: 1.5; }
+.settingsDialog .checkbox { display: flex; align-items: center; gap: 8px; }
+.checkbox input { width: auto; }
+.settingsActions { position: sticky; bottom: -20px; padding: 12px 0; background: var(--dsw-alias-bg-base, #fff); flex-wrap: wrap; }

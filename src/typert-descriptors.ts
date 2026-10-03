@@ -4,8 +4,25 @@ import { z } from 'zod'
 import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol'
 import { namedReviewRepositorySchema, reviewProjectPageSchema, reviewWorkspaceSchema, saveReviewProjectSchema } from './repository-schemas.ts'
 import { gitReviewDiffSchema, gitReviewFileRequestSchema, gitReviewRequestSchema, gitReviewResultSchema } from './git-review-schemas.ts'
+import { USER_GUIDE_IMAGES } from './user-guide.ts'
 
 export const PACKAGE_NAME = 'dsh-file-review-tab-multi-git-repository'
+
+const userGuideDocumentSchema = z.object({
+  path: z.string().min(1).max(4096), markdown: z.string().max(512 * 1024),
+  images: z.partialRecord(z.enum(USER_GUIDE_IMAGES.map(name => `image/${name}`)), z.string().regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/).max(2 * 1024 * 1024)),
+})
+
+const locationRequestSchema = z.object({
+  repository: z.string().min(1).max(4096), path: z.string().min(1).max(4096), source: z.string().max(4096),
+  side: z.enum(['old', 'new']), line: z.number().int().min(1).max(10000000), endLine: z.number().int().min(1).max(10000000),
+  quote: z.string().max(65536), before: z.string().max(65536), after: z.string().max(65536),
+  fullText: z.string().max(8 * 1024 * 1024).optional(), allowRelocate: z.boolean().optional(), editorPath: z.string().max(4096).optional(),
+})
+const locationResultSchema = z.object({
+  state: z.enum(['exact', 'moved', 'ambiguous', 'changed', 'missing', 'unsupported', 'started', 'editor-missing', 'error']),
+  line: z.number().int().min(1).optional(), endLine: z.number().int().min(1).optional(), reason: z.string().optional(),
+})
 
 const diffSchema = z.object({
   path: z.string(),
@@ -110,6 +127,15 @@ function recordedDescriptor(): InvocationDescriptor {
 }
 
 export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
+  ...(['locateReference', 'openEditor'] as const).map(method => ({
+    id: `${PACKAGE_NAME}#fileReview/${method}`, service: 'fileReview', namespace: 'fileReview', method,
+    invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'request', wire: 'request', source: 'json', codec: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewLocationRequest`, create: () => locationRequestSchema } },
+    ],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewLocationResult`, create: () => locationResultSchema },
+  } satisfies InvocationDescriptor)),
   ...(['gitReview', 'gitReviewDiff'] as const).map(method => ({
     id: `${PACKAGE_NAME}#fileReview/${method}`, service: 'fileReview', namespace: 'fileReview', method,
     invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
@@ -128,7 +154,25 @@ export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
     ],
     result: { mode: 'strict', typeSymbol: 'string', create: () => z.string() },
   },
+  {
+    id: `${PACKAGE_NAME}#fileReview/userGuide`, service: 'fileReview', namespace: 'fileReview',
+    method: 'userGuide', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'language', wire: 'language', source: 'json', codec: { mode: 'strict', typeSymbol: "'zh' | 'en'", create: () => z.enum(['zh', 'en']) } },
+    ],
+    result: { mode: 'strict', typeSymbol: 'string', create: () => z.string().min(1) },
+  },
   descriptor('status'),
+  {
+    id: `${PACKAGE_NAME}#fileReview/userGuideDocument`, service: 'fileReview', namespace: 'fileReview',
+    method: 'userGuideDocument', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
+    parameters: [
+      { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
+      { name: 'language', wire: 'language', source: 'json', codec: { mode: 'strict', typeSymbol: "'zh' | 'en'", create: () => z.enum(['zh', 'en']) } },
+    ],
+    result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#UserGuideDocument`, create: () => userGuideDocumentSchema },
+  },
   descriptor('apply'),
   recordedDescriptor(),
   {

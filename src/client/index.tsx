@@ -30,6 +30,7 @@ import type { TabDescriptor } from 'dsh-better-sidebar/client/service'
 import type { FileReviewRequest, FileReviewResult } from '../change-types.ts'
 import { TYPERT_REMOTE } from '../remote.ts'
 import { FileReviewTab } from './FileReviewTab.tsx'
+import { UserGuideTab } from './UserGuideTab.tsx'
 import { RepositorySettings } from './RepositorySettings.tsx'
 import { ProducedFiles } from './ProducedFiles.tsx'
 import { normalizeSnapshot } from './snapshot-compat.ts'
@@ -267,4 +268,11 @@ export function apply(ctx: Context): void {
       />
     ),
   } satisfies TabDescriptor), 'file-review-tab: register tab')
+
+  ctx.effect(() => ctx.betterSidebar.registerTab({
+    id: 'file-review-guide', title: () => t('userGuide'), hidden: true, single: true,
+    icon: (size: number) => <FileReviewIcon size={size} />,
+    component: ({ ctx: tabCtx, scope, visible, tab }) => <UserGuideTab
+      ctx={tabCtx as unknown as Context} sessionId={scope.sessionId} visible={visible} tabId={tab.id} />,
+  } satisfies TabDescriptor), 'file-review-tab: register user guide')
 }

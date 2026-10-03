@@ -1,1 +1,1 @@
-{"version":3,"file":"DiffViewControls.d.ts","sourceRoot":"","sources":["../../../src/client/DiffViewControls.tsx"],"names":[],"mappings":"AAeA,wBAAgB,sBAAsB,6DAGrC;AACD,wBAAgB,gBAAgB,gCA0C/B"}
+{"version":3,"file":"DiffViewControls.d.ts","sourceRoot":"","sources":["../../../src/client/DiffViewControls.tsx"],"names":[],"mappings":"AACA,OAAO,EAAqD,KAAK,mBAAmB,EAAE,MAAM,4BAA4B,CAAA;AAcxH,wBAAgB,sBAAsB,wBAGrC;AACD,wBAAgB,gBAAgB,gCAkE/B"}

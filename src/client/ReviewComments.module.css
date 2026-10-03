@@ -21,3 +21,8 @@
 .lineAdd { position: absolute; left: 3px; top: 2px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; opacity: 0; color: white; background: var(--dsw-alias-state-link-primary, #4d6bfe); cursor: pointer; font: 18px/20px sans-serif; }
 :global([data-line-kind]):hover .lineAdd, :global([data-line-kind]):focus-within .lineAdd, .lineAdd:focus-visible { opacity: 1; }
 @media (hover: none) { .lineAdd { opacity: 1; } }
+.unread { padding: 2px 6px; border-radius: 5px; color: var(--dsw-alias-state-link-primary, #0969da); background: var(--dsw-alias-bg-layer-2, #e7efff); font-size: 12px; }
+.discussionOpinion + .discussionOpinion { border-top: 1px solid var(--dsw-alias-border-l2); margin-top: 10px; padding-top: 10px; }
+.discussionReplies { margin: 12px 0; }
+.discussionReplies summary { cursor: pointer; font-weight: 600; }
+.discussionReplies .commentText { max-height: 340px; overflow: auto; }

@@ -2,6 +2,7 @@
 
 import { readFile, lstat, realpath } from 'node:fs/promises'
 import { basename, isAbsolute, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -18,6 +19,9 @@ import { canonicalRepositoryPath } from './repository-path-policy.ts'
 import { resolveDirectoryStart } from './repository-directory.ts'
 import { gitReview, gitReviewDiff } from './git-review.ts'
 import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts'
+import { locateReviewReference, type ReviewLocationRequest, type ReviewLocationResult } from './review-location.ts'
+import { findVSCode, launchVSCode, vscodeArguments } from './editor-launch.ts'
+import { USER_GUIDE_IMAGES, type UserGuideDocument } from './user-guide.ts'
 
 type InspectState = Exclude<FileReviewFileResult['state'], 'error'>
 
@@ -299,6 +303,69 @@ export class FileReviewService extends TypertRemoteService {
   async directoryStart(agent: Agent, path: string): Promise<string> {
     const current = await this.project(agent)
     return resolveDirectoryStart(current.project.root, path)
+  }
+
+  /** Open the shipped manual, independently of the session's project directory. */
+  async userGuide(_agent: Agent, language: 'zh' | 'en'): Promise<string> {
+    if (language !== 'zh' && language !== 'en') throw new Error('Unsupported user guide language')
+    // Both the source module and the bundled Host entry live one level below docs.
+    const document = new URL(`../docs/USER_GUIDE${language === 'en' ? '.en' : ''}.md`, import.meta.url)
+    if (!(await lstat(document)).isFile()) throw new Error('User guide is not a regular file')
+    return fileURLToPath(document)
+  }
+
+  /** The Desktop Markdown preview cannot load sidebar media URLs from its app protocol. */
+  async userGuideDocument(agent: Agent, language: 'zh' | 'en'): Promise<UserGuideDocument> {
+    const path = await this.userGuide(agent, language)
+    const markdown = await readFile(path, 'utf8')
+    const images = await Promise.all(USER_GUIDE_IMAGES.map(async name => {
+      const image = new URL(`../docs/image/${name}`, import.meta.url)
+      const info = await lstat(image)
+      if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024) throw new Error('Invalid user guide screenshot')
+      const bytes = await readFile(image)
+      return [`image/${name}`, `data:image/jpeg;base64,${bytes.toString('base64')}`] as const
+    }))
+    return { path, markdown, images: Object.fromEntries(images) }
+  }
+
+  /** Verify references against disk without writing project files. */
+  async locateReference(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult> {
+    try {
+      const { roots } = await this.workspace(agent)
+      const repository = await realpath(request.repository)
+      if (!roots.some(root => pathKey(root) === pathKey(repository))) return { state: 'unsupported', reason: 'scope' }
+      const candidate = resolve(sessionCwd(agent), request.path)
+      if (!inside(repository, candidate)) return { state: 'unsupported', reason: 'scope' }
+      const metadata = await lstat(candidate)
+      if (metadata.size > 16 * 1024 * 1024) return { state: 'unsupported', reason: 'size' }
+      const file = await resolveFile(sessionCwd(agent), request.path, roots)
+      if (!inside(repository, file.filename)) return { state: 'unsupported', reason: 'scope' }
+      if (file.lfText.includes('\0')) return { state: 'unsupported', reason: 'binary' }
+      return locateReviewReference(file.lfText, request)
+    } catch (cause) {
+      return { state: typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ENOENT' ? 'missing' : 'unsupported' }
+    }
+  }
+
+  async openEditor(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult> {
+    if (request.side !== 'new') return { state: 'unsupported', reason: 'old' }
+    const located = await this.locateReference(agent, request)
+    if (located.state !== 'exact' && !(located.state === 'moved' && request.allowRelocate)) return located
+    const executable = await findVSCode(request.editorPath)
+    if (executable === null) return { state: 'editor-missing' }
+    // Check again after executable detection (registry lookups can take time).
+    const current = await this.locateReference(agent, request)
+    if (current.line !== located.line || current.endLine !== located.endLine || current.state !== located.state) return { state: 'changed' }
+    try {
+      const { roots } = await this.workspace(agent)
+      const file = await resolveFile(sessionCwd(agent), request.path, roots)
+      if (!inside(await realpath(request.repository), file.filename)) return { state: 'unsupported', reason: 'scope' }
+      if (file.lfText.includes('\0')) return { state: 'unsupported', reason: 'binary' }
+      const final = locateReviewReference(file.lfText, request)
+      if (final.line !== located.line || final.state !== located.state) return { state: 'changed' }
+      await launchVSCode(executable, vscodeArguments(file.filename, located.line!))
+      return { ...located, state: 'started' }
+    } catch { return { state: 'error', reason: 'launch' } }
   }
 
   /** Preview and save cannot choose another project's root through the wire. */

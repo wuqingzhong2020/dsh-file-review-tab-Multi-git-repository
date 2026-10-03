@@ -1,0 +1,2 @@
+.viewport { max-height: min(600px, 65vh); min-height: 120px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; overflow-anchor: none; }
+.spacer { pointer-events: none; min-width: 1px; }

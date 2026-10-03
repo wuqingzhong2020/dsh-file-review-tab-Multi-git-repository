@@ -6,6 +6,8 @@ import type { FileReviewAction, FileReviewChange, FileReviewRequest, FileReviewR
 import type { RepositorySettings } from './repository-settings.ts';
 import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts';
 import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts';
+import { type ReviewLocationRequest, type ReviewLocationResult } from './review-location.ts';
+import { type UserGuideDocument } from './user-guide.ts';
 /** Apply a complete file's hunk sequence in memory, or report a strict mismatch. */
 export declare function transformFile(text: string, file: FileReviewChange, action: FileReviewAction): string | null;
 /** Host service published as the `fileReview` Remote namespace. */
@@ -21,6 +23,13 @@ export declare class FileReviewService extends TypertRemoteService {
     gitReview(agent: Agent, request: GitReviewRequest): Promise<GitReviewResult>;
     gitReviewDiff(agent: Agent, request: GitReviewFileRequest): Promise<GitReviewDiff>;
     directoryStart(agent: Agent, path: string): Promise<string>;
+    /** Open the shipped manual, independently of the session's project directory. */
+    userGuide(_agent: Agent, language: 'zh' | 'en'): Promise<string>;
+    /** The Desktop Markdown preview cannot load sidebar media URLs from its app protocol. */
+    userGuideDocument(agent: Agent, language: 'zh' | 'en'): Promise<UserGuideDocument>;
+    /** Verify references against disk without writing project files. */
+    locateReference(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult>;
+    openEditor(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult>;
     /** Preview and save cannot choose another project's root through the wire. */
     preview(agent: Agent, project: ReviewProject): Promise<ReviewWorkspace>;
     saveProject(agent: Agent, request: SaveReviewProject): Promise<ReviewProjectPage>;

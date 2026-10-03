@@ -160,11 +160,11 @@ test('only split and unified preferences are accepted and display choices surviv
   const values = new Map()
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value) } }
   const store = new DiffViewStore(storage)
-  assert.deepEqual(store.getSnapshot(), { layout: 'unified', wrap: true, contextExpansionLines: 20 })
+  assert.deepEqual(store.getSnapshot(), { ...DEFAULT_DIFF_VIEW, layout: 'unified', wrap: true, contextExpansionLines: 20 })
   let notifications = 0; const unsubscribe = store.subscribe(() => { notifications++ })
   store.set({ layout: 'split' }); store.set({ wrap: false }); store.set({ wrap: false })
   assert.equal(notifications, 2)
-  assert.deepEqual(new DiffViewStore(storage).getSnapshot(), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+  assert.deepEqual(new DiffViewStore(storage).getSnapshot(), { ...DEFAULT_DIFF_VIEW, layout: 'split', wrap: false, contextExpansionLines: 20 })
   assert.ok(values.has(DIFF_VIEW_STORAGE_KEY))
   unsubscribe(); store.set({ layout: 'unified' }); assert.equal(notifications, 2)
   for (const raw of [null, '{', '{}', '{"layout":"auto","wrap":true}', '{"layout":"split","wrap":"false"}']) assert.deepEqual(parseDiffViewPreferences(raw), DEFAULT_DIFF_VIEW)
@@ -173,7 +173,7 @@ test('only split and unified preferences are accepted and display choices surviv
 test('unavailable local storage does not prevent changing the display in memory', () => {
   const store = new DiffViewStore({ getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
   store.set({ layout: 'split', wrap: false })
-  assert.deepEqual(store.getSnapshot(), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+  assert.deepEqual(store.getSnapshot(), { ...DEFAULT_DIFF_VIEW, layout: 'split', wrap: false, contextExpansionLines: 20 })
 })
 
 test('configured expansion handles odd counts, single lines and counts beyond the remaining interval', () => {
@@ -238,9 +238,9 @@ test('expanded intervals keep local collapse controls after partial or full expa
 })
 
 test('context line settings migrate old preferences, reject invalid counts, persist and notify open views', () => {
-  assert.deepEqual(parseDiffViewPreferences('{"layout":"split","wrap":false}'), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+  assert.deepEqual(parseDiffViewPreferences('{"layout":"split","wrap":false}'), { ...DEFAULT_DIFF_VIEW, layout: 'split', wrap: false, contextExpansionLines: 20 })
   for (const count of [0, -1, 1.5, '30', null, Number.MAX_SAFE_INTEGER + 1]) {
-    assert.deepEqual(parseDiffViewPreferences(JSON.stringify({ layout: 'split', wrap: false, contextExpansionLines: count })), { layout: 'split', wrap: false, contextExpansionLines: 20 })
+    assert.deepEqual(parseDiffViewPreferences(JSON.stringify({ ...DEFAULT_DIFF_VIEW, layout: 'split', wrap: false, contextExpansionLines: count })), { ...DEFAULT_DIFF_VIEW, layout: 'split', wrap: false, contextExpansionLines: 20 })
   }
   const values = new Map()
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value) } }
@@ -252,7 +252,7 @@ test('context line settings migrate old preferences, reject invalid counts, pers
   assert.equal(notifications, 1)
   assert.equal(new DiffViewStore(storage).getSnapshot().contextExpansionLines, 7)
   store.set({ layout: 'split', wrap: false })
-  assert.deepEqual(store.getSnapshot(), { layout: 'split', wrap: false, contextExpansionLines: 7 })
+  assert.deepEqual(store.getSnapshot(), { ...DEFAULT_DIFF_VIEW, layout: 'split', wrap: false, contextExpansionLines: 7 })
   const unavailable = new DiffViewStore({ getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
   unavailable.set({ contextExpansionLines: 5 })
   assert.equal(unavailable.getSnapshot().contextExpansionLines, 5)

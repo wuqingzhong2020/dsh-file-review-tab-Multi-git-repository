@@ -1,7 +1,7 @@
 import type { ProducedFileDiff } from '../change-types.ts'
 import { normalizeReviewPath } from './repository-paths.ts'
 
-export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged'
+export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged' | 'staged' | 'commit' | 'branch'
 export interface ReviewCommentTarget {
   readonly scope: CommentScope
   readonly turn?: number | undefined
@@ -9,6 +9,7 @@ export interface ReviewCommentTarget {
   readonly repositoryName: string
   readonly path: string
   readonly absolutePath: string
+  readonly ref?: string | undefined
 }
 export interface ReviewCommentLine {
   readonly kind: 'context' | 'add' | 'del'
@@ -23,11 +24,14 @@ export interface ReviewCommentAnchor extends ReviewCommentTarget {
   readonly before: string
   readonly after: string
   readonly revision: string
+  readonly endLine?: number | undefined
+  readonly sourceKey?: string | undefined
 }
 export interface ReviewComment {
   readonly id: string
   readonly anchor: ReviewCommentAnchor
   readonly text: string
+  readonly discussionId?: string | undefined
 }
 export const COMMENT_TEXT_LIMIT = 6000
 
@@ -38,10 +42,10 @@ function pathKey(path: string): string {
 /** Session review scopes address the same recorded turn, regardless of the filter. */
 export function commentFileKey(target: ReviewCommentTarget): string {
   const source = target.scope === 'session' || target.scope === 'last-turn' || target.scope === 'pending' ? `turn:${target.turn}` : target.scope
-  return JSON.stringify([pathKey(target.repository), pathKey(target.absolutePath), source])
+  return JSON.stringify([pathKey(target.repository), pathKey(target.absolutePath), source, target.ref ?? ''])
 }
 export function commentAnchorKey(anchor: ReviewCommentAnchor): string {
-  return JSON.stringify([commentFileKey(anchor), anchor.side, anchor.line, anchor.revision, anchor.quote])
+  return JSON.stringify([commentFileKey(anchor), anchor.side, anchor.line, anchor.endLine ?? anchor.line, anchor.revision, anchor.quote, anchor.sourceKey ?? ''])
 }
 /** A deterministic snapshot tag: comments never silently move to another diff revision. */
 export function reviewDiffRevision(diffs: readonly ProducedFileDiff[]): string {
@@ -102,13 +106,16 @@ export function parseReviewComments(raw: string): readonly ReviewComment[] {
     const anchor = value.anchor as Record<string, unknown> | undefined
     if (typeof value.id !== 'string' || ids.has(value.id) || typeof value.text !== 'string' || !value.text.trim() || value.text.length > COMMENT_TEXT_LIMIT || !anchor) throw new Error('Invalid review comment')
     ids.add(value.id)
-    if (!['last-turn', 'session', 'pending', 'uncommitted', 'unstaged'].includes(String(anchor.scope)) || !['old', 'new', 'file'].includes(String(anchor.side))) throw new Error('Invalid review anchor')
+    if (!['last-turn', 'session', 'pending', 'uncommitted', 'unstaged', 'staged', 'commit', 'branch'].includes(String(anchor.scope)) || !['old', 'new', 'file'].includes(String(anchor.side))) throw new Error('Invalid review anchor')
     for (const field of ['repository', 'repositoryName', 'path', 'absolutePath', 'quote', 'before', 'after', 'revision']) if (typeof anchor[field] !== 'string') throw new Error('Invalid review anchor')
     if (anchor.side === 'file' ? anchor.line !== null : typeof anchor.line !== 'number' || !Number.isInteger(anchor.line) || anchor.line < 1) throw new Error('Invalid review line')
+    if (anchor.endLine !== undefined && (anchor.side === 'file' || typeof anchor.endLine !== 'number' || !Number.isSafeInteger(anchor.endLine) || anchor.endLine < Number(anchor.line))) throw new Error('Invalid review range')
+    for (const field of ['ref', 'sourceKey']) if (anchor[field] !== undefined && typeof anchor[field] !== 'string') throw new Error('Invalid review source')
     if (anchor.scope === 'session' || anchor.scope === 'last-turn' || anchor.scope === 'pending') {
       if (typeof anchor.turn !== 'number' || !Number.isInteger(anchor.turn) || anchor.turn < 1) throw new Error('Invalid review turn')
     }
-    return { id: value.id, text: value.text, anchor: anchor as unknown as ReviewCommentAnchor }
+    if (value.discussionId !== undefined && typeof value.discussionId !== 'string') throw new Error('Invalid discussion link')
+    return { id: value.id, text: value.text, anchor: anchor as unknown as ReviewCommentAnchor, ...(typeof value.discussionId === 'string' ? { discussionId: value.discussionId } : {}) }
   })
 }
 
@@ -135,8 +142,8 @@ export function formatReviewComments(comments: readonly ReviewComment[], labels:
       `${index + 1}. [${anchor.repositoryName}] ${anchor.path}`,
       `${labels.repository}: ${anchor.repository}`,
       `${labels.file}: ${anchor.absolutePath}`,
-      `${labels.source}: ${labels.scope(anchor.scope)}${anchor.turn === undefined ? '' : ` · ${labels.turn(anchor.turn)}`} · ${labels.position(anchor)}`,
-      ...(anchor.side === 'file' ? [] : [`${labels.reference}:`, codeBlock([anchor.before, `> ${anchor.quote}`, anchor.after].filter(Boolean).join('\n'))]),
+      `${labels.source}: ${labels.scope(anchor.scope)}${anchor.turn === undefined ? '' : ` · ${labels.turn(anchor.turn)}`}${anchor.ref ? ` · ${anchor.ref}` : ''} · ${labels.position(anchor)}${anchor.revision ? ` · ${anchor.revision}` : ''}`,
+      ...(anchor.side === 'file' ? [] : [`${labels.reference}:`, codeBlock([anchor.before, anchor.quote.split('\n').map(line => `> ${line}`).join('\n'), anchor.after].filter(Boolean).join('\n'))]),
       `${labels.opinion}:\n${comment.text}`,
     ].join('\n')
   })].join('\n\n')
@@ -174,14 +181,26 @@ export class ReviewCommentStore {
     this.snapshot = { comments, busy, storageError }
     for (const listener of this.listeners) listener()
   }
-  save(anchor: ReviewCommentAnchor, text: string, id?: string): void {
+  save(anchor: ReviewCommentAnchor, text: string, id?: string, discussionId?: string): void {
     if (this.snapshot.busy || !text.trim() || text.length > COMMENT_TEXT_LIMIT) return
     const existing = id ? this.snapshot.comments.find(item => item.id === id) : undefined
-    const comment = { id: existing?.id ?? globalThis.crypto.randomUUID(), anchor, text: text.trim() }
+    const comment = { id: existing?.id ?? globalThis.crypto.randomUUID(), anchor, text: text.trim(), ...(discussionId ?? existing?.discussionId ? { discussionId: discussionId ?? existing?.discussionId } : {}) }
     this.publish(existing ? this.snapshot.comments.map(item => item.id === existing.id ? comment : item) : [...this.snapshot.comments, comment], false, true)
   }
   remove(id: string): void {
     if (!this.snapshot.busy) this.publish(this.snapshot.comments.filter(item => item.id !== id), false, true)
+  }
+  /** Explicitly accepted draft relocation; submitted/history records keep the original anchor. */
+  relocate(id: string, anchor: ReviewCommentAnchor): void {
+    if (!this.snapshot.busy) this.publish(this.snapshot.comments.map(item => item.id === id ? { ...item, anchor } : item), false, true)
+  }
+  acknowledge(batch: readonly ReviewComment[]): void {
+    const accepted = new Map(batch.map(item => [item.id, item]))
+    const remaining = this.snapshot.comments.filter(item => {
+      const sent = accepted.get(item.id)
+      return !sent || sent.text !== item.text || commentAnchorKey(sent.anchor) !== commentAnchorKey(item.anchor)
+    })
+    if (remaining.length !== this.snapshot.comments.length) this.publish(remaining, this.snapshot.busy, true)
   }
   async submit(send: (comments: readonly ReviewComment[]) => Promise<void>): Promise<boolean> {
     if (this.snapshot.busy || this.snapshot.comments.length === 0) return false

@@ -18,17 +18,36 @@
 
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-height: 36px;
-  padding: 0 10px;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   flex: none;
 }
 
 .headerTitle {
   font-weight: 600;
+  flex: none;
 }
+.guideButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 3px 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: inherit;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.guideButton:hover:not(:disabled) { background: var(--dsw-alias-border-l1); }
+.guideButton:focus-visible { outline: 2px solid var(--dsw-alias-state-focus-primary, #006fee); outline-offset: 2px; }
+.guideButton:disabled { opacity: 0.6; cursor: default; }
 .scopeSelect { max-width: 150px; min-width: 0; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; padding: 3px 6px; color: inherit; background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; }
 .gitPanel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .gitFileName { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }

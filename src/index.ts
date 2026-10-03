@@ -15,6 +15,8 @@ import { RepositorySettings } from './repository-settings.ts'
 export type * from './change-types.ts'
 export type * from './repository-types.ts'
 export type * from './git-review-types.ts'
+export type * from './review-location.ts'
+export type * from './user-guide.ts'
 export { Config } from './repository-config.ts'
 export { FileReviewService, transformFile } from './file-review-service.ts'
 

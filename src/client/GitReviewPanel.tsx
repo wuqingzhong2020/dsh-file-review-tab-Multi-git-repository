@@ -123,10 +123,11 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
         <ul className={css.fileList}>{group.files.map(file => {
           const key = keyOf(file); const open = expanded.has(key); const diff = diffs.get(key)
           const repo = data.repositories.find(item => item.path === file.repository)
-          const commentTarget: ReviewCommentTarget | undefined = mode === 'uncommitted' || mode === 'unstaged' ? {
+          const commentTarget: ReviewCommentTarget = {
             scope: mode, repository: file.repository, repositoryName: repo?.name ?? file.repository,
             path: file.path, absolutePath: resolveSessionPath(file.repository, file.path),
-          } : undefined
+            ...(refsMode ? { ref: ref || data.comparisons.join('\n') } : {}),
+          }
           return <li className={css.fileItem} key={key}>
             <div className={css.fileRow}>
               <button className={css.gitFileName} type="button" aria-expanded={open} title={file.path} onClick={() => { toggle(file) }}>
