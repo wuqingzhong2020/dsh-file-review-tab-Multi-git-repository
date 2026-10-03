@@ -113,7 +113,10 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 通信契约 | [change-types.ts](../src/change-types.ts)、[typert-descriptors.ts](../src/typert-descriptors.ts)、[typert.host.ts](../src/typert.host.ts)、[remote.ts](../src/remote.ts) | 请求结果类型、运行时校验、Host 模型和客户端类型注册 |
 | 工程数据模型 | [repository-types.ts](../src/repository-types.ts)、[repository-schemas.ts](../src/repository-schemas.ts)、[repository-config.ts](../src/repository-config.ts) | 工程、仓库、工作区及 Profile 配置类型 |
 | 配置文件与 Profile | [repository-project-file.ts](../src/repository-project-file.ts)、[repository-settings.ts](../src/repository-settings.ts) | 项目 JSON 发现、校验、版本检查、原子写入和 Profile 索引 |
-| 仓库范围与路径 | [repository-workspace.ts](../src/repository-workspace.ts)、[repository-path-policy.ts](../src/repository-path-policy.ts)、[repository-directory.ts](../src/repository-directory.ts) | 清单兼容解析、真实路径、去重、仓库可用性和目录选择 |
+| 仓库范围与路径 | [repository-workspace.ts](../src/repository-workspace.ts)、[repository-path-policy.ts](../src/repository-path-policy.ts)、[repository-directory.ts](../src/repository-directory.ts) | 配置规范化、候选仓库收集、真实路径与 Git 可用性检查、去重和目录选择 |
+| 旧仓库清单解析 | [repository-manifest.ts](../src/repository-manifest.ts) | 纯文本解析 JSON、INI 和 `.gitmodules`；`repository-workspace` 保留原解析函数导出 |
+| 多仓库管理界面 | [RepositorySettings.tsx](../src/client/RepositorySettings.tsx)、[repository-settings-components.tsx](../src/client/repository-settings-components.tsx) | 设置页组合、仓库行编辑、解析结果展示及删除确认 |
+| 多仓库管理流程 | [use-repository-settings.ts](../src/client/use-repository-settings.ts)、[repository-settings-model.ts](../src/client/repository-settings-model.ts) | 会话表单与请求生命周期、目录选择、临时仓库更新；草稿合并和保存数据转换 |
 | 客户端目录选择 | [directory-picker.ts](../src/client/directory-picker.ts) | 选择 Desktop/Web 目录接口、检查起始目录能力、处理取消及错误 |
 | Git 查询 | [git-review.ts](../src/git-review.ts)、[git-review-command.ts](../src/git-review-command.ts)、[git-review-parser.ts](../src/git-review-parser.ts) | 比较与仓库编排、受限命令执行、NUL 分隔输出与 patch 解析；契约位于 `git-review-types/schemas` |
 | 会话审查页面 | [FileReviewTab.tsx](../src/client/FileReviewTab.tsx)、[file-review-turn.tsx](../src/client/file-review-turn.tsx)、[file-review-model.ts](../src/client/file-review-model.ts) | 范围选择与页面组合、轮次/文件展示、共享身份及操作条件 |
@@ -145,7 +148,11 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 
 Host 的 `FileReviewService` 保留公开服务边界，文件验证/变换、引用定位和手册装载由私有模块实现。`transformFile` 仍通过原服务模块再导出；编辑器启动的再次验证仍调用服务的 `this.locateReference`。修改私有模块时也要核对原调用顺序、错误文字和路径边界。
 
-职责拆分应让一个模块能独立说明用途；不为每个短函数新增文件。已足够清晰的仓库配置、协议与快照模型保持现有结构。新增具名函数优先解释业务条件、异步身份和失败语义，注释解释约束，不重复描述代码。
+多仓库设置页沿「`RepositorySettings` 页面 → `use-repository-settings` 操作 → `repository-settings-model` 数据转换 → Host」阅读。展示组件只接收数据与回调，表单状态和请求版本留在同一个 hook；保存仍依次写入工程配置、更新临时仓库、重新读取页面。数据转换函数不读写磁盘，便于单独验证空白行过滤、路径规范化与临时仓库去重。
+
+`repository-workspace` 按规范化工程、收集候选、检查仓库、归并根目录的顺序组织。`repository-manifest` 只负责文本格式；清单大小限制、读取失败警告和实际目录检查仍属于工作区解析。客户端路径用于显示与编辑，Host 的真实路径校验仍是授权范围的依据。
+
+职责拆分应让一个模块能独立说明用途；不为每个短函数新增文件。已足够清晰的协议与快照模型保持现有结构。新增具名函数优先解释业务条件、异步身份和失败语义，注释解释约束，不重复描述代码。
 
 ## 4. 两条差异数据链路
 
@@ -225,7 +232,7 @@ Host 的 `git-review.ts` 使用 `execFile('git', args)` 参数数组调用 Git�
 
 配置发现从会话 `cwd` 的真实目录向父目录查找，最近的配置文件优先。Profile 中的项目索引可辅助匹配已登记工程，但最终仍检查工程文件是否存在、是否启用。没有配置文件时保持原有会话目录范围，不会仅凭旧 Profile 记录启用多代码仓。
 
-[src/repository-workspace.ts](../src/repository-workspace.ts) 解析候选仓库并检查目录/Git 可用性；实际 Git 审查使用可用仓库。嵌套仓库的文件归属按最具体的匹配根目录判定，避免统一归到父仓库；去重使用路径身份，不依赖仓库显示名称。
+[src/repository-workspace.ts](../src/repository-workspace.ts) 收集候选仓库并检查目录/Git 可用性，旧清单文本委托给 [repository-manifest.ts](../src/repository-manifest.ts) 解析；实际 Git 审查使用可用仓库。嵌套仓库的文件归属按最具体的匹配根目录判定，避免统一归到父仓库；去重使用路径身份，不依赖仓库显示名称。
 
 ### 5.2 保存、重新加载与旧配置迁移
 
@@ -439,7 +446,7 @@ pnpm build
 
 ### 10.2 验证能力与当前仓库情况
 
-本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`pnpm test` 执行同一套测试；部分集成测试读取 `lib/index.js`，源码重构后先构建再测试。
+本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`repository-settings-model.test.mjs` 专门验证表单数据转换和外部路径规则；`repository-workspace.test.mjs` 包含清单限制、失败后继续读取其他清单及工作区根目录规则。`pnpm test` 执行同一套测试；部分集成测试读取 `lib/index.js`，源码重构后先构建再测试。
 
 `tests/` 不再被 [.gitignore](../.gitignore) 忽略，应与源码一并提交。已有本地测试文件在移除忽略规则后会显示为未跟踪；提交并推送后，其他开发人员才能在克隆中获得它们。测试创建的临时仓库位于系统临时目录，`coverage/` 等生成报告继续忽略。接手时应确认测试文件齐全，不能把「没有测试文件」当成测试通过。
 
@@ -481,7 +488,7 @@ pnpm pack --pack-destination dist
 | 增加或调整审查范围 | `FileReviewTab`、`GitReviewPanel`、`git-review-types/schemas`、`locales` | 明确数据来源及是否允许评论/撤销；不能把 Git 历史当作工具轮次 |
 | 改变差异布局或上下文 | `UnifiedDiff`、`unified-diff-model`、对应 CSS | 只保留统一/并排两种布局；保留行身份，不改变撤销数据 |
 | 改变批量展开 | `ReviewRepositoryGroup`、`review-repository-groups`、两个审查页面 | 区分文件列表与正文，限定会话/轮次/仓库范围，复用 Git 加载队列 |
-| 增加仓库配置字段 | `repository-types/schemas`、`repository-project-file`、`RepositorySettings` | 维护文件版本兼容与修订检查，不保存机器绝对根目录或临时外部仓库 |
+| 增加仓库配置字段 | `repository-types/schemas`、`repository-project-file`、`repository-settings-model`、`use-repository-settings`、`RepositorySettings` | 维护文件版本兼容与修订检查，不保存机器绝对根目录或临时外部仓库 |
 | 新增 Host 能力 | `FileReviewService` 和 Typert 三层契约 | Agent 作用域、请求/响应运行时校验、Host 路径验证 |
 | 修改评论发送/定位 | `review-comment-submission`、`review-comments-send`、`review-discussion-events`、`review-file-opener` | 保留原引用与准确请求身份、发送失败保留草稿，不覆盖会话输入草稿 |
 | 修改撤销算法 | `file-review-files` 中的 `transformFile/resolveReviewFile` 及 `FileReviewService` | 精确匹配、逐文件结果、真实路径边界、写前核对 |

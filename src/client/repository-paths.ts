@@ -7,60 +7,107 @@ export function normalizeReviewPath(path: string): string {
   const segments: string[] = []
   for (const segment of slash.slice(prefix.length).split('/')) {
     if (!segment || segment === '.') continue
-    if (segment === '..' && segments.length > 0 && segments.at(-1) !== '..' && !segments.at(-1)?.endsWith(':')) segments.pop()
+    const parent = segments.at(-1)
+    const canResolveParent =
+      segment === '..' && parent !== undefined && parent !== '..' && !parent.endsWith(':')
+    if (canResolveParent) segments.pop()
     else segments.push(segment)
   }
   return prefix + segments.join('/')
 }
 
-function key(path: string): string {
+function repositoryPathKey(path: string): string {
   const normalized = normalizeReviewPath(path)
-  return /^[A-Za-z]:/.test(normalized) || normalized.startsWith('//') ? normalized.toLowerCase() : normalized
+  const isWindowsPath = /^[A-Za-z]:/.test(normalized) || normalized.startsWith('//')
+  return isWindowsPath ? normalized.toLowerCase() : normalized
 }
 
 export function absoluteReviewPath(path: string): boolean {
   const normalized = normalizeReviewPath(path)
-  return /^[A-Za-z]:(?:\/|$)/.test(normalized) || normalized.startsWith('//') || normalized.startsWith('/')
+  return (
+    /^[A-Za-z]:(?:\/|$)/.test(normalized) ||
+    normalized.startsWith('//') ||
+    normalized.startsWith('/')
+  )
+}
+
+interface AbsolutePathParts {
+  volume: string
+  segments: string[]
+  caseInsensitive: boolean
+}
+
+/** Windows drives and UNC shares compare without case; POSIX paths retain case. */
+function parseAbsolutePath(value: string): AbsolutePathParts | null {
+  const path = normalizeReviewPath(value)
+  const drive = /^([A-Za-z]:)(?:\/|$)/.exec(path)
+  if (drive !== null)
+    return {
+      volume: drive[1]!.toLowerCase(),
+      segments: path.slice(drive[1]!.length).split('/').filter(Boolean),
+      caseInsensitive: true,
+    }
+  const share = /^(\/\/[^/]+\/[^/]+)(?:\/|$)/.exec(path)
+  if (share !== null)
+    return {
+      volume: share[1]!.toLowerCase(),
+      segments: path.slice(share[1]!.length).split('/').filter(Boolean),
+      caseInsensitive: true,
+    }
+  if (path.startsWith('/'))
+    return {
+      volume: '/',
+      segments: path.slice(1).split('/').filter(Boolean),
+      caseInsensitive: false,
+    }
+  return null
 }
 
 /** Return a portable path only for the project itself or its descendants. */
 export function relativeProjectDirectory(root: string, selected: string): string | null {
-  const parse = (value: string): { volume: string; parts: string[]; insensitive: boolean } | null => {
-    const path = normalizeReviewPath(value)
-    const drive = /^([A-Za-z]:)(?:\/|$)/.exec(path)
-    if (drive !== null) return { volume: drive[1]!.toLowerCase(), parts: path.slice(drive[1]!.length).split('/').filter(Boolean), insensitive: true }
-    const share = /^(\/\/[^/]+\/[^/]+)(?:\/|$)/.exec(path)
-    if (share !== null) return { volume: share[1]!.toLowerCase(), parts: path.slice(share[1]!.length).split('/').filter(Boolean), insensitive: true }
-    if (path.startsWith('/')) return { volume: '/', parts: path.slice(1).split('/').filter(Boolean), insensitive: false }
-    return null
+  const project = parseAbsolutePath(root)
+  const target = parseAbsolutePath(selected)
+  if (project === null || target === null || project.volume !== target.volume) return null
+  if (target.segments.length < project.segments.length) return null
+  for (let index = 0; index < project.segments.length; index += 1) {
+    const parent = project.segments[index]!
+    const child = target.segments[index]!
+    const matches = project.caseInsensitive
+      ? parent.toLowerCase() === child.toLowerCase()
+      : parent === child
+    if (!matches) return null
   }
-  const from = parse(root)
-  const to = parse(selected)
-  if (from === null || to === null || from.volume !== to.volume) return null
-  let shared = 0
-  while (shared < from.parts.length && shared < to.parts.length && (
-    from.insensitive ? from.parts[shared]!.toLowerCase() === to.parts[shared]!.toLowerCase() : from.parts[shared] === to.parts[shared]
-  )) shared += 1
-  if (shared !== from.parts.length) return null
-  return to.parts.slice(shared).join('/') || '.'
+  return target.segments.slice(project.segments.length).join('/') || '.'
 }
 
 /** Normalize manual ../ entries to absolute temporary paths outside the project. */
 export function repositoryProjectPath(root: string, input: string): string {
-  if (input.trim() === '') return ''
-  const target = absoluteReviewPath(input.trim()) ? normalizeReviewPath(input.trim()) : normalizeReviewPath(`${root}/${input.trim()}`)
+  const path = input.trim()
+  if (path === '') return ''
+  const target = absoluteReviewPath(path)
+    ? normalizeReviewPath(path)
+    : normalizeReviewPath(`${root}/${path}`)
   return relativeProjectDirectory(root, target) ?? target
 }
 
-export function fileRepository(path: string, repositories: readonly ReviewRepository[]): ReviewRepository | undefined {
-  const candidate = key(path)
-  return [...repositories].sort((a, b) => b.path.length - a.path.length).find(repo => {
+export function fileRepository(
+  path: string,
+  repositories: readonly ReviewRepository[],
+): ReviewRepository | undefined {
+  const candidate = repositoryPathKey(path)
+  const mostSpecificFirst = [...repositories].sort(
+    (left, right) => right.path.length - left.path.length,
+  )
+  return mostSpecificFirst.find(repo => {
     if (repo.state !== 'ready' && repo.source !== 'project') return false
-    const root = key(repo.path)
+    const root = repositoryPathKey(repo.path)
     return candidate === root || candidate.startsWith(`${root}/`)
   })
 }
 
 export function repositoryRelativePath(path: string, repo: ReviewRepository): string {
-  return normalizeReviewPath(path).slice(normalizeReviewPath(repo.path).length).replace(/^\//, '') || repo.name
+  return (
+    normalizeReviewPath(path).slice(normalizeReviewPath(repo.path).length).replace(/^\//, '') ||
+    repo.name
+  )
 }

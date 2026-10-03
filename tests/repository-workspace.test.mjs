@@ -39,6 +39,41 @@ test('JSON repository arrays validate each path and preserve optional names', ()
   assert.throws(() => parseRepositoryManifest('arbitrary', 'repos.yaml'), /Supported formats/)
 })
 
+test('manifest limits produce warnings without suppressing later valid manifests', async () => {
+  const root = join(directory, 'manifest-limits')
+  await mkdir(join(root, 'core', '.git'), { recursive: true })
+  await writeFile(join(root, 'oversized.ini'), ' '.repeat(1024 * 1024 + 1))
+  await writeFile(join(root, 'too-many.json'), JSON.stringify(Array(513).fill('core')))
+  await writeFile(join(root, 'invalid.json'), '{"repositories":false}')
+  await writeFile(join(root, 'valid.ini'), '[Core]\npath=core')
+  const preview = await previewProject(project(root, {
+    includeProjectRoot: false,
+    configFiles: ['oversized.ini', 'too-many.json', 'invalid.json', 'valid.ini'],
+  }))
+  assert.deepEqual(preview.warnings, [
+    'oversized.ini: Configuration file exceeds 1 MiB',
+    'too-many.json: Configuration file exceeds 512 repositories',
+    'invalid.json: JSON must contain an array or a repositories array',
+  ])
+  assert.equal(preview.repositories.length, 1)
+  assert.equal(preview.repositories[0].source, 'valid.ini')
+  assert.deepEqual(preview.roots, [await realpath(join(root, 'core'))])
+})
+
+test('a plain aggregate root and a file-style Git marker retain their distinct ownership rules', async () => {
+  const root = join(directory, 'plain-aggregate')
+  const worktree = join(root, 'worktree')
+  await mkdir(worktree, { recursive: true })
+  await writeFile(join(worktree, '.git'), 'gitdir: /external/git/worktrees/example')
+  const preview = await previewProject(project(root, { repositories: ['worktree', './worktree'] }))
+  assert.deepEqual(preview.repositories.map(repo => repo.state), ['notGit', 'ready'])
+  assert.deepEqual(preview.roots, [await realpath(root), await realpath(worktree)])
+  const withoutRoot = await previewProject(project(root, {
+    includeProjectRoot: false, repositories: ['worktree'],
+  }))
+  assert.deepEqual(withoutRoot.roots, [await realpath(worktree)])
+})
+
 test('different projects resolve identical relative repo paths independently', async () => {
   await writeFile(join(rootA, 'repos.ini'), '[A-Core]\npath=libs/core\n')
   await writeFile(join(rootB, 'repos.json'), '[{"name":"B-Core","path":"libs/core"}]')
