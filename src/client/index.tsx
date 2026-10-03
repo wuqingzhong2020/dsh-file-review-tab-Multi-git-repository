@@ -36,13 +36,9 @@ import { ProducedFiles } from './ProducedFiles.tsx'
 import { normalizeSnapshot } from './snapshot-compat.ts'
 import { attachLocale, en, LOCALE_NS, t, zh } from './locales.ts'
 import { publishFileReviewSeed } from './deep-link.ts'
-import {
-  en as chatEn, NS as CHAT_NS, zh as chatZh, type DeliverablesKey,
-} from './chat-locales.ts'
+import { en as chatEn, NS as CHAT_NS, zh as chatZh, type DeliverablesKey } from './chat-locales.ts'
 import { countChangedFiles, deriveSessionChanges, splitArchivedTurns } from './session-changes.ts'
-import {
-  deliverablesDefinition, selectProducedFiles,
-} from './turn-deliverables.ts'
+import { deliverablesDefinition, selectProducedFiles } from './turn-deliverables.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -119,8 +115,9 @@ interface BadgeConversationFace {
 function badgeCount(ctx: Context, sessionId: string): number | null {
   // DSH 0.2: the Conversation projection lives on the uiConversation
   // binding, not on the Session face (whose snapshot is session lifecycle).
-  const uiConversation = (ctx as unknown as { get(name: string): unknown })
-    .get('uiConversation') as BadgeConversationFace | undefined
+  const uiConversation = (ctx as unknown as { get(name: string): unknown }).get(
+    'uiConversation',
+  ) as BadgeConversationFace | undefined
   let snapshot: ConversationSnapshot | null = null
   try {
     snapshot = uiConversation?.binding(sessionId as SessionId).snapshot.getSnapshot() ?? null
@@ -150,7 +147,10 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const offZh = ctx.locale.register(LOCALE_NS, 'zh', zh)
     const offEn = ctx.locale.register(LOCALE_NS, 'en', en)
-    return () => { offZh(); offEn() }
+    return () => {
+      offZh()
+      offEn()
+    }
   }, 'file-review-tab: tab dictionaries')
 
   ctx.effect(
@@ -161,22 +161,37 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     let disposed = false
     let disposeRemote: (() => Promise<void>) | undefined
-    void ctx.remote.$mount(TYPERT_REMOTE).then((dispose) => {
-      if (disposed) void dispose()
-      else disposeRemote = dispose
-    }).catch((error: unknown) => {
-      console.error('[dsh-file-review-tab-multi-git-repository] remote mount error:', error)
-    })
+    void ctx.remote
+      .$mount(TYPERT_REMOTE)
+      .then(dispose => {
+        if (disposed) void dispose()
+        else disposeRemote = dispose
+      })
+      .catch((error: unknown) => {
+        console.error('[dsh-file-review-tab-multi-git-repository] remote mount error:', error)
+      })
     return () => {
       disposed = true
       if (disposeRemote !== undefined) void disposeRemote()
     }
   }, 'file-review-tab: typert remote')
 
-  ctx.effect(() => ctx.slots.inject('conversation.view', () => ctx.slots.register({
-    name: 'conversation.view', id: 'repositories', order: 200,
-    label: () => t('projectTab'), inject: (sessionId: string) => ({ ctx, sessionId }),
-  }, RepositorySettings)), 'file-review-tab: repository conversation view')
+  ctx.effect(
+    () =>
+      ctx.slots.inject('conversation.view', () =>
+        ctx.slots.register(
+          {
+            name: 'conversation.view',
+            id: 'repositories',
+            order: 200,
+            label: () => t('projectTab'),
+            inject: (sessionId: string) => ({ ctx, sessionId }),
+          },
+          RepositorySettings,
+        ),
+      ),
+    'file-review-tab: repository conversation view',
+  )
 
   // Plugin-owned Turn data uses a separate key from DSH 0.2's built-in
   // `deliverables` definition and its native file-mention service.
@@ -188,91 +203,126 @@ export function apply(ctx: Context): void {
   // DSH 0.2 exposes an ordered list: our review action lives alongside (not
   // instead of) the built-in changes card and better-sidebar contributions.
   ctx.effect(
-    () => ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
-      name: 'conversation.chat.turnTail',
-      id: 'dsh-file-review-tab-multi-git-repository',
-      order: 110,
-      locale: CHAT_NS,
-      registrant: 'dsh-file-review-tab-multi-git-repository',
-      inject: (sessionId: string) => {
-        const sessions = (ctx as unknown as { readonly sessions: ISessions }).sessions
-        const projectRoot = sessions.list.getSnapshot().byId[sessionId as SessionId]?.cwd
-        const invoke = async (
-          method: 'status' | 'apply',
-          request: FileReviewRequest,
-        ): Promise<FileReviewResult> => {
-          const scope = sessions.scope(sessionId as SessionId)
-          if (scope === undefined) throw new Error('Session is unavailable')
-          // Session scopes are minted by the client runtime and cannot
-          // statically inject namespaces contributed later by feature plugins.
-          // `get()` is the Cordis escape hatch for an explicitly mounted
-          // dynamic service; tracing still binds the Remote call to this
-          // Session scope.
-          const fileReview = scope.get('remote.fileReview') as FileReviewRemote | undefined
-          if (fileReview === undefined) throw new Error('File review Remote is unavailable')
-          const result = await fileReview[method](request)
-          if (!result.ok) throw new Error(result.error.message)
-          return result.value
-        }
-        return {
-          projectRoot,
-          inspectChanges: (request: FileReviewRequest) => invoke('status', request),
-          applyChanges: (request: FileReviewRequest) => invoke('apply', request),
-          // 审查 button / per-file chip: publish the target through the
-          // plugin's own seed channel, then open (or focus) the sidebar tab by
-          // type. better-sidebar 0.24.1 preserves an already-open tab's meta;
-          // the seed channel reliably delivers repeated links to that tab. The native
-          // open still reveals the right panel (revealIfOpened), and the
-          // mounted/existing tab replays the newest seed.
-          openInSidebarTab: (paths: readonly string[], turn?: number) => {
-            const sidebar = ctx.betterSidebar
-            if (sidebar === undefined || paths.length === 0) return
-            publishFileReviewSeed(sessionId, paths, turn)
-            const scope = { sessionId, ...(projectRoot !== undefined ? { cwd: projectRoot } : {}) }
-            sidebar.openTab({ type: 'file-review' }, scope)
+    () =>
+      ctx.slots.inject('conversation.chat.turnTail', () =>
+        ctx.slots.register(
+          {
+            name: 'conversation.chat.turnTail',
+            id: 'dsh-file-review-tab-multi-git-repository',
+            order: 110,
+            locale: CHAT_NS,
+            registrant: 'dsh-file-review-tab-multi-git-repository',
+            inject: (sessionId: string) => {
+              const sessions = (ctx as unknown as { readonly sessions: ISessions }).sessions
+              const projectRoot = sessions.list.getSnapshot().byId[sessionId as SessionId]?.cwd
+              const invoke = async (
+                method: 'status' | 'apply',
+                request: FileReviewRequest,
+              ): Promise<FileReviewResult> => {
+                const scope = sessions.scope(sessionId as SessionId)
+                if (scope === undefined) throw new Error('Session is unavailable')
+                // Session scopes are minted by the client runtime and cannot
+                // statically inject namespaces contributed later by feature plugins.
+                // `get()` is the Cordis escape hatch for an explicitly mounted
+                // dynamic service; tracing still binds the Remote call to this
+                // Session scope.
+                const fileReview = scope.get('remote.fileReview') as FileReviewRemote | undefined
+                if (fileReview === undefined) throw new Error('File review Remote is unavailable')
+                const result = await fileReview[method](request)
+                if (!result.ok) throw new Error(result.error.message)
+                return result.value
+              }
+              return {
+                projectRoot,
+                inspectChanges: (request: FileReviewRequest) => invoke('status', request),
+                applyChanges: (request: FileReviewRequest) => invoke('apply', request),
+                // 审查 button / per-file chip: publish the target through the
+                // plugin's own seed channel, then open (or focus) the sidebar tab by
+                // type. better-sidebar 0.24.1 preserves an already-open tab's meta;
+                // the seed channel reliably delivers repeated links to that tab. The native
+                // open still reveals the right panel (revealIfOpened), and the
+                // mounted/existing tab replays the newest seed.
+                openInSidebarTab: (paths: readonly string[], turn?: number) => {
+                  const sidebar = ctx.betterSidebar
+                  if (sidebar === undefined || paths.length === 0) return
+                  publishFileReviewSeed(sessionId, paths, turn)
+                  const scope = {
+                    sessionId,
+                    ...(projectRoot !== undefined ? { cwd: projectRoot } : {}),
+                  }
+                  sidebar.openTab({ type: 'file-review' }, scope)
+                },
+              }
+            },
           },
-        }
-      },
-    }, ({ turn, seq, openFile, projectRoot, inspectChanges, applyChanges, openInSidebarTab, t }) => {
-      const matched = selectProducedFiles({ turn, seq, openFile })
-      return matched === null ? null : (
-        <ProducedFiles
-          matched={matched}
-          turn={turn}
-          openFile={openFile}
-          projectRoot={projectRoot}
-          inspectChanges={inspectChanges}
-          applyChanges={applyChanges}
-          openInSidebarTab={openInSidebarTab}
-          t={t}
-        />
-      )
-    })),
+          ({
+            turn,
+            seq,
+            openFile,
+            projectRoot,
+            inspectChanges,
+            applyChanges,
+            openInSidebarTab,
+            t,
+          }) => {
+            const matched = selectProducedFiles({ turn, seq, openFile })
+            return matched === null ? null : (
+              <ProducedFiles
+                matched={matched}
+                turn={turn}
+                openFile={openFile}
+                projectRoot={projectRoot}
+                inspectChanges={inspectChanges}
+                applyChanges={applyChanges}
+                openInSidebarTab={openInSidebarTab}
+                t={t}
+              />
+            )
+          },
+        ),
+      ),
     'file-review-tab: turn-tail row',
   )
 
-  ctx.effect(() => ctx.betterSidebar.registerTab({
-    id: 'file-review',
-    title: () => t('tabTitle'),
-    icon: (size: number) => <FileReviewIcon size={size} />,
-    order: 35,
-    single: true,
-    badge: (badgeCtx, scope) => badgeCount(badgeCtx as unknown as Context, scope.sessionId),
-    component: ({ ctx: tabCtx, scope, visible, tab }) => (
-      <FileReviewTab
-        ctx={tabCtx as unknown as Context}
-        sessionId={scope.sessionId}
-        cwd={scope.cwd}
-        visible={visible}
-        tab={tab}
-      />
-    ),
-  } satisfies TabDescriptor), 'file-review-tab: register tab')
+  ctx.effect(
+    () =>
+      ctx.betterSidebar.registerTab({
+        id: 'file-review',
+        title: () => t('tabTitle'),
+        icon: (size: number) => <FileReviewIcon size={size} />,
+        order: 35,
+        single: true,
+        badge: (badgeCtx, scope) => badgeCount(badgeCtx as unknown as Context, scope.sessionId),
+        component: ({ ctx: tabCtx, scope, visible, tab }) => (
+          <FileReviewTab
+            ctx={tabCtx as unknown as Context}
+            sessionId={scope.sessionId}
+            cwd={scope.cwd}
+            visible={visible}
+            tab={tab}
+          />
+        ),
+      } satisfies TabDescriptor),
+    'file-review-tab: register tab',
+  )
 
-  ctx.effect(() => ctx.betterSidebar.registerTab({
-    id: 'file-review-guide', title: () => t('userGuide'), hidden: true, single: true,
-    icon: (size: number) => <FileReviewIcon size={size} />,
-    component: ({ ctx: tabCtx, scope, visible, tab }) => <UserGuideTab
-      ctx={tabCtx as unknown as Context} sessionId={scope.sessionId} visible={visible} tabId={tab.id} />,
-  } satisfies TabDescriptor), 'file-review-tab: register user guide')
+  ctx.effect(
+    () =>
+      ctx.betterSidebar.registerTab({
+        id: 'file-review-guide',
+        title: () => t('userGuide'),
+        hidden: true,
+        single: true,
+        icon: (size: number) => <FileReviewIcon size={size} />,
+        component: ({ ctx: tabCtx, scope, visible, tab }) => (
+          <UserGuideTab
+            ctx={tabCtx as unknown as Context}
+            sessionId={scope.sessionId}
+            visible={visible}
+            tabId={tab.id}
+          />
+        ),
+      } satisfies TabDescriptor),
+    'file-review-tab: register user guide',
+  )
 }

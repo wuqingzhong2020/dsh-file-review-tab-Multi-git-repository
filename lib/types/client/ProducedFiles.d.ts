@@ -1,3 +1,8 @@
+/**
+ * Turn-tail summary of paths and hunks from mutation-tool results.
+ * Sidebar navigation passes the selected paths and owning turn to the opener;
+ * inspection and undo/redo requests keep the original reversible diff data.
+ */
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { FileReviewRequest, FileReviewResult } from '../change-types.ts';

@@ -13,38 +13,96 @@ export interface ReviewLocationRequest {
   readonly allowRelocate?: boolean | undefined
   readonly editorPath?: string | undefined
 }
+
 export interface ReviewLocationResult {
-  readonly state: 'exact' | 'moved' | 'ambiguous' | 'changed' | 'missing' | 'unsupported' | 'started' | 'editor-missing' | 'error'
+  readonly state:
+    | 'exact'
+    | 'moved'
+    | 'ambiguous'
+    | 'changed'
+    | 'missing'
+    | 'unsupported'
+    | 'started'
+    | 'editor-missing'
+    | 'error'
   readonly line?: number | undefined
   readonly endLine?: number | undefined
   readonly reason?: string | undefined
 }
+
 export const REFERENCE_TEXT_LIMIT = 65536
-export const referenceTextFits = (text: string): boolean => text.length <= REFERENCE_TEXT_LIMIT && new TextEncoder().encode(text).length <= REFERENCE_TEXT_LIMIT
+
+export const referenceTextFits = (text: string): boolean => {
+  return (
+    text.length <= REFERENCE_TEXT_LIMIT &&
+    new TextEncoder().encode(text).length <= REFERENCE_TEXT_LIMIT
+  )
+}
+
 export const normalizeReferenceText = (text: string): string => text.replace(/\r\n?/g, '\n')
 
+function validReferenceRange(request: ReviewLocationRequest, quote: string): boolean {
+  return (
+    Number.isSafeInteger(request.line) &&
+    request.line >= 1 &&
+    Number.isSafeInteger(request.endLine) &&
+    request.endLine >= request.line &&
+    [quote, request.before, request.after].every(referenceTextFits) &&
+    request.endLine - request.line + 1 === quote.split('\n').length
+  )
+}
+
+function linesMatchAt(
+  lines: readonly string[],
+  selected: readonly string[],
+  offset: number,
+): boolean {
+  return selected.every((value, index) => lines[offset + index] === value)
+}
+
 /** Exact full-version validation, otherwise require a unique complete quote + adjacent context. */
-export function locateReviewReference(text: string, request: ReviewLocationRequest): ReviewLocationResult {
+export function locateReviewReference(
+  text: string,
+  request: ReviewLocationRequest,
+): ReviewLocationResult {
   const disk = normalizeReferenceText(text)
   const quote = normalizeReferenceText(request.quote)
-  if (!Number.isSafeInteger(request.line) || request.line < 1 || !Number.isSafeInteger(request.endLine) || request.endLine < request.line
-    || ![quote, request.before, request.after].every(referenceTextFits) || request.endLine - request.line + 1 !== quote.split('\n').length) return { state: 'unsupported' }
+  if (!validReferenceRange(request, quote)) return { state: 'unsupported' }
+
   const lines = disk.split('\n')
   const expected = request.line - 1
   const selected = quote.split('\n')
-  const sameAt = (offset: number) => selected.every((value, index) => lines[offset + index] === value)
-  if (request.fullText !== undefined && normalizeReferenceText(request.fullText) === disk && sameAt(expected)) return { state: 'exact', line: request.line, endLine: request.endLine }
+  if (
+    request.fullText !== undefined &&
+    normalizeReferenceText(request.fullText) === disk &&
+    linesMatchAt(lines, selected, expected)
+  ) {
+    return { state: 'exact', line: request.line, endLine: request.endLine }
+  }
+
   const before = request.before ? normalizeReferenceText(request.before).split('\n') : []
   const after = request.after ? normalizeReferenceText(request.after).split('\n') : []
   // An empty line without context cannot identify a location in another version.
   if (!quote.trim() && !before.length && !after.length) return { state: 'ambiguous' }
+
   const candidates: number[] = []
   for (let offset = 0; offset <= lines.length - selected.length; offset++) {
-    if (!sameAt(offset) || !before.every((value, index) => lines[offset - before.length + index] === value)
-      || !after.every((value, index) => lines[offset + selected.length + index] === value)) continue
+    if (
+      !linesMatchAt(lines, selected, offset) ||
+      !linesMatchAt(lines, before, offset - before.length) ||
+      !linesMatchAt(lines, after, offset + selected.length)
+    ) {
+      continue
+    }
     candidates.push(offset + 1)
     if (candidates.length > 1) return { state: 'ambiguous' }
   }
+
   const line = candidates[0]
-  return line === undefined ? { state: 'changed' } : { state: line === request.line ? 'exact' : 'moved', line, endLine: line + selected.length - 1 }
+  if (line === undefined) return { state: 'changed' }
+  return {
+    state: line === request.line ? 'exact' : 'moved',
+    line,
+    endLine: line + selected.length - 1,
+  }
 }

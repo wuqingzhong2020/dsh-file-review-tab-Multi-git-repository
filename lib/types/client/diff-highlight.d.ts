@@ -10,7 +10,9 @@ export interface SyntaxToken {
 export interface SyntaxState {
     blockComment?: boolean;
     quote?: string;
+    /** Closing delimiter for a C++ raw string or Python triple-quoted string. */
     rawClose?: string;
+    /** Markdown fences are highlighted as source, without rendering their contents. */
     fence?: string;
 }
 export declare const HIGHLIGHT_CHARACTER_LIMIT = 500000;

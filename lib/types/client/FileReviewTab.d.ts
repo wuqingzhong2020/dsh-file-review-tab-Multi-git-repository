@@ -7,9 +7,9 @@ export interface FileReviewTabProps {
     /** Active tab + open panel; live status inspection pauses while false. */
     readonly visible: boolean;
     /**
-     * The sidebar tab handle. `meta.expandPaths` (string[]) is the deep link
-     * the chat turn-tail row writes via updateTab/openTab: a fresh meta
-     * reference replays as "expand those files' diffs and scroll to the first".
+     * Sidebar tab handle. New deep links arrive through the plugin's seed
+     * channel; meta.expandPaths is still accepted for older links. Both expand
+     * the requested diffs and scroll this tab's own container to the first file.
      */
     readonly tab: {
         readonly id: string;
@@ -17,6 +17,6 @@ export interface FileReviewTabProps {
         readonly meta?: unknown;
     };
 }
-/** The sidebar tab body: per-turn change groups with inline diffs and undo. */
+/** The sidebar tab body; all hooks remain unconditional across review scopes. */
 export declare function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewTabProps): import("react").JSX.Element;
 //# sourceMappingURL=FileReviewTab.d.ts.map

@@ -1,4 +1,5 @@
 import { type ReviewComment } from './review-comments.ts';
+export { reconcileDiscussions } from './review-discussion-events.ts';
 export interface DiscussionReply {
     readonly id: string;
     readonly seq: number;
@@ -27,9 +28,8 @@ export interface DiscussionSnapshot {
     readonly records: readonly ReviewDiscussion[];
     readonly storageError: boolean;
 }
+export declare function isAdmittedDiscussionState(state: DiscussionState): boolean;
 export declare function parseReviewDiscussions(raw: string): readonly ReviewDiscussion[];
-/** Reconcile durable request -> user event -> turn -> assistant messages, never the latest unrelated reply. */
-export declare function reconcileDiscussions(records: readonly ReviewDiscussion[], entries: readonly unknown[]): readonly ReviewDiscussion[];
 export declare class ReviewDiscussionStore {
     private snapshot;
     private readonly listeners;
@@ -45,5 +45,4 @@ export declare class ReviewDiscussionStore {
     resolve(id: string, commentId: string, resolved: boolean): void;
     reconcile(entries: readonly unknown[]): void;
 }
-export {};
 //# sourceMappingURL=review-discussions.d.ts.map

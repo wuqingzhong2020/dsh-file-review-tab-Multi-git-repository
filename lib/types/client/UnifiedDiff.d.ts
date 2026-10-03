@@ -20,5 +20,5 @@ interface UnifiedDiffProps {
     readonly sourceKey?: string | undefined;
 }
 /** Two presentations share the original rows, context expansion, and anchors. */
-export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, reviewTarget, sourceKey }: UnifiedDiffProps): import("react").JSX.Element | null;
+export declare function UnifiedDiff({ diffs, contextLines, labels, className, showCopyButton, showFileHeaders, reviewTarget, sourceKey, }: UnifiedDiffProps): import("react").JSX.Element | null;
 //# sourceMappingURL=UnifiedDiff.d.ts.map

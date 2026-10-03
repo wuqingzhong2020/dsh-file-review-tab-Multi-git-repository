@@ -10,13 +10,14 @@
 
 这是一个运行在 DeepSeek Harness 内的插件，包含 Node.js Host 服务和浏览器 React 界面。它把会话中的文件工具改动，以及多个 Git 仓库的真实差异，统一放进「文件审查」侧栏，并提供工程级仓库配置、行评论和会话改动撤销。
 
-三个用户入口均由 [src/client/index.tsx](../src/client/index.tsx) 注册：
+四个用户入口均由 [src/client/index.tsx](../src/client/index.tsx) 注册：
 
 | 入口 | 组件 | 作用 |
 | --- | --- | --- |
 | better-sidebar 的「文件审查」Tab | [FileReviewTab.tsx](../src/client/FileReviewTab.tsx) | 选择审查范围、查看差异、确认轮次、撤销和提交修改意见 |
 | 会话顶部「多代码仓管理」页签 | [RepositorySettings.tsx](../src/client/RepositorySettings.tsx) | 编辑当前工程的仓库列表，保存工程配置文件 |
 | 对话轮次末尾的审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx) | 展示工具改动摘要，撤销或定位到侧栏的文件差异 |
+| 审查标题行的「操作指南」按钮 | [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) | 打开安装包内的双语手册，预览截图并点击放大 |
 
 理解工程时，先区分以下概念：
 
@@ -78,6 +79,7 @@ flowchart TB
 2. 挂载 `TYPERT_REMOTE`。
 3. 注册工程配置页、插件自己的 Conversation 数据定义和轮次尾部审查行。
 4. 通过 `ctx.betterSidebar.registerTab` 注册 `file-review` Tab。
+5. 注册隐藏的 `file-review-guide` 单例页签，由审查页的操作指南按钮打开。
 
 注册使用 `ctx.effect` 管理清理，供插件禁用和热重载使用。新增全局监听或宿主注册时，也需要提供对应的释放逻辑。
 
@@ -106,26 +108,44 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 
 | 模块 | 主要文件 | 职责 |
 | --- | --- | --- |
-| Host 调度与文件操作 | [file-review-service.ts](../src/file-review-service.ts) | 远程方法、状态检查、安全撤销/重做、嵌套改动及临时仓库存储 |
+| Host 调度 | [file-review-service.ts](../src/file-review-service.ts) | 远程方法编排、会话工作区、嵌套改动及临时仓库存储 |
+| Host 文件能力 | [file-review-files.ts](../src/file-review-files.ts)、[file-review-locations.ts](../src/file-review-locations.ts)、[file-review-user-guide.ts](../src/file-review-user-guide.ts) | 路径验证与安全撤销/重做、磁盘引用与编辑器、安装目录手册装载 |
 | 通信契约 | [change-types.ts](../src/change-types.ts)、[typert-descriptors.ts](../src/typert-descriptors.ts)、[typert.host.ts](../src/typert.host.ts)、[remote.ts](../src/remote.ts) | 请求结果类型、运行时校验、Host 模型和客户端类型注册 |
 | 工程数据模型 | [repository-types.ts](../src/repository-types.ts)、[repository-schemas.ts](../src/repository-schemas.ts)、[repository-config.ts](../src/repository-config.ts) | 工程、仓库、工作区及 Profile 配置类型 |
 | 配置文件与 Profile | [repository-project-file.ts](../src/repository-project-file.ts)、[repository-settings.ts](../src/repository-settings.ts) | 项目 JSON 发现、校验、版本检查、原子写入和 Profile 索引 |
 | 仓库范围与路径 | [repository-workspace.ts](../src/repository-workspace.ts)、[repository-path-policy.ts](../src/repository-path-policy.ts)、[repository-directory.ts](../src/repository-directory.ts) | 清单兼容解析、真实路径、去重、仓库可用性和目录选择 |
 | 客户端目录选择 | [directory-picker.ts](../src/client/directory-picker.ts) | 选择 Desktop/Web 目录接口、检查起始目录能力、处理取消及错误 |
-| Git 查询 | [git-review.ts](../src/git-review.ts)、[git-review-types.ts](../src/git-review-types.ts)、[git-review-schemas.ts](../src/git-review-schemas.ts) | Git 比较、文件列表、单文件差异及契约 |
+| Git 查询 | [git-review.ts](../src/git-review.ts)、[git-review-command.ts](../src/git-review-command.ts)、[git-review-parser.ts](../src/git-review-parser.ts) | 比较与仓库编排、受限命令执行、NUL 分隔输出与 patch 解析；契约位于 `git-review-types/schemas` |
+| 会话审查页面 | [FileReviewTab.tsx](../src/client/FileReviewTab.tsx)、[file-review-turn.tsx](../src/client/file-review-turn.tsx)、[file-review-model.ts](../src/client/file-review-model.ts) | 范围选择与页面组合、轮次/文件展示、共享身份及操作条件 |
+| 会话审查生命周期 | [use-file-review-conversation.ts](../src/client/use-file-review-conversation.ts)、[use-file-review-archive.ts](../src/client/use-file-review-archive.ts)、[use-file-review-deep-link.ts](../src/client/use-file-review-deep-link.ts)、[use-file-review-actions.ts](../src/client/use-file-review-actions.ts) | 快照与补录、归档与迁移、深链与局部滚动、状态巡检与撤销/重做 |
 | 会话数据归并 | [session-changes.ts](../src/client/session-changes.ts)、[mutation-call.ts](../src/client/mutation-call.ts)、[recorded-diffs.ts](../src/client/recorded-diffs.ts) | 工具结果解析、轮次归属、PTC 补录及归档 |
 | 宿主快照适配 | [snapshot-compat.ts](../src/client/snapshot-compat.ts)、[turn-deliverables.ts](../src/client/turn-deliverables.ts)、[deleted-paths.ts](../src/client/deleted-paths.ts) | 快照形状适配、审查行数据、字面删除路径识别 |
-| Git 页面与加载 | [GitReviewPanel.tsx](../src/client/GitReviewPanel.tsx)、[git-review-diff-loader.ts](../src/client/git-review-diff-loader.ts) | Git 范围、仓库筛选、差异缓存和并发队列 |
+| 对话审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx)、[produced-files-summary.tsx](../src/client/produced-files-summary.tsx)、[produced-files-toast.tsx](../src/client/produced-files-toast.tsx) | 巡检与撤销流程、文件摘要与深链操作、带自动关闭的结果提示 |
+| Git 页面与加载 | [GitReviewPanel.tsx](../src/client/GitReviewPanel.tsx)、[GitReviewFile.tsx](../src/client/GitReviewFile.tsx)、[git-review-diff-loader.ts](../src/client/git-review-diff-loader.ts) | 范围、仓库筛选与请求生命周期，文件行与差异展示，并发加载队列 |
 | 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、[repository-paths.ts](../src/client/repository-paths.ts) | 文件所属仓库、组标题、列表折叠和批量内容展开 |
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
+| 差异交互与展示 | [use-diff-selection.ts](../src/client/use-diff-selection.ts)、[unified-diff-controls.tsx](../src/client/unified-diff-controls.tsx)、[unified-diff-block.tsx](../src/client/unified-diff-block.tsx) | 选区/菜单生命周期与异步反馈、搜索导航控件、上下文与行窗口展示 |
 | 差异阅读 | [diff-search.ts](../src/client/diff-search.ts)、[diff-navigation.ts](../src/client/diff-navigation.ts)、[diff-highlight.ts](../src/client/diff-highlight.ts)、[DiffCode.tsx](../src/client/DiffCode.tsx) | 原始行搜索、修改块索引、有限语言词法着色与匹配标记 |
-| 评论 | [ReviewComments.tsx](../src/client/ReviewComments.tsx)、[review-comments.ts](../src/client/review-comments.ts)、[review-comments-send.ts](../src/client/review-comments-send.ts) | 评论编辑、定位、存储和发送 |
+| 评论界面与存储 | [ReviewComments.tsx](../src/client/ReviewComments.tsx)、[review-comment-context.ts](../src/client/review-comment-context.ts)、[review-comment-components.tsx](../src/client/review-comment-components.tsx)、[review-comments.ts](../src/client/review-comments.ts) | Provider 与工具条、会话草稿/讨论上下文、编辑与卡片展示、草稿模型 |
+| 评论提交与答复 | [review-comment-submission.ts](../src/client/review-comment-submission.ts)、[review-comments-send.ts](../src/client/review-comments-send.ts)、[use-review-discussion-events.ts](../src/client/use-review-discussion-events.ts)、[review-discussion-events.ts](../src/client/review-discussion-events.ts) | 批次/父意见格式化、宿主发送、订阅和确认草稿、按请求与轮次归并事件 |
 | 范围引用与外部定位 | [review-reference.ts](../src/client/review-reference.ts)、[review-file-opener.ts](../src/client/review-file-opener.ts)、[review-location.ts](../src/review-location.ts)、[editor-launch.ts](../src/editor-launch.ts) | 完整行范围、来源、磁盘唯一匹配、受限编辑器启动 |
 | 讨论与大文件窗口 | [review-discussions.ts](../src/client/review-discussions.ts)、[VirtualDiffRows.tsx](../src/client/VirtualDiffRows.tsx)、[virtual-diff-model.ts](../src/client/virtual-diff-model.ts) | 持久化请求／轮次关联、已读／解决状态、可变高度渲染 |
 | 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
 | 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](../src/client/repository-events.ts) | 深链定位和配置变化通知 |
 | 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts)、[use-review-locale.ts](../src/client/use-review-locale.ts)、[message-locales.ts](../src/client/message-locales.ts) | 中英文词典、宿主语言订阅、界面实时刷新及已识别的错误说明翻译 |
 | Desktop 兼容适配 | [patch-desktop-directory-picker.mjs](../scripts/patch-desktop-directory-picker.mjs) | 为特定 Desktop 构建的目录选择桥增加起始目录参数 |
+
+### 3.1 维护模块边界
+
+页面负责组合状态和展示；独立的订阅、请求和存储生命周期放在具名 hook 中。`FileReviewTab` 的四个 hook 按快照、归档、深链、操作组织，保持原有依赖和清理顺序；阅读撤销流程从 `use-file-review-actions` 进入，阅读归档定位从 `use-file-review-deep-link` 进入。
+
+`UnifiedDiff` 继续集中管理相互依赖的搜索、修改导航和上下文曝光。选区与菜单由 `use-diff-selection` 管理，展示组件接受模型和回调。不要在展示组件中重新创建行身份，或把搜索索引改为可见 DOM 的索引。
+
+评论沿「草稿存储 → 提交批次 → 宿主发送 → 事件关联 → 草稿确认」追踪。`review-discussion-events` 是纯事件归并；`review-discussions` 负责持久化和状态发布；`use-review-discussion-events` 负责订阅与清理。组件不直接推测答复归属。标签映射集中在 `review-comment-labels`，避免提交文字和界面使用不同范围名称。
+
+Host 的 `FileReviewService` 保留公开服务边界，文件验证/变换、引用定位和手册装载由私有模块实现。`transformFile` 仍通过原服务模块再导出；编辑器启动的再次验证仍调用服务的 `this.locateReference`。修改私有模块时也要核对原调用顺序、错误文字和路径边界。
+
+职责拆分应让一个模块能独立说明用途；不为每个短函数新增文件。已足够清晰的仓库配置、协议与快照模型保持现有结构。新增具名函数优先解释业务条件、异步身份和失败语义，注释解释约束，不重复描述代码。
 
 ## 4. 两条差异数据链路
 
@@ -419,7 +439,7 @@ pnpm build
 
 ### 10.2 验证能力与当前仓库情况
 
-本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`package.json` 当前没有 `test` 脚本。
+本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`pnpm test` 执行同一套测试；部分集成测试读取 `lib/index.js`，源码重构后先构建再测试。
 
 `tests/` 不再被 [.gitignore](../.gitignore) 忽略，应与源码一并提交。已有本地测试文件在移除忽略规则后会显示为未跟踪；提交并推送后，其他开发人员才能在克隆中获得它们。测试创建的临时仓库位于系统临时目录，`coverage/` 等生成报告继续忽略。接手时应确认测试文件齐全，不能把「没有测试文件」当成测试通过。
 
@@ -434,7 +454,8 @@ pnpm build
 这些条件说明测试并非仅供维护者本机使用，也不等于已验证所有平台。后续完善可移植性时，应先隔离 Git 集成测试的配置和模板，再在 Windows/Linux CI 中执行相同的依赖安装、构建和测试流程；不能以忽略整个 `tests/` 代替验证。纯数据模型测试与 Git/链接集成测试失败时，需分别排查业务逻辑和环境条件。
 
 ~~~powershell
-node --test tests/*.test.mjs
+pnpm build
+pnpm test
 ~~~
 
 改变显示或交互时，重点人工验证半宽侧栏、长路径、自动换行、统一/并排切换、局部与全部展开、切换会话及异步刷新。改变文件写入逻辑时，在临时目录验证冲突、越界、符号链接、CRLF 和多次编辑顺序，不用真实业务仓库验证破坏性操作。
@@ -462,8 +483,8 @@ pnpm pack --pack-destination dist
 | 改变批量展开 | `ReviewRepositoryGroup`、`review-repository-groups`、两个审查页面 | 区分文件列表与正文，限定会话/轮次/仓库范围，复用 Git 加载队列 |
 | 增加仓库配置字段 | `repository-types/schemas`、`repository-project-file`、`RepositorySettings` | 维护文件版本兼容与修订检查，不保存机器绝对根目录或临时外部仓库 |
 | 新增 Host 能力 | `FileReviewService` 和 Typert 三层契约 | Agent 作用域、请求/响应运行时校验、Host 路径验证 |
-| 修改评论发送/定位 | `review-comments`、`ReviewComments`、`review-comments-send` | 保留原引用、发送失败保留草稿，不覆盖会话输入草稿 |
-| 修改撤销算法 | `transformFile`、`resolveFile` 及 `FileReviewService` | 精确匹配、逐文件结果、真实路径边界、写前核对 |
+| 修改评论发送/定位 | `review-comment-submission`、`review-comments-send`、`review-discussion-events`、`review-file-opener` | 保留原引用与准确请求身份、发送失败保留草稿，不覆盖会话输入草稿 |
+| 修改撤销算法 | `file-review-files` 中的 `transformFile/resolveReviewFile` 及 `FileReviewService` | 精确匹配、逐文件结果、真实路径边界、写前核对 |
 | 升级宿主或 sidebar | `package.json`、两个入口、`snapshot-compat`、目录桥脚本 | 核对插槽、Conversation 快照、Typert 注册、Tab 打开和清理生命周期 |
 
 完成一次功能修改后，同步更新 README 的用户行为说明与本文的架构/限制说明；跨 Host/Client 的修改需保持契约和构建产物一致。

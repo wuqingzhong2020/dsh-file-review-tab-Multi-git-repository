@@ -1,258 +1,56 @@
 /** Host-side, workspace-contained undo / redo service for produced text diffs. */
 
-import { readFile, lstat, realpath } from 'node:fs/promises'
-import { basename, isAbsolute, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { realpath } from 'node:fs/promises'
+import { basename, isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type {
-  FileReviewAction, FileReviewChange, FileReviewFileResult, FileReviewRequest, FileReviewResult,
-  ProducedFileDiff, RecordedMutation, RecordedRequest, RecordedResult,
+  FileReviewFileResult,
+  FileReviewRequest,
+  FileReviewResult,
+  RecordedMutation,
+  RecordedRequest,
+  RecordedResult,
 } from './change-types.ts'
 import type { RepositorySettings } from './repository-settings.ts'
-import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts'
-import { inside, pathKey, previewProject, resolveReviewWorkspace } from './repository-workspace.ts'
-import { findProjectFile, PROJECT_FILE_NAME, readProjectFile, writeProjectFile } from './repository-project-file.ts'
+import type {
+  NamedReviewRepository,
+  ReviewProject,
+  ReviewProjectPage,
+  ReviewWorkspace,
+  SaveReviewProject,
+} from './repository-types.ts'
+import { pathKey, previewProject, resolveReviewWorkspace } from './repository-workspace.ts'
+import {
+  findProjectFile,
+  PROJECT_FILE_NAME,
+  readProjectFile,
+  writeProjectFile,
+} from './repository-project-file.ts'
 import { canonicalRepositoryPath } from './repository-path-policy.ts'
 import { resolveDirectoryStart } from './repository-directory.ts'
 import { gitReview, gitReviewDiff } from './git-review.ts'
-import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts'
-import { locateReviewReference, type ReviewLocationRequest, type ReviewLocationResult } from './review-location.ts'
-import { findVSCode, launchVSCode, vscodeArguments } from './editor-launch.ts'
-import { USER_GUIDE_IMAGES, type UserGuideDocument } from './user-guide.ts'
+import type {
+  GitReviewDiff,
+  GitReviewFileRequest,
+  GitReviewRequest,
+  GitReviewResult,
+} from './git-review-types.ts'
+import type { ReviewLocationRequest, ReviewLocationResult } from './review-location.ts'
+import type { UserGuideDocument } from './user-guide.ts'
+import { inspectReviewFile, applyReviewFile } from './file-review-files.ts'
+import { locateReferenceOnDisk, openReferenceInEditor } from './file-review-locations.ts'
+import { userGuidePath, readUserGuideDocument } from './file-review-user-guide.ts'
 
-type InspectState = Exclude<FileReviewFileResult['state'], 'error'>
-
-interface InspectedFile {
-  readonly state: InspectState
-  readonly text?: string | undefined
-  readonly nextText?: string | undefined
-  readonly reason?: string | undefined
-}
-
-interface ResolvedFile {
-  readonly filename: string
-  readonly mode: number
-  readonly bytes: Uint8Array
-  /** Raw disk text (line endings as stored). */
-  readonly text: string
-  /** Whether the file uses CRLF line endings on disk. */
-  readonly crlf: boolean
-  /** Disk text normalized to the backend diff basis (LF), used for hunk math. */
-  readonly lfText: string
-}
-
-/**
- * The mutation tools' recorded hunks (both diff cards and Code Mode
- * before/after values) ride the filesystem backend's LF-normalized basis,
- * while files on disk may use CRLF. All hunk matching therefore runs on the
- * normalized text; the write path restores the file's own line-ending style.
- */
-function normalizeNewlines(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-}
-
-function restoreNewlines(text: string, crlf: boolean): string {
-  return crlf ? text.replace(/\n/g, '\r\n') : text
-}
-
-async function resolveFile(cwd: string, requestedPath: string, roots: readonly string[]): Promise<ResolvedFile> {
-  const candidate = resolve(await realpath(cwd), requestedPath)
-  const linkStat = await lstat(candidate)
-  if (linkStat.isSymbolicLink()) throw new Error('symbolic links are not supported')
-  if (!linkStat.isFile()) throw new Error('path is not a regular file')
-  const filename = await realpath(candidate)
-  if (!roots.some(root => inside(root, filename))) throw new Error('resolved path is outside the configured project repositories')
-  const bytes = await readFile(filename)
-  const text = bytes.toString('utf8')
-  if (!Buffer.from(text, 'utf8').equals(bytes)) throw new Error('file is not valid UTF-8 text')
-  const crlf = text.includes('\r')
-  return { filename, mode: linkStat.mode & 0o777, bytes, text, crlf, lfText: normalizeNewlines(text) }
-}
-
-function offsetAtLine(text: string, line: number): number | null {
-  if (!Number.isInteger(line) || line < 1) return null
-  if (line === 1) return 0
-  let offset = 0
-  for (let current = 1; current < line; current += 1) {
-    const next = text.indexOf('\n', offset)
-    if (next === -1) return null
-    offset = next + 1
-  }
-  return offset
-}
-
-function replaceHunk(
-  text: string,
-  source: string,
-  replacement: string,
-  line: number | undefined,
-): string | null {
-  let offset: number
-  if (line !== undefined) {
-    const located = offsetAtLine(text, line)
-    if (located === null || text.slice(located, located + source.length) !== source) return null
-    offset = located
-  } else {
-    if (source === '') return null
-    offset = text.indexOf(source)
-    if (offset === -1 || text.indexOf(source, offset + 1) !== -1) return null
-  }
-  return text.slice(0, offset) + replacement + text.slice(offset + source.length)
-}
-
-function hunkSupported(diff: ProducedFileDiff, path: string): boolean {
-  if (diff.path !== path || diff.oldText === null || diff.oldText === diff.newText) return false
-  if (diff.oldText === '' && diff.oldStart === undefined) return false
-  if (diff.newText === '' && diff.newStart === undefined) return false
-  return true
-}
-
-/** Apply a complete file's hunk sequence in memory, or report a strict mismatch. */
-export function transformFile(
-  text: string,
-  file: FileReviewChange,
-  action: FileReviewAction,
-): string | null {
-  if (file.diffs.length === 0 || !file.diffs.every(diff => hunkSupported(diff, file.path))) {
-    return null
-  }
-  const diffs = action === 'undo' ? [...file.diffs].reverse() : file.diffs
-  let next = text
-  for (const diff of diffs) {
-    const source = action === 'undo' ? diff.newText : diff.oldText
-    const replacement = action === 'undo' ? diff.oldText : diff.newText
-    if (source === null || replacement === null) return null
-    const changed = replaceHunk(
-      next,
-      source,
-      replacement,
-      action === 'undo' ? diff.newStart : diff.oldStart,
-    )
-    if (changed === null) return null
-    next = changed
-  }
-  return next
-}
-
-function hunkSidePresent(text: string, file: FileReviewChange, side: 'old' | 'new'): boolean {
-  for (const diff of file.diffs) {
-    const source = side === 'old' ? diff.oldText : diff.newText
-    if (source === null) continue
-    const line = side === 'old' ? diff.oldStart : diff.newStart
-    if (line !== undefined) {
-      const located = offsetAtLine(text, line)
-      if (located === null || text.slice(located, located + source.length) !== source) return false
-    } else if (text.indexOf(source) === -1) {
-      return false
-    }
-  }
-  return true
-}
-
-function inspectText(text: string, file: FileReviewChange): InspectedFile {
-  if (file.diffs.length === 0 || !file.diffs.every(diff => hunkSupported(diff, file.path))) {
-    return { state: 'unsupported', reason: 'change has no complete reversible diff' }
-  }
-  const undone = transformFile(text, file, 'undo')
-  const redone = transformFile(text, file, 'redo')
-  if (undone !== null && redone !== null) {
-    // Both directions textually succeed. This is the classic pure-append
-    // shape: the before hunks are a lead-in prefix of the after hunks, so
-    // they are contained in the after state too. Decide by what the CURRENT
-    // text actually contains: the after hunks are present => applied (undo
-    // strips them); otherwise the change is undone and only before hunks
-    // remain.
-    return hunkSidePresent(text, file, 'new')
-      ? { state: 'applied', text, nextText: undone }
-      : { state: 'undone', text, nextText: redone }
-  }
-  if (undone !== null) return { state: 'applied', text, nextText: undone }
-  if (redone !== null) return { state: 'undone', text, nextText: redone }
-  return { state: 'conflict', reason: 'current content does not match the recorded change' }
-}
-
-async function inspectOne(cwd: string, file: FileReviewChange, roots: readonly string[]): Promise<FileReviewFileResult> {
-  if (file.diffs.length === 0 || !file.diffs.every(diff => hunkSupported(diff, file.path))) {
-    return {
-      path: file.path,
-      state: 'unsupported',
-      changed: false,
-      reason: 'change has no complete reversible diff',
-    }
-  }
-  try {
-    const resolved = await resolveFile(cwd, file.path, roots)
-    const inspected = inspectText(resolved.lfText, file)
-    return { path: file.path, state: inspected.state, changed: false, reason: inspected.reason }
-  } catch (error) {
-    return {
-      path: file.path,
-      state: 'error',
-      changed: false,
-      reason: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-async function applyOne(
-  cwd: string,
-  file: FileReviewChange,
-  action: FileReviewAction,
-  roots: readonly string[],
-): Promise<FileReviewFileResult> {
-  if (file.diffs.length === 0 || !file.diffs.every(diff => hunkSupported(diff, file.path))) {
-    return {
-      path: file.path,
-      state: 'unsupported',
-      changed: false,
-      reason: 'change has no complete reversible diff',
-    }
-  }
-  try {
-    const resolved = await resolveFile(cwd, file.path, roots)
-    const inspected = inspectText(resolved.lfText, file)
-    const sourceState = action === 'undo' ? 'applied' : 'undone'
-    const targetState = action === 'undo' ? 'undone' : 'applied'
-    if (inspected.state === targetState) {
-      return { path: file.path, state: targetState, changed: false }
-    }
-    if (inspected.state !== sourceState || inspected.nextText === undefined) {
-      return { path: file.path, state: inspected.state, changed: false, reason: inspected.reason }
-    }
-
-    // Re-read immediately before commit. This is the closest available CAS fence for
-    // external editors that do not participate in the package's writer lock.
-    const current = await readFile(resolved.filename)
-    if (!Buffer.from(resolved.bytes).equals(current)) {
-      return {
-        path: file.path,
-        state: 'conflict',
-        changed: false,
-        reason: 'file changed while the operation was being prepared',
-      }
-    }
-    await writeFileAtomic(
-      resolved.filename,
-      restoreNewlines(inspected.nextText, resolved.crlf),
-      { mode: resolved.mode },
-    )
-    return { path: file.path, state: targetState, changed: true }
-  } catch (error) {
-    return {
-      path: file.path,
-      state: 'error',
-      changed: false,
-      reason: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
+// Preserve the existing Host entry point for callers of the pure transform.
+export { transformFile } from './file-review-files.ts'
 
 function sessionCwd(agent: Agent): string {
   const cwd = agent.session.header.cwd
-  if (cwd === undefined || cwd.trim() === '') throw new Error('session has no workspace directory')
+  if (cwd === undefined || cwd.trim() === '') {
+    throw new Error('session has no workspace directory')
+  }
   return cwd
 }
 
@@ -269,7 +67,10 @@ export class FileReviewService extends TypertRemoteService {
   private readonly recordLog = new Map<string, RecordedMutation[]>()
   private readonly temporaryRepositories = new Map<string, NamedReviewRepository[]>()
 
-  constructor(ctx: Context, private readonly projectSettings?: RepositorySettings) {
+  constructor(
+    ctx: Context,
+    private readonly projectSettings?: RepositorySettings,
+  ) {
     super(ctx, 'fileReview')
   }
 
@@ -280,14 +81,35 @@ export class FileReviewService extends TypertRemoteService {
     const root = await realpath(cwd)
     const localFile = await findProjectFile(root)
     const matched = await resolveReviewWorkspace(cwd, settings.projects)
-    const project = localFile !== null ? localFile.project
-      : matched.project !== null ? { ...matched.project, name: basename(matched.project.root) }
-      : { name: basename(root), root, includeProjectRoot: true, configFiles: [], repositories: [], enabled: true }
-    const workspace = localFile !== null && project.enabled !== false ? await this.workspace(agent) : await previewProject(project)
+    let project: ReviewProject
+    if (localFile !== null) {
+      project = localFile.project
+    } else if (matched.project !== null) {
+      project = { ...matched.project, name: basename(matched.project.root) }
+    } else {
+      project = {
+        name: basename(root),
+        root,
+        includeProjectRoot: true,
+        configFiles: [],
+        repositories: [],
+        enabled: true,
+      }
+    }
+    const workspace =
+      localFile !== null && project.enabled !== false
+        ? await this.workspace(agent)
+        : await previewProject(project)
     return {
-      project, revision: settings.revision, configured: localFile !== null,
-      workspace, fileRevision: localFile?.revision ?? '',
-      temporaryRepositories: localFile !== null ? this.temporaryRepositories.get(agentKey(agent)) ?? localFile.temporaryRepositories : [],
+      project,
+      revision: settings.revision,
+      configured: localFile !== null,
+      workspace,
+      fileRevision: localFile?.revision ?? '',
+      temporaryRepositories:
+        localFile !== null
+          ? (this.temporaryRepositories.get(agentKey(agent)) ?? localFile.temporaryRepositories)
+          : [],
     }
   }
 
@@ -307,96 +129,84 @@ export class FileReviewService extends TypertRemoteService {
 
   /** Open the shipped manual, independently of the session's project directory. */
   async userGuide(_agent: Agent, language: 'zh' | 'en'): Promise<string> {
-    if (language !== 'zh' && language !== 'en') throw new Error('Unsupported user guide language')
-    // Both the source module and the bundled Host entry live one level below docs.
-    const document = new URL(`../docs/USER_GUIDE${language === 'en' ? '.en' : ''}.md`, import.meta.url)
-    if (!(await lstat(document)).isFile()) throw new Error('User guide is not a regular file')
-    return fileURLToPath(document)
+    return userGuidePath(language)
   }
 
   /** The Desktop Markdown preview cannot load sidebar media URLs from its app protocol. */
   async userGuideDocument(agent: Agent, language: 'zh' | 'en'): Promise<UserGuideDocument> {
     const path = await this.userGuide(agent, language)
-    const markdown = await readFile(path, 'utf8')
-    const images = await Promise.all(USER_GUIDE_IMAGES.map(async name => {
-      const image = new URL(`../docs/image/${name}`, import.meta.url)
-      const info = await lstat(image)
-      if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024) throw new Error('Invalid user guide screenshot')
-      const bytes = await readFile(image)
-      return [`image/${name}`, `data:image/jpeg;base64,${bytes.toString('base64')}`] as const
-    }))
-    return { path, markdown, images: Object.fromEntries(images) }
+    return readUserGuideDocument(path)
   }
 
   /** Verify references against disk without writing project files. */
-  async locateReference(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult> {
-    try {
-      const { roots } = await this.workspace(agent)
-      const repository = await realpath(request.repository)
-      if (!roots.some(root => pathKey(root) === pathKey(repository))) return { state: 'unsupported', reason: 'scope' }
-      const candidate = resolve(sessionCwd(agent), request.path)
-      if (!inside(repository, candidate)) return { state: 'unsupported', reason: 'scope' }
-      const metadata = await lstat(candidate)
-      if (metadata.size > 16 * 1024 * 1024) return { state: 'unsupported', reason: 'size' }
-      const file = await resolveFile(sessionCwd(agent), request.path, roots)
-      if (!inside(repository, file.filename)) return { state: 'unsupported', reason: 'scope' }
-      if (file.lfText.includes('\0')) return { state: 'unsupported', reason: 'binary' }
-      return locateReviewReference(file.lfText, request)
-    } catch (cause) {
-      return { state: typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ENOENT' ? 'missing' : 'unsupported' }
-    }
+  async locateReference(
+    agent: Agent,
+    request: ReviewLocationRequest,
+  ): Promise<ReviewLocationResult> {
+    return locateReferenceOnDisk(request, {
+      workspace: () => this.workspace(agent),
+      cwd: () => sessionCwd(agent),
+    })
   }
 
   async openEditor(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult> {
-    if (request.side !== 'new') return { state: 'unsupported', reason: 'old' }
-    const located = await this.locateReference(agent, request)
-    if (located.state !== 'exact' && !(located.state === 'moved' && request.allowRelocate)) return located
-    const executable = await findVSCode(request.editorPath)
-    if (executable === null) return { state: 'editor-missing' }
-    // Check again after executable detection (registry lookups can take time).
-    const current = await this.locateReference(agent, request)
-    if (current.line !== located.line || current.endLine !== located.endLine || current.state !== located.state) return { state: 'changed' }
-    try {
-      const { roots } = await this.workspace(agent)
-      const file = await resolveFile(sessionCwd(agent), request.path, roots)
-      if (!inside(await realpath(request.repository), file.filename)) return { state: 'unsupported', reason: 'scope' }
-      if (file.lfText.includes('\0')) return { state: 'unsupported', reason: 'binary' }
-      const final = locateReviewReference(file.lfText, request)
-      if (final.line !== located.line || final.state !== located.state) return { state: 'changed' }
-      await launchVSCode(executable, vscodeArguments(file.filename, located.line!))
-      return { ...located, state: 'started' }
-    } catch { return { state: 'error', reason: 'launch' } }
+    return openReferenceInEditor(request, {
+      workspace: () => this.workspace(agent),
+      cwd: () => sessionCwd(agent),
+      // Revalidation goes through the service method on every check.
+      locateReference: () => this.locateReference(agent, request),
+    })
   }
 
   /** Preview and save cannot choose another project's root through the wire. */
   async preview(agent: Agent, project: ReviewProject): Promise<ReviewWorkspace> {
     const current = await this.project(agent)
-    if (pathKey(await realpath(project.root)) !== pathKey(current.project.root)) throw new Error('Project root does not belong to this session')
+    if (pathKey(await realpath(project.root)) !== pathKey(current.project.root)) {
+      throw new Error('Project root does not belong to this session')
+    }
     return previewProject({ ...project, name: current.project.name, root: current.project.root })
   }
 
   async saveProject(agent: Agent, request: SaveReviewProject): Promise<ReviewProjectPage> {
     const preview = await this.preview(agent, {
-      ...request.project, configFiles: [], repositories: [],
+      ...request.project,
+      configFiles: [],
+      repositories: [],
     })
     const project = preview.project!
-    await writeProjectFile({
-      ...project,
-      enabled: request.project.enabled ?? project.enabled ?? true,
-      namedRepositories: project.namedRepositories?.filter(entry => !isAbsolute(entry.path)),
-    }, request.fileRevision)
+    await writeProjectFile(
+      {
+        ...project,
+        enabled: request.project.enabled ?? project.enabled ?? true,
+        namedRepositories: project.namedRepositories?.filter(entry => !isAbsolute(entry.path)),
+      },
+      request.fileRevision,
+    )
     if (this.projectSettings !== undefined) {
       const settings = this.projectSettings.get()
-      const index = settings.projects.findIndex(item => pathKey(item.root) === pathKey(project.root))
+      const index = settings.projects.findIndex(
+        item => pathKey(item.root) === pathKey(project.root),
+      )
       const projects = [...settings.projects]
       const indexEntry = {
-        name: project.name, root: project.root, includeProjectRoot: project.includeProjectRoot,
-        configFiles: [PROJECT_FILE_NAME], repositories: [], enabled: request.project.enabled ?? project.enabled ?? true,
+        name: project.name,
+        root: project.root,
+        includeProjectRoot: project.includeProjectRoot,
+        configFiles: [PROJECT_FILE_NAME],
+        repositories: [],
+        enabled: request.project.enabled ?? project.enabled ?? true,
       }
-      if (index === -1) projects.push(indexEntry)
-      else projects[index] = indexEntry
+      if (index === -1) {
+        projects.push(indexEntry)
+      } else {
+        projects[index] = indexEntry
+      }
       // The project-local file is authoritative; the profile keeps its index.
-      try { await this.projectSettings.save({ projects, revision: settings.revision }) } catch { /* local file remains usable */ }
+      try {
+        await this.projectSettings.save({ projects, revision: settings.revision })
+      } catch {
+        // The local file remains usable if updating the profile index fails.
+      }
     }
     return this.project(agent)
   }
@@ -417,8 +227,12 @@ export class FileReviewService extends TypertRemoteService {
     const temporary = this.temporaryRepositories.get(agentKey(agent)) ?? []
     if (base.project === null || temporary.length === 0) return base
     const extra = await previewProject({
-      name: base.project.name, root: base.project.root, includeProjectRoot: false,
-      configFiles: [], repositories: [], namedRepositories: temporary,
+      name: base.project.name,
+      root: base.project.root,
+      includeProjectRoot: false,
+      configFiles: [],
+      repositories: [],
+      namedRepositories: temporary,
     })
     const repositories = [...base.repositories]
     const seen = new Set(repositories.map(repo => pathKey(repo.path)))
@@ -428,15 +242,24 @@ export class FileReviewService extends TypertRemoteService {
       repositories.push({ ...repo, source: 'temporary' })
     }
     return {
-      ...base, repositories, warnings: [...base.warnings, ...extra.warnings],
-      roots: [...new Map([...base.roots, ...extra.roots].map(root => [pathKey(root), root])).values()],
+      ...base,
+      repositories,
+      warnings: [...base.warnings, ...extra.warnings],
+      roots: [
+        ...new Map([...base.roots, ...extra.roots].map(root => [pathKey(root), root])).values(),
+      ],
     }
   }
 
   /** All repositories outside the project live only in this agent's session. */
-  async setTemporaryRepositories(agent: Agent, entries: NamedReviewRepository[]): Promise<ReviewWorkspace> {
+  async setTemporaryRepositories(
+    agent: Agent,
+    entries: NamedReviewRepository[],
+  ): Promise<ReviewWorkspace> {
     const current = await this.project(agent)
-    if (!current.configured) throw new Error('Enable this project before adding temporary repositories')
+    if (!current.configured) {
+      throw new Error('Enable this project before adding temporary repositories')
+    }
     const root = current.project.root
     const normalized: NamedReviewRepository[] = []
     for (const entry of entries) {
@@ -476,7 +299,7 @@ export class FileReviewService extends TypertRemoteService {
   async status(agent: Agent, request: FileReviewRequest): Promise<FileReviewResult> {
     const cwd = sessionCwd(agent)
     const { roots } = await this.workspace(agent)
-    const files = await Promise.all(request.files.map(file => inspectOne(cwd, file, roots)))
+    const files = await Promise.all(request.files.map(file => inspectReviewFile(cwd, file, roots)))
     return { files }
   }
 
@@ -486,7 +309,9 @@ export class FileReviewService extends TypertRemoteService {
       const cwd = sessionCwd(agent)
       const { roots } = await this.workspace(agent)
       const files: FileReviewFileResult[] = []
-      for (const file of request.files) files.push(await applyOne(cwd, file, request.action, roots))
+      for (const file of request.files) {
+        files.push(await applyReviewFile(cwd, file, request.action, roots))
+      }
       return { files }
     })
   }

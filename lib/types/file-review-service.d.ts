@@ -2,14 +2,13 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { FileReviewAction, FileReviewChange, FileReviewRequest, FileReviewResult, RecordedMutation, RecordedRequest, RecordedResult } from './change-types.ts';
+import type { FileReviewRequest, FileReviewResult, RecordedMutation, RecordedRequest, RecordedResult } from './change-types.ts';
 import type { RepositorySettings } from './repository-settings.ts';
 import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWorkspace, SaveReviewProject } from './repository-types.ts';
 import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts';
-import { type ReviewLocationRequest, type ReviewLocationResult } from './review-location.ts';
-import { type UserGuideDocument } from './user-guide.ts';
-/** Apply a complete file's hunk sequence in memory, or report a strict mismatch. */
-export declare function transformFile(text: string, file: FileReviewChange, action: FileReviewAction): string | null;
+import type { ReviewLocationRequest, ReviewLocationResult } from './review-location.ts';
+import type { UserGuideDocument } from './user-guide.ts';
+export { transformFile } from './file-review-files.ts';
 /** Host service published as the `fileReview` Remote namespace. */
 export declare class FileReviewService extends TypertRemoteService {
     private readonly projectSettings?;

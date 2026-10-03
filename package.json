@@ -69,7 +69,8 @@
   "scripts": {
     "build:types": "tsc --emitDeclarationOnly --outDir lib/types",
     "build": "tsc --emitDeclarationOnly --outDir lib/types && tsdown",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
