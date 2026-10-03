@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-当前版本：**v0.1.1**。
+当前版本：**v0.1.2**。
 
 **dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并适配 DeepSeek Harness Desktop 0.2.0-rc.2 与 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1。**
 
@@ -16,6 +16,9 @@
 
 ## 功能
 
+- **文件内搜索**：每个差异工具条可打开搜索，支持大小写、整词、旧版／新版筛选和匹配计数。搜索覆盖当前记录中的折叠代码，命中时仅展开附近 3 行；Enter / F3 下一处，Shift+Enter / Shift+F3 上一处，Esc 关闭。在差异区域聚焦时，Ctrl/Cmd+F 打开该文件搜索；评论输入框保留自己的编辑快捷键。最多显示 10,000 个匹配，达到上限时提示。
+- **差异块导航**：工具条的上下箭头和块选择框可循环定位上一处／下一处修改，显示当前块及总数，并标示目标行。差异区域内支持 Ctrl/Cmd+↑ / ↓；切换统一／并排或中英文时保留搜索和定位。
+- **基础语法高亮**：按文件扩展名识别 C/C++、JavaScript、TypeScript、**Python 3**、JSON 和 Markdown，支持常见关键字、字符串、注释和数字；Python 支持三引号多行字符串。未知类型显示纯文本。高亮只为原始代码着色，Markdown 保留源码显示；超长行或超出高亮预算时保留原始文本和行级差异。
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
 - **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
 - **仓库分组与内容展开**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。仓库标题旁的图标批量展开或收起该仓库内文件的差异内容；轮次标题旁的图标控制该轮全部仓库的文件内容，Git 范围的文件数标题旁图标控制当前显示的全部文件内容。收起内容后仍显示文件名，点击仓库名称或左侧箭头则隐藏、显示整个文件列表。部分文件已展开时，图标先展开剩余内容，再次点击全部收起；操作只影响当前作用范围。Git 差异按需加载并缓存，批量展开最多同时请求 4 个文件。
@@ -38,14 +41,14 @@
 
 适配版本：**DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.1.1.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.1.2.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.1.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.2.tgz"
 ```
 
 维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；在会话顶部打开「多代码仓管理」，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。
@@ -55,7 +58,7 @@ pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-r
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.1/dsh-file-review-tab-multi-git-repository-0.1.1.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.2/dsh-file-review-tab-multi-git-repository-0.1.2.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -80,7 +83,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供 `v0.1.1` 的打包、推送与 Release 发布步骤；另有 [本版本发布说明](docs/releases/v0.1.1.md) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供 `v0.1.2` 的打包、推送与 Release 发布步骤；另有 [本版本发布说明](docs/releases/v0.1.2.md) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
@@ -99,6 +102,12 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 Git 范围沿用当前工程的仓库配置和当前会话临时仓库，可筛选具体仓库、展开逐行差异或在编辑器中打开文件。支持新建、删除、重命名，二进制、符号链接或超过 2 MiB 的未跟踪文件显示说明。Git 范围只读，不执行暂存、提交、切换分支或撤销；点击右上角刷新重新读取磁盘状态。
 
 Git 范围的上下文来自所选比较的真实版本，查看历史提交时也使用当时的代码。PTC / Code Mode 可展开实际记录的完整 before/after；标准工具的历史轮次若只记录了局部差异，缺失内容显示为「历史记录未包含这些代码」，不会用当前磁盘内容替代历史版本。展开上下文不改变撤销所用的原始差异或评论定位；「复制差异」仍复制带 3 行上下文的精简差异。
+
+## 搜索与定位的范围
+
+搜索和高亮适用于八种审查范围与两种布局，按会话、仓库、文件及比较来源隔离。旧版删除行只在旧版搜索中出现；共有上下文在「两者」搜索中只计一次。历史记录缺少正文时，只搜索已记录的内容，不读取当前文件补齐历史代码。搜索框输入的是普通文本，特殊符号按字面匹配。
+
+高亮为轻量词法着色，不等同于完整语言解析。单行超过 16,000 字符时该行显示纯文本；单个差异组件高亮预算为 500,000 字符，超过剩余预算的片段显示纯文本。搜索、原始行号、评论、统计、复制及撤销仍使用原始差异。展开大量代码依然会增加 DOM 数量，建议按需展开。
 
 ## 提交文件审查意见
 

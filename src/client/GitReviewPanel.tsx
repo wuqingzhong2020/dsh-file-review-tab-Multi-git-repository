@@ -142,7 +142,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: { ctx: C
             </div>
             <ReviewFileCommentThread target={commentTarget} />
             {open && <div className={css.diffWrap}>{diff === null || diff === undefined ? <p>{t('reviewLoading')}</p> : typeof diff === 'string' ? <p role="alert">{localizeReviewMessage(diff)}</p>
-              : diff.diffs.length ? <UnifiedDiff diffs={diff.diffs} reviewTarget={commentTarget} contextLines={3} showCopyButton showFileHeaders={false} labels={{ copy: t('copy'), copied: t('copied'), expandContext: (count, remaining) => t('expandContext', { count, remaining }), collapseContext: t('collapseContext'), unavailableContext: count => t('unavailableContext', { count }) }} />
+              : diff.diffs.length ? <UnifiedDiff diffs={diff.diffs} sourceKey={JSON.stringify([sessionId, mode, file.repository, file.path, ref])} reviewTarget={commentTarget} contextLines={3} showCopyButton showFileHeaders={false} labels={{ copy: t('copy'), copied: t('copied'), expandContext: (count, remaining) => t('expandContext', { count, remaining }), collapseContext: t('collapseContext'), unavailableContext: count => t('unavailableContext', { count }) }} />
                 : <p>{diff.binary ? t('reviewBinaryHint') : t('reviewMetadataOnly')}{diff.note ? ` (${localizeReviewMessage(diff.note)})` : ''}</p>}</div>}
           </li>
         })}</ul>

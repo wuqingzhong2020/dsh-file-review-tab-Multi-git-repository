@@ -13,7 +13,7 @@ export declare function ReviewCommentLine({ anchor, alternateAnchor, children }:
     anchor?: ReviewCommentAnchor | undefined;
     alternateAnchor?: ReviewCommentAnchor | undefined;
     children: (button: ReactNode) => ReactNode;
-}): string | number | boolean | import("react").JSX.Element | Iterable<ReactNode> | null | undefined;
+}): string | number | boolean | Iterable<ReactNode> | import("react").JSX.Element | null | undefined;
 export declare function ReviewFileCommentButton({ target }: {
     target?: ReviewCommentTarget | undefined;
 }): import("react").JSX.Element | null;

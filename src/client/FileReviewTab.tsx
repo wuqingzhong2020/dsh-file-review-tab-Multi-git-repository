@@ -824,6 +824,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
                   : (
                   <UnifiedDiff
                     diffs={file.reviewDiffs ?? file.diffs}
+                    sourceKey={JSON.stringify([sessionId, turn.turn, commentTarget.repository, file.path])}
                     contextLines={3}
                     showCopyButton
                     showFileHeaders={false}

@@ -15,6 +15,9 @@ export interface UnifiedGap {
   readonly id: string
   readonly position: 'leading' | 'middle' | 'trailing'
   readonly lines: readonly UnifiedLine[]
+  /** Search can split a hidden interval; controls still address its original id. */
+  readonly originId?: string
+  readonly offset?: number
 }
 export type UnifiedRow = UnifiedLine | UnifiedGap
 export interface UnifiedHunk {
@@ -25,7 +28,11 @@ export interface UnifiedHunk {
   /** Count only: a historical tool hunk may not contain the omitted text. */
   readonly unchangedBefore: number
 }
-export interface ContextExpansion { readonly before: number; readonly after: number }
+export interface ContextExpansion {
+  readonly before: number
+  readonly after: number
+  readonly revealed?: readonly { readonly start: number; readonly end: number }[]
+}
 export interface UnifiedVisibleBlock { readonly gap: UnifiedGap | null; readonly lines: readonly UnifiedLine[] }
 export interface SplitDiffRow { readonly old: UnifiedLine | null; readonly next: UnifiedLine | null }
 
@@ -129,6 +136,28 @@ export function visibleHunkRows(hunk: UnifiedHunk, expansions: ReadonlyMap<strin
   return hunk.rows.flatMap(row => {
     if (row.kind !== 'gap') return [row]
     const expansion = expansions.get(row.id)
+    if (expansion?.revealed?.length) {
+      const ranges = [{ start: 0, end: expansion.before }, ...expansion.revealed, { start: row.lines.length - expansion.after, end: row.lines.length }]
+        .map(range => ({ start: Math.max(0, range.start), end: Math.min(row.lines.length, range.end) }))
+        .filter(range => range.end > range.start).sort((a, b) => a.start - b.start)
+      const merged: { start: number; end: number }[] = []
+      for (const range of ranges) {
+        const last = merged.at(-1)
+        if (last && range.start <= last.end) last.end = Math.max(last.end, range.end)
+        else merged.push({ ...range })
+      }
+      const result: UnifiedRow[] = []
+      const hidden = (start: number, end: number) => {
+        if (end <= start) return
+        result.push({ kind: 'gap', id: `${row.id}:slice:${start}`, originId: row.id, offset: start,
+          position: start === 0 && row.position === 'leading' ? 'leading' : end === row.lines.length && row.position === 'trailing' ? 'trailing' : 'middle', lines: row.lines.slice(start, end) })
+      }
+      let cursor = 0
+      for (const range of merged) { hidden(cursor, range.start); result.push(...row.lines.slice(range.start, range.end)); cursor = range.end }
+      hidden(cursor, row.lines.length)
+      if (preserveExpandedGaps && !result.some(line => line.kind === 'gap')) result.unshift({ ...row, lines: [] })
+      return result
+    }
     const before = Math.min(row.lines.length, expansion?.before ?? 0)
     const after = Math.min(row.lines.length - before, expansion?.after ?? 0)
     const remaining = row.lines.slice(before, row.lines.length - after)

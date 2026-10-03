@@ -2,7 +2,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.1.1**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.1.2**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
 
@@ -118,6 +118,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | Git 页面与加载 | [GitReviewPanel.tsx](../src/client/GitReviewPanel.tsx)、[git-review-diff-loader.ts](../src/client/git-review-diff-loader.ts) | Git 范围、仓库筛选、差异缓存和并发队列 |
 | 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、[repository-paths.ts](../src/client/repository-paths.ts) | 文件所属仓库、组标题、列表折叠和批量内容展开 |
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
+| 差异阅读 | [diff-search.ts](../src/client/diff-search.ts)、[diff-navigation.ts](../src/client/diff-navigation.ts)、[diff-highlight.ts](../src/client/diff-highlight.ts)、[DiffCode.tsx](../src/client/DiffCode.tsx) | 原始行搜索、修改块索引、有限语言词法着色与匹配标记 |
 | 评论 | [ReviewComments.tsx](../src/client/ReviewComments.tsx)、[review-comments.ts](../src/client/review-comments.ts)、[review-comments-send.ts](../src/client/review-comments-send.ts) | 评论编辑、定位、存储和发送 |
 | 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
 | 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](../src/client/repository-events.ts) | 深链定位和配置变化通知 |
@@ -306,6 +307,18 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 `ReviewCommentStore` 按会话保存草稿，单条文字上限为 6000 字符。`review-comments-send.ts` 调用该会话的 `conversation.send` 发送整理后的意见，不增加插件 RPC，也不覆盖输入框现有草稿。发送期间防止重复提交；成功只清除已发送批次，失败保留。Agent 忙碌时由宿主处理消息排队。
 
+### 7.4 搜索、导航与语法高亮
+
+`diff-navigation.ts` 在原始行模型上生成 `(hunkIndex, lineIndex)` 定位，避免同一文件多次编辑产生重复行号时串位置。文件组件的来源键包含会话、仓库、文件及轮次／Git 比较基线，再组合差异修订标识；搜索位置及上下文展开不会沿用到另一来源。相距超过两侧默认上下文长度的修改分成独立导航块。
+
+`diff-search.ts` 按字面匹配 Unicode 文本，支持大小写、整词与旧／新侧过滤；共有上下文只计一次，删除行属于旧侧。每次最多返回 10,000 个匹配。搜索可访问折叠行，但不访问缺失的历史代码。定位只在原间隔增加命中附近的小范围 `revealed` 区段，`visibleHunkRows` 合并区段并保留原始行对象，局部展开和收起继续使用原间隔身份。
+
+快捷键绑定在差异组件内：Ctrl/Cmd+F、Enter/F3、Shift+Enter/Shift+F3、Esc、Ctrl/Cmd+↑/↓。除搜索框外的输入控件不处理这些快捷键。语言和布局切换不重建搜索选择或评论草稿；新查询、筛选或修订变化重新定位到第一处匹配。关闭搜索去除其临时定位窗口，手动展开仍保留。
+
+宿主当前公开渲染接口未提供可直接复用的高亮服务，因此 `diff-highlight.ts` 使用有限词法着色，不增加高亮依赖。支持 C/C++、JS、TS、Python 3、JSON、Markdown；旧／新侧分别维护多行注释和字符串状态。状态只能从已记录片段开头推导，未知片段前的语法状态不可恢复。`DiffCode` 用 React 文本节点和范围跨度着色，不注入 HTML，不修改源文本；主题颜色在 CSS 中跟随宿主变量，高亮缓存不因主题变更重新计算。
+
+单行超过 16,000 字符或片段超过当前组件剩余的 500,000 字符预算时降级纯文本；未知语言同样降级。预算只限制着色，不截断内容、搜索、行号和评论。Markdown 为源码着色，不渲染文档预览。词级 diff、语言全量包与行虚拟化不属于当前实现。
+
 ## 8. 状态存储与生命周期
 
 | 数据 | 存储位置 | 隔离与生命周期 |
@@ -319,6 +332,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | 归档展开状态 | localStorage 的 `…:archive:<sessionId>` | 按会话持久化，兼容旧前缀迁移 |
 | 差异布局、换行与每次展开行数 | localStorage 的 `…:diff-view` | 同一浏览器环境下共享的显示偏好 |
 | 文件内容、仓库列表、上下文展开 | React/组件内存 | 页面状态，不写工程 JSON |
+| 搜索条件、匹配位置、修改块选择 | `UnifiedDiff` 内存 | 来源／修订隔离，不持久化；布局与语言切换保留 |
 | Git 文件差异缓存 | `GitReviewPanel` 内存 | 模式/引用/刷新等变化时失效 |
 | 审查深链目标 | `deep-link.ts` 模块内存 | 按会话保存最新目标，带 nonce 支持重复点击 |
 
@@ -353,6 +367,8 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 - Git 命令超时为 15 秒，输出缓冲上限为 2 MiB；单仓库最多审查 1000 个文件。过大的正文/输出返回说明或错误，不保证无限规模。
 - 未跟踪文件如果是符号链接、二进制、非 UTF-8 或超过 2 MiB，不渲染文本差异。
 - 工程配置最大 1 MiB，最多 512 条仓库记录，配置文件必须是普通文件。
+- 搜索索引与语法 token 按差异模型缓存；命中折叠区域只增加附近行的 DOM。高亮有字符预算，搜索有匹配数量上限。
+- 差异正文尚未行虚拟化，全部展开大文件仍需挂载每行及评论控件。v0.1.2 的 [验证记录](releases/v0.1.2-validation.md) 给出与 v0.1.1 的组件预览测量，不能代替实际 Desktop 或跨平台性能验收。
 
 修改这些限制时，要同时考虑 Host 负载、浏览器渲染和 RPC 数据量，而不只增加一个常量。
 
@@ -404,7 +420,7 @@ node --test tests/*.test.mjs
 pnpm pack --pack-destination dist
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.1.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
+默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.1.2.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 

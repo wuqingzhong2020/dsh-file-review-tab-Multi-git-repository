@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.1.1**.
+Current version: **v0.1.2**.
 
 **dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 and [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1.**
 
@@ -16,6 +16,9 @@ Release maintainers should also read the [Public release and plugin marketplace 
 
 ## Features
 
+- **File search**: Each diff toolbar offers literal search, match counts, case sensitivity, whole-word matching, and before/after filtering. Recorded code in folded intervals is searchable; locating a match reveals only three nearby context lines on each side. Enter / F3 moves forward, Shift+Enter / Shift+F3 backward, and Esc closes search. Ctrl/Cmd+F opens search when the diff area has focus; comment editors retain their editing shortcuts. Results are capped at 10,000 with a visible limit notice.
+- **Change navigation**: Toolbar arrows and a change selector cycle through modification blocks, show the current block and total, and indicate the target line. Ctrl/Cmd+↑ / ↓ works within the diff area. Switching layouts or UI languages retains the query and location.
+- **Basic syntax highlighting**: File extensions identify C/C++, JavaScript, TypeScript, **Python 3**, JSON, and Markdown. Common keywords, strings, comments, and numbers are colored; Python triple-quoted strings are supported. Unknown types use plain text. Markdown remains source code. Long lines and hunks exceeding the highlighting budget retain their original text and line diff.
 - **End-of-turn review row**: After a turn ends, a row shows the edited file count, additions and deletions, and Undo / Review actions. Clicking Review or an individual filename **opens the sidebar tab through a deep link, expands the relevant file's diff, and scrolls to the top of that turn's group**, instead of opening a full-width drawer. This is a separate entry that coexists with the host's native change card; it does not replace or disable it.
 - **File review sidebar tab**: Lists files changed in the current session, grouped by turn. Expand a file to see a line-by-line red/green diff. Supports undoing a turn, undoing a single file, and reapplying changes. The tab badge updates with the changed file count.
 - **Repository groups and content expansion**: Each group header shows the repository name and changed file count, with repository-relative file paths below it. The icon beside a repository header expands or collapses all file diffs in that repository. The turn header icon controls file contents across all repositories in that turn; in Git scopes, the icon beside the file count controls all currently displayed file contents. Collapsing contents keeps filenames visible. Clicking the repository name or its left arrow hides or shows the entire file list. If some files are already expanded, the icon first expands the rest, then collapses all on the next click. Each action affects only its own scope. Git diffs load on demand and are cached; bulk expansion requests at most four files concurrently.
@@ -37,14 +40,14 @@ Release maintainers should also read the [Public release and plugin marketplace 
 
 Supported versions: **DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.1.1.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.1.2.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.1.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.1.2.tgz"
 ```
 
 Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open Multi-repository management at the top of the session, and open File review from the ＋ menu in the better-sidebar sidebar.
@@ -54,7 +57,7 @@ Maintainers can also use the package with the same name in the project's `dist/`
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.1/dsh-file-review-tab-multi-git-repository-0.1.1.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.1.2/dsh-file-review-tab-multi-git-repository-0.1.2.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -79,7 +82,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the complete `v0.1.1` packaging, push, and Release workflow. The [Release notes](docs/releases/v0.1.1.md) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. These supporting documents are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the complete `v0.1.2` packaging, push, and Release workflow. The bilingual [Release notes](docs/releases/v0.1.2.md) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 
@@ -98,6 +101,12 @@ The dropdown beside the File review title defaults to **Last turn**. Available s
 Git scopes use the project's repository configuration and the current session's temporary repositories. Filter by repository, expand line diffs, or open files in the editor. New, deleted, and renamed files are supported. Binary files, symbolic links, and untracked files larger than 2 MiB display an explanation. Git scopes are read-only: they do not stage, commit, switch branches, or undo changes. Use the refresh action in the upper-right corner to reread disk state.
 
 Git context comes from the actual versions in the selected comparison, including the original code for historical commits. PTC / Code Mode can expand the full recorded before/after content. If a historical standard-tool turn recorded only a partial diff, missing content is marked as not recorded; current disk content is never substituted for a historical version. Expanding context does not change the original undo diff or comment anchors. Copy diff still copies the compact diff with three context lines.
+
+## Search and navigation scope
+
+Search and highlighting work in all eight review scopes and both layouts. Locations are isolated by session, repository, file, and comparison source. Removed lines appear only in before-version searches. Shared context is counted once when searching both versions. If historical records lack content, only recorded code is searched; current files are never read to fill historical gaps. Special characters in queries are matched literally.
+
+Highlighting uses a lightweight lexer rather than a complete language parser. Lines longer than 16,000 characters use plain text. Each diff component has a 500,000-character highlighting budget; hunks exceeding the remaining budget use plain text. Search, original line numbers, comments, statistics, copying, and undo still use the original diff. Expanding many lines still increases the DOM size, so expand context as needed.
 
 ## Submitting file review comments
 

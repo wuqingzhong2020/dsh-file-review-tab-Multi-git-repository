@@ -15,6 +15,9 @@ export interface UnifiedGap {
     readonly id: string;
     readonly position: 'leading' | 'middle' | 'trailing';
     readonly lines: readonly UnifiedLine[];
+    /** Search can split a hidden interval; controls still address its original id. */
+    readonly originId?: string;
+    readonly offset?: number;
 }
 export type UnifiedRow = UnifiedLine | UnifiedGap;
 export interface UnifiedHunk {
@@ -28,6 +31,10 @@ export interface UnifiedHunk {
 export interface ContextExpansion {
     readonly before: number;
     readonly after: number;
+    readonly revealed?: readonly {
+        readonly start: number;
+        readonly end: number;
+    }[];
 }
 export interface UnifiedVisibleBlock {
     readonly gap: UnifiedGap | null;
