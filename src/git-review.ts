@@ -11,6 +11,7 @@ import type {
   GitReviewResult,
 } from './git-review-types.ts'
 import { inside, pathKey } from './repository-workspace.ts'
+import { REVIEW_SCOPES, usesWorkingTree } from './review-scopes.ts'
 import {
   GIT_DIFF_FLAGS,
   MAX_GIT_REVIEW_BYTES,
@@ -174,7 +175,7 @@ async function listChangedFiles(
   if (request.mode === 'uncommitted' && comparison.args.includes('--cached')) {
     await includeUnbornWorkingTreeChanges(root, files)
   }
-  if (request.mode === 'unstaged' || request.mode === 'uncommitted') {
+  if (usesWorkingTree(request.mode)) {
     await appendUntrackedFiles(root, files)
   }
   if (files.length > MAX_FILES)
@@ -191,7 +192,7 @@ async function loadRepositoryMetadata(
       () => 'HEAD',
     )
   ).trim()
-  if (request.mode === 'commit' || request.mode === 'branch') {
+  if (REVIEW_SCOPES[request.mode].reference !== 'none') {
     repository.branches = (
       await runReviewGit(repository.path, [
         'for-each-ref',

@@ -1,5 +1,6 @@
 import type { ProducedFileDiff } from '../change-types.ts';
-export type CommentScope = 'last-turn' | 'session' | 'pending' | 'uncommitted' | 'unstaged' | 'staged' | 'commit' | 'branch';
+import { type ReviewMode } from '../review-scopes.ts';
+export type CommentScope = ReviewMode;
 export interface ReviewCommentTarget {
     readonly scope: CommentScope;
     readonly turn?: number | undefined;

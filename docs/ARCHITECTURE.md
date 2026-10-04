@@ -119,6 +119,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 多仓库管理流程 | [use-repository-settings.ts](../src/client/use-repository-settings.ts)、[repository-settings-model.ts](../src/client/repository-settings-model.ts) | 会话表单与请求生命周期、目录选择、临时仓库更新；草稿合并和保存数据转换 |
 | 客户端目录选择 | [directory-picker.ts](../src/client/directory-picker.ts) | 选择 Desktop/Web 目录接口、检查起始目录能力、处理取消及错误 |
 | Git 查询 | [git-review.ts](../src/git-review.ts)、[git-review-command.ts](../src/git-review-command.ts)、[git-review-parser.ts](../src/git-review-parser.ts) | 比较与仓库编排、受限命令执行、NUL 分隔输出与 patch 解析；契约位于 `git-review-types/schemas` |
+| 审查范围定义 | [review-scopes.ts](../src/review-scopes.ts)、[review-scope-model.ts](../src/client/review-scope-model.ts) | 共享范围 ID、数据来源、标签与 Git 能力；客户端轮次筛选、分页规则及引用选择器 |
 | 会话审查页面 | [FileReviewTab.tsx](../src/client/FileReviewTab.tsx)、[file-review-turn.tsx](../src/client/file-review-turn.tsx)、[file-review-model.ts](../src/client/file-review-model.ts) | 范围选择与页面组合、轮次/文件展示、共享身份及操作条件 |
 | 会话审查生命周期 | [use-file-review-conversation.ts](../src/client/use-file-review-conversation.ts)、[use-file-review-archive.ts](../src/client/use-file-review-archive.ts)、[use-file-review-deep-link.ts](../src/client/use-file-review-deep-link.ts)、[use-file-review-actions.ts](../src/client/use-file-review-actions.ts) | 快照与补录、归档与迁移、深链与局部滚动、状态巡检与撤销/重做 |
 | 会话数据归并 | [session-changes.ts](../src/client/session-changes.ts)、[mutation-call.ts](../src/client/mutation-call.ts)、[recorded-diffs.ts](../src/client/recorded-diffs.ts) | 工具结果解析、轮次归属、PTC 补录及归档 |
@@ -153,6 +154,21 @@ Host 的 `FileReviewService` 保留公开服务边界，文件验证/变换、�
 `repository-workspace` 按规范化工程、收集候选、检查仓库、归并根目录的顺序组织。`repository-manifest` 只负责文本格式；清单大小限制、读取失败警告和实际目录检查仍属于工作区解析。客户端路径用于显示与编辑，Host 的真实路径校验仍是授权范围的依据。
 
 职责拆分应让一个模块能独立说明用途；不为每个短函数新增文件。已足够清晰的协议与快照模型保持现有结构。新增具名函数优先解释业务条件、异步身份和失败语义，注释解释约束，不重复描述代码。
+
+### 3.2 扩展审查范围
+
+[review-scopes.ts](../src/review-scopes.ts) 是范围 ID 和公共能力的定义入口。`ReviewMode`、`SessionReviewMode`、`GitReviewMode` 从定义推导；下拉菜单按定义顺序展示，评论标签和存储校验、Git 请求的 Zod 枚举使用同一来源。已保存的评论与引用包含范围 ID，扩展时保留现有 ID 和含义。
+
+新增范围按以下顺序实现：
+
+1. 在 `REVIEW_SCOPES` 登记 ID、标签键与 `source`，在中英文词典中补齐对应标签。Git 范围还需说明 `reference` 类型和是否读取工作区。
+2. 对会话范围，在 `review-scope-model` 的 `SESSION_SCOPE_BEHAVIORS` 中提供轮次筛选、分页方式和空状态文案。页面、归档 hook 和评论身份识别会使用共享定义。
+3. 对 Git 范围，在 `git-review-command` 的 `COMPARISON_RESOLVERS` 中实现比较参数和说明。若需要新的引用类型，再扩展 `REFERENCE_SELECTORS` 与对应元数据契约；复用提交或分支引用时无需重复修改 JSX 分支。
+4. 检查新比较是否需要特殊文件收集规则，补充真实 Git 仓库测试、范围行为测试，以及中文/英文说明。`uncommitted` 在没有 HEAD 时合并暂存区与磁盘内容的处理仍明确保留在 `git-review` 中。
+
+处理表使用 `satisfies Record<…>` 检查覆盖情况：增加范围后未提供对应会话行为或 Git 比较函数会产生编译错误。`workingTree` 驱动未跟踪文件纳入及新版意见的定位复核；文件写入权限、真实路径检查与撤销条件仍由各自的 Host 接口负责。
+
+`resolveGitComparison` 和 `resolveDefaultBranchRequest` 支持传入 `ReviewGitRunner`，用于单独验证比较策略的命令参数、失败分支和默认分支优先级。生产调用使用默认的 `runReviewGit`，继续保留参数数组、超时、输出大小及只读环境设置。
 
 ## 4. 两条差异数据链路
 
@@ -446,7 +462,7 @@ pnpm build
 
 ### 10.2 验证能力与当前仓库情况
 
-本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`repository-settings-model.test.mjs` 专门验证表单数据转换和外部路径规则；`repository-workspace.test.mjs` 包含清单限制、失败后继续读取其他清单及工作区根目录规则。`pnpm test` 执行同一套测试；部分集成测试读取 `lib/index.js`，源码重构后先构建再测试。
+本地 `tests/` 使用 Node test runner 和临时 Git 仓库，覆盖仓库配置/路径、目录选择桥、Git 比较、差异模型、评论、确认及分组作用域。`repository-settings-model.test.mjs` 专门验证表单数据转换和外部路径规则；`repository-workspace.test.mjs` 包含清单限制、失败后继续读取其他清单及工作区根目录规则。`review-scopes.test.mjs` 验证范围、协议、评论身份和界面选项的一致性；`git-review-comparison.test.mjs` 用注入的命令执行函数覆盖比较参数与失败路径，真实 Git 行为继续由 `git-review.test.mjs` 验证。`pnpm test` 执行同一套测试；部分集成测试读取 `lib/index.js`，源码重构后先构建再测试。
 
 `tests/` 不再被 [.gitignore](../.gitignore) 忽略，应与源码一并提交。已有本地测试文件在移除忽略规则后会显示为未跟踪；提交并推送后，其他开发人员才能在克隆中获得它们。测试创建的临时仓库位于系统临时目录，`coverage/` 等生成报告继续忽略。接手时应确认测试文件齐全，不能把「没有测试文件」当成测试通过。
 
@@ -485,7 +501,7 @@ pnpm pack --pack-destination dist
 
 | 需求 | 首先查看 | 必须保持的约定 |
 | --- | --- | --- |
-| 增加或调整审查范围 | `FileReviewTab`、`GitReviewPanel`、`git-review-types/schemas`、`locales` | 明确数据来源及是否允许评论/撤销；不能把 Git 历史当作工具轮次 |
+| 增加或调整审查范围 | `review-scopes`、`review-scope-model`、`git-review-command`、`locales`，参见 [扩展步骤](#32-扩展审查范围) | 保持稳定范围 ID、补齐处理表与中英文标签；明确数据来源及评论/撤销条件 |
 | 改变差异布局或上下文 | `UnifiedDiff`、`unified-diff-model`、对应 CSS | 只保留统一/并排两种布局；保留行身份，不改变撤销数据 |
 | 改变批量展开 | `ReviewRepositoryGroup`、`review-repository-groups`、两个审查页面 | 区分文件列表与正文，限定会话/轮次/仓库范围，复用 Git 加载队列 |
 | 增加仓库配置字段 | `repository-types/schemas`、`repository-project-file`、`repository-settings-model`、`use-repository-settings`、`RepositorySettings` | 维护文件版本兼容与修订检查，不保存机器绝对根目录或临时外部仓库 |

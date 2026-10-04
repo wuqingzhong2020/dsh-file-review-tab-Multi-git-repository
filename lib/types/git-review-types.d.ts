@@ -1,5 +1,6 @@
 import type { ProducedFileDiff } from './change-types.ts';
-export type GitReviewMode = 'uncommitted' | 'unstaged' | 'staged' | 'commit' | 'branch';
+import type { GitReviewMode } from './review-scopes.ts';
+export type { GitReviewMode } from './review-scopes.ts';
 export interface GitReviewRequest {
     mode: GitReviewMode;
     repository?: string | undefined;

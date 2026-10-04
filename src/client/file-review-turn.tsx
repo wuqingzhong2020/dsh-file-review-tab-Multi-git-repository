@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react'
 import type { FileReviewAction, FileReviewFileState } from '../change-types.ts'
 import type { ReviewWorkspace } from '../repository-types.ts'
+import { isSessionReviewMode } from '../review-scopes.ts'
 import {
   basename,
   resolveSessionPath,
@@ -333,8 +334,7 @@ function FileReviewFile({
   const repository = ownerOf(file.path)
   const absolutePath = resolveSessionPath(cwd, file.path)
   const commentTarget: ReviewCommentTarget = {
-    scope:
-      reviewMode === 'last-turn' ? 'last-turn' : reviewMode === 'pending' ? 'pending' : 'session',
+    scope: isSessionReviewMode(reviewMode) ? reviewMode : 'session',
     turn: turn.turn,
     repository: repository?.path ?? cwd ?? '',
     repositoryName: repository?.name ?? basename(cwd ?? ''),

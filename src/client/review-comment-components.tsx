@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { ReviewLocationResult } from '../review-location.ts'
+import { usesWorkingTree } from '../review-scopes.ts'
 import {
   COMMENT_TEXT_LIMIT,
   commentAnchorKey,
@@ -120,9 +121,7 @@ export function CommentCard({
   const { composer, snapshot, start, store } = context
   if (composer?.id === comment.id && composer.placement === placement) return <CommentEditor />
   const canRelocate =
-    currentAnchor &&
-    comment.anchor.side === 'new' &&
-    (comment.anchor.scope === 'uncommitted' || comment.anchor.scope === 'unstaged')
+    currentAnchor && comment.anchor.side === 'new' && usesWorkingTree(comment.anchor.scope)
   const checkLocation = () => {
     setChecking(true)
     void reviewLocation(

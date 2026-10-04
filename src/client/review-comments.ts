@@ -1,15 +1,8 @@
 import type { ProducedFileDiff } from '../change-types.ts'
+import { isReviewMode, isSessionReviewMode, type ReviewMode } from '../review-scopes.ts'
 import { normalizeReviewPath } from './repository-paths.ts'
 
-export type CommentScope =
-  | 'last-turn'
-  | 'session'
-  | 'pending'
-  | 'uncommitted'
-  | 'unstaged'
-  | 'staged'
-  | 'commit'
-  | 'branch'
+export type CommentScope = ReviewMode
 export interface ReviewCommentTarget {
   readonly scope: CommentScope
   readonly turn?: number | undefined
@@ -51,10 +44,7 @@ function pathKey(path: string): string {
 }
 /** Session review scopes address the same recorded turn, regardless of the filter. */
 export function commentFileKey(target: ReviewCommentTarget): string {
-  const source =
-    target.scope === 'session' || target.scope === 'last-turn' || target.scope === 'pending'
-      ? `turn:${target.turn}`
-      : target.scope
+  const source = isSessionReviewMode(target.scope) ? `turn:${target.turn}` : target.scope
   return JSON.stringify([
     pathKey(target.repository),
     pathKey(target.absolutePath),
@@ -173,19 +163,7 @@ export function parseReviewComments(raw: string): readonly ReviewComment[] {
     )
       throw new Error('Invalid review comment')
     ids.add(value.id)
-    if (
-      ![
-        'last-turn',
-        'session',
-        'pending',
-        'uncommitted',
-        'unstaged',
-        'staged',
-        'commit',
-        'branch',
-      ].includes(String(anchor.scope)) ||
-      !['old', 'new', 'file'].includes(String(anchor.side))
-    )
+    if (!isReviewMode(anchor.scope) || !['old', 'new', 'file'].includes(String(anchor.side)))
       throw new Error('Invalid review anchor')
     for (const field of [
       'repository',
@@ -215,7 +193,7 @@ export function parseReviewComments(raw: string): readonly ReviewComment[] {
     for (const field of ['ref', 'sourceKey'])
       if (anchor[field] !== undefined && typeof anchor[field] !== 'string')
         throw new Error('Invalid review source')
-    if (anchor.scope === 'session' || anchor.scope === 'last-turn' || anchor.scope === 'pending') {
+    if (isSessionReviewMode(anchor.scope)) {
       if (typeof anchor.turn !== 'number' || !Number.isInteger(anchor.turn) || anchor.turn < 1)
         throw new Error('Invalid review turn')
     }

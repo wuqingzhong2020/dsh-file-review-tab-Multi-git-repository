@@ -7,11 +7,10 @@ import type {
   RecordedResult,
 } from '../change-types.ts'
 import type { ReviewWorkspace } from '../repository-types.ts'
-import type { GitReviewMode } from '../git-review-types.ts'
 import type { SessionFileChange } from './session-changes.ts'
 import type { UnifiedDiffStats } from './UnifiedDiff.tsx'
 
-export type ReviewMode = 'session' | 'last-turn' | 'pending' | GitReviewMode
+export type { ReviewMode } from '../review-scopes.ts'
 
 export interface FileReviewRemote {
   workspace(): Promise<RemoteResult<ReviewWorkspace>>

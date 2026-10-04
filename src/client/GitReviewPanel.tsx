@@ -27,6 +27,7 @@ import {
 import { FileContentsButton, ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
 import { loadMissingReviewDiffs } from './git-review-diff-loader.ts'
 import { GitReviewFile } from './GitReviewFile.tsx'
+import { gitReferenceSelector } from './review-scope-model.ts'
 
 interface GitRemote {
   gitReview(request: GitReviewRequest): Promise<RemoteResult<GitReviewResult>>
@@ -146,7 +147,8 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
     }),
     { added: 0, removed: 0 },
   )
-  const refsMode = mode === 'commit' || mode === 'branch'
+  const referenceSelector = gitReferenceSelector(mode, selected)
+  const refsMode = referenceSelector !== null
   const repositoryGroups = groupReviewFiles(data?.files ?? [], file => ({
     key: file.repository,
     path: file.repository,
@@ -185,27 +187,21 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
             </option>
           ))}
         </select>
-        {refsMode && (
+        {referenceSelector !== null && (
           <select
-            aria-label={t(mode === 'commit' ? 'reviewCommit' : 'reviewBranch')}
+            aria-label={t(referenceSelector.label)}
             value={ref}
             disabled={!selected}
             onChange={event => {
               setRef(event.target.value)
             }}
           >
-            <option value="">{t(mode === 'commit' ? 'reviewHead' : 'reviewAutoBranch')}</option>
-            {mode === 'commit'
-              ? selected?.commits.map(commit => (
-                  <option key={commit.oid} value={commit.oid}>
-                    {commit.oid.slice(0, 8)} · {commit.subject} · {commit.date}
-                  </option>
-                ))
-              : selected?.branches.map(branch => (
-                  <option key={branch} value={branch}>
-                    {branch}
-                  </option>
-                ))}
+            <option value="">{t(referenceSelector.defaultLabel)}</option>
+            {referenceSelector.options.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         )}
         {!loading && totals && (

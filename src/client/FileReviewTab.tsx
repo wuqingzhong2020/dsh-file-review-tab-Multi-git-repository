@@ -4,12 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { FileReviewFileState } from '../change-types.ts'
-import {
-  basename,
-  lastTurnChanges,
-  resolveSessionPath,
-  type TurnFileChanges,
-} from './session-changes.ts'
+import { basename, resolveSessionPath, type TurnFileChanges } from './session-changes.ts'
 import { summarizeDiffs, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import { t, type CopyKey } from './locales.ts'
 import { useReviewLocale } from './use-review-locale.ts'
@@ -21,7 +16,9 @@ import { fileRepository } from './repository-paths.ts'
 import { subscribeRepositories } from './repository-events.ts'
 import { GitReviewPanel } from './GitReviewPanel.tsx'
 import { ReviewCommentsProvider } from './ReviewComments.tsx'
-import { confirmationStoreFor, pendingTurnChanges } from './review-confirmations.ts'
+import { confirmationStoreFor } from './review-confirmations.ts'
+import { REVIEW_MODES, REVIEW_SCOPES, isGitReviewMode, isReviewMode } from '../review-scopes.ts'
+import { sessionScopeBehavior } from './review-scope-model.ts'
 import { DiffViewControls } from './DiffViewControls.tsx'
 import {
   addStats,
@@ -43,16 +40,6 @@ import css from './FileReviewTab.module.css'
 
 const SUCCESS_NOTICE_DURATION = 3000
 const ERROR_NOTICE_DURATION = 8000
-const REVIEW_SCOPES: readonly { readonly value: ReviewMode; readonly label: CopyKey }[] = [
-  { value: 'last-turn', label: 'reviewLastTurn' },
-  { value: 'session', label: 'reviewSession' },
-  { value: 'pending', label: 'reviewPending' },
-  { value: 'uncommitted', label: 'reviewUncommitted' },
-  { value: 'unstaged', label: 'reviewUnstaged' },
-  { value: 'staged', label: 'reviewStaged' },
-  { value: 'commit', label: 'reviewCommit' },
-  { value: 'branch', label: 'reviewBranch' },
-]
 
 /** Tab component props (a narrowing of better-sidebar's TabComponentProps). */
 export interface FileReviewTabProps {
@@ -77,8 +64,8 @@ interface Notice {
 }
 
 function emptyStateMessage(mode: ReviewMode, repositoryFilter: string): CopyKey {
-  if (mode === 'pending') return repositoryFilter === '*' ? 'pendingEmpty' : 'pendingRepoEmpty'
-  return repositoryFilter === '*' ? 'empty' : 'repoFilterEmpty'
+  const behavior = sessionScopeBehavior(mode)
+  return repositoryFilter === '*' ? behavior.empty : behavior.filteredEmpty
 }
 
 /** The sidebar tab body; all hooks remain unconditional across review scopes. */
@@ -99,8 +86,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
   const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
-  const isGitMode =
-    reviewMode !== 'session' && reviewMode !== 'last-turn' && reviewMode !== 'pending'
+  const isGitMode = isGitReviewMode(reviewMode)
+  const scopeBehavior = sessionScopeBehavior(reviewMode)
   const confirmationStore = useMemo(() => confirmationStoreFor(sessionId), [sessionId])
   const confirmationSnapshot = useSyncExternalStore(
     confirmationStore.subscribe,
@@ -153,11 +140,10 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
 
   const { snapshot, turns } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
   const repositories = workspace?.repositories ?? []
-  const scopeTurns = useMemo(() => {
-    if (reviewMode === 'last-turn') return lastTurnChanges(snapshot, turns)
-    if (reviewMode === 'pending') return pendingTurnChanges(turns, confirmationSnapshot.confirmed)
-    return turns
-  }, [snapshot, turns, reviewMode, confirmationSnapshot.confirmed])
+  const scopeTurns = useMemo(
+    () => scopeBehavior.select({ snapshot, turns, confirmed: confirmationSnapshot.confirmed }),
+    [snapshot, turns, scopeBehavior, confirmationSnapshot.confirmed],
+  )
   const filteredTurns = useMemo(() => {
     if (repositoryFilter === '*') return scopeTurns
     return scopeTurns
@@ -332,12 +318,12 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           aria-label={t('reviewScope')}
           value={reviewMode}
           onChange={event => {
-            setReviewMode(event.target.value as ReviewMode)
+            if (isReviewMode(event.target.value)) setReviewMode(event.target.value)
           }}
         >
-          {REVIEW_SCOPES.map(scope => (
-            <option key={scope.value} value={scope.value}>
-              {t(scope.label)}
+          {REVIEW_MODES.map(mode => (
+            <option key={mode} value={mode}>
+              {t(REVIEW_SCOPES[mode].label)}
             </option>
           ))}
         </select>
@@ -437,7 +423,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           />
         ) : (
           <div className={css.body} ref={bodyRef}>
-            {reviewMode === 'pending' && (
+            {scopeBehavior.pagination === 'pending' && (
               <p className={css.pendingHint}>{t('reviewPendingHint')}</p>
             )}
             {filteredTurns.length === 0 ? (

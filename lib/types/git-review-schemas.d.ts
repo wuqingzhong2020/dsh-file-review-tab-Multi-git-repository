@@ -1,22 +1,22 @@
 import { z } from 'zod';
 export declare const gitReviewRequestSchema: z.ZodObject<{
     mode: z.ZodEnum<{
+        commit: "commit";
+        branch: "branch";
         uncommitted: "uncommitted";
         unstaged: "unstaged";
         staged: "staged";
-        commit: "commit";
-        branch: "branch";
     }>;
     repository: z.ZodOptional<z.ZodString>;
     ref: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export declare const gitReviewFileRequestSchema: z.ZodObject<{
     mode: z.ZodEnum<{
+        commit: "commit";
+        branch: "branch";
         uncommitted: "uncommitted";
         unstaged: "unstaged";
         staged: "staged";
-        commit: "commit";
-        branch: "branch";
     }>;
     ref: z.ZodOptional<z.ZodString>;
     repository: z.ZodString;

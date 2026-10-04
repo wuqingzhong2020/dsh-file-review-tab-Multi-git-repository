@@ -1,17 +1,7 @@
 import type { CommentScope, ReviewCommentAnchor } from './review-comments.ts'
 import type { DiscussionState } from './review-discussions.ts'
 import { t } from './locales.ts'
-
-const SCOPE_LABELS = {
-  'last-turn': 'reviewLastTurn',
-  session: 'reviewSession',
-  pending: 'reviewPending',
-  uncommitted: 'reviewUncommitted',
-  unstaged: 'reviewUnstaged',
-  staged: 'reviewStaged',
-  commit: 'reviewCommit',
-  branch: 'reviewBranch',
-} as const
+import { REVIEW_SCOPES } from '../review-scopes.ts'
 
 const DISCUSSION_LABELS = {
   submitting: 'discussionSubmitting',
@@ -26,7 +16,7 @@ const DISCUSSION_LABELS = {
 } as const
 
 export function commentScopeLabel(scope: CommentScope): string {
-  return t(SCOPE_LABELS[scope])
+  return t(REVIEW_SCOPES[scope].label)
 }
 
 export function discussionStateLabel(state: DiscussionState): string {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ARCHIVE_PAGE_TURNS, splitArchivedTurns, type TurnFileChanges } from './session-changes.ts'
 import type { ReviewMode } from './file-review-model.ts'
+import { sessionScopeBehavior } from './review-scope-model.ts'
 
 const ARCHIVE_STORAGE_PREFIX = 'dsh-file-review-tab-multi-git-repository:archive:'
 const LEGACY_ARCHIVE_STORAGE_PREFIX = 'dsh-file-review-tab:archive:'
@@ -12,16 +13,17 @@ export function useFileReviewArchive(
   reviewMode: ReviewMode,
   pendingPages: number,
 ) {
+  const pendingQueue = sessionScopeBehavior(reviewMode).pagination === 'pending'
   // Older completed turns mount only after the archive opens, one page at a time.
   const { main: mainTurns, archived: archivedTurns } = useMemo(() => {
-    if (reviewMode !== 'pending') return splitArchivedTurns(filteredTurns)
+    if (!pendingQueue) return splitArchivedTurns(filteredTurns)
     // Pending turns always stay in the review queue, sorted newest-first.
     const main = [...filteredTurns]
       .sort((left, right) => right.turn - left.turn)
       .slice(0, pendingPages * ARCHIVE_PAGE_TURNS)
     return { main, archived: [] }
-  }, [filteredTurns, reviewMode, pendingPages])
-  const pendingRemaining = reviewMode === 'pending' ? filteredTurns.length - mainTurns.length : 0
+  }, [filteredTurns, pendingQueue, pendingPages])
+  const pendingRemaining = pendingQueue ? filteredTurns.length - mainTurns.length : 0
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archivePages, setArchivePages] = useState(1)
   // Archive UI state persists per session, so reopening a long session
