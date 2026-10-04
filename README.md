@@ -4,7 +4,7 @@
 
 当前版本：**v0.2.0**。
 
-**dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并适配 DeepSeek Harness Desktop 0.2.0-rc.2 与 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1。**
+**dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并直接接入 DeepSeek Harness Desktop 0.2.0-rc.2 的原生右侧栏，无需安装第三方侧栏插件。**
 
 在原有文件审查侧边栏 Tab 和对话尾部审查行的基础上，扩展工程级多仓库配置、跨仓库差异审查、修改意见与轮次确认等功能。宿主自带的改动摘要、审查页及文件提及功能保持启用。
 
@@ -12,7 +12,7 @@
 
 首次使用请阅读 [插件使用手册（中文）](docs/USER_GUIDE.md)，其中按操作步骤介绍审查范围、多仓库配置、差异阅读、外部编辑器定位、修改意见与讨论，并配有界面截图。
 
-也可阅读 [English user guide](docs/USER_GUIDE.en.md)。文件审查顶部的 **操作指南** 按钮会按宿主语言打开中英文手册，支持 Markdown 排版和截图显示；点击截图可以放大查看。
+也可阅读 [English user guide](docs/USER_GUIDE.en.md)。文件审查顶部的 **操作指南** 按钮会按宿主语言在插件弹窗中打开中英文手册，支持 Markdown 排版和截图显示；点击截图可以放大查看。
 
 ## 开发文档
 
@@ -48,7 +48,9 @@
 
 ## 安装
 
-适配版本：**DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
+适配版本：**DeepSeek Harness Desktop 0.2.0-rc.2**。文件审查直接使用原生右侧栏；dsh-better-sidebar 为可选共存插件。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
+
+文件由宿主选择内置查看器；原生预览可能只读，可选编辑器插件可为其接管的格式提供编辑能力。外部 IDE 定位仍可独立使用。
 
 公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.2.0.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
@@ -60,7 +62,7 @@
 pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.2.0.tgz"
 ```
 
-维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；在会话顶部打开「多代码仓管理」，在 better-sidebar 侧栏「+」菜单中打开「文件审查」。
+维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；在会话顶部打开「多代码仓管理」，在原生右侧栏「+」引导页中打开「文件审查」。
 
 ### 独立 Web Profile
 
@@ -185,7 +187,7 @@ node --test tests/*.test.mjs
 
 本插件基于 [Lzh3070/dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 修改和扩展，感谢原作者提供文件审查侧边栏 Tab、对话审查行及相关基础能力。
 
-上游核心 diff 渲染器与撤销服务源自 [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review)（MIT 许可证，© ZhangWenChao）。侧边栏集成基于 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 开放的 `ctx.betterSidebar` 注册 API。
+上游核心 diff 渲染器与撤销服务源自 [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review)（MIT 许可证，© ZhangWenChao）。侧边栏集成使用宿主原生 `sidebarRightTabs` 和正文／标题插槽；感谢 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 的早期接入参考。
 
 ## 许可证
 

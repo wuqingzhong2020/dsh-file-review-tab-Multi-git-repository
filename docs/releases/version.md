@@ -25,8 +25,10 @@ Release notes and validation records are maintained in this file, with the newes
 - 大块差异启用可变高度行虚拟化，换行、并排对齐及评论高度共同测量，编辑行保持挂载；搜索、导航、复制及原始撤销数据保留完整语义。
 - 中英文 README、界面及维护文档同步更新。Git 比较保持只读，不新增选区写回或回退动作。
 - 文件审查标题行新增「操作指南」按钮，按宿主语言打开随插件安装的 [中文手册](../USER_GUIDE.md) 或 [英文手册](../USER_GUIDE.en.md)，支持 Markdown 排版、截图显示和点击放大。
+- 文件审查直接注册宿主原生右侧栏，不再要求安装 dsh-better-sidebar。保留聊天尾部审查入口、会话顶部多仓库管理和文件数角标；文件打开绑定来源会话与窗格。
+- 操作指南改为主题适配的弹窗，保留图片放大、刷新和 Esc；旧布局中的指南标签提供兼容入口。修正原生深色主题下仓库标题、评论和菜单的背景。
 
-适配 DeepSeek Harness Desktop **0.2.0-rc.2** / dsh-better-sidebar **0.24.1**。验证环境为 Windows；其他平台尚未完成真实宿主验证。具体测试与性能记录见 [验证记录](#v020-验证记录)。
+适配 DeepSeek Harness Desktop **0.2.0-rc.2**。dsh-better-sidebar **0.24.1** 可选共存。验证环境为 Windows；其他平台尚未完成真实宿主验证。具体测试与性能记录见 [验证记录](#v020-验证记录)。
 
 安装资产：`dsh-file-review-tab-multi-git-repository-0.2.0.tgz` 及 `.sha256`。安装后完整退出 Desktop（含托盘）并重新启动，确保 Host 与浏览器同时加载新版。
 
@@ -40,12 +42,29 @@ Release notes and validation records are maintained in this file, with the newes
 - Variable-height rendering windows large diff blocks, measuring wrapping, paired split cells and comments together. Editing rows stay mounted; search, navigation, copying and original undo data retain their full semantics.
 - Chinese/English UI, READMEs and maintenance documentation are updated. Git comparisons remain read-only.
 - Open the shipped [English](../USER_GUIDE.en.md) or [Chinese](../USER_GUIDE.md) manual from the User guide button beside the review scope. The host language selects the manual; instructions and screenshots are included in the package.
+- File Review now registers directly with the native right sidebar; dsh-better-sidebar is optional. The turn-tail actions, conversation repository settings and file-count badge remain available. File navigation stays bound to its originating session and pane.
+- The guide opens in a themed dialog with image enlargement, refresh and Esc support. Restored legacy guide tabs provide a compatibility page. Native dark-mode backgrounds are corrected for repository headers, comments and selection menus.
 
-Compatible with DeepSeek Harness Desktop **0.2.0-rc.2** and dsh-better-sidebar **0.24.1**. Validated on Windows; other platforms have not completed real-host testing. See the [validation record](#v020-验证记录) for evidence and limits.
+Compatible with DeepSeek Harness Desktop **0.2.0-rc.2**. dsh-better-sidebar **0.24.1** is optional and can coexist with the plugin. Validated on Windows; other platforms have not completed real-host testing. See the [validation record](#v020-验证记录) for evidence and limits.
 
 Assets: `dsh-file-review-tab-multi-git-repository-0.2.0.tgz` and its `.sha256`. Fully exit Desktop, including its tray process, and restart after installation so both Host and browser load the new version.
 
 ### v0.2.0 验证记录
+
+#### 2026-10-04 原生侧栏迁移
+
+- 严格类型检查、声明生成和构建通过；完整自动测试 **166 / 166 通过**，0 失败、0 跳过，约 39.1 秒。新测试覆盖会话限定导航、重复目标、种子消费及卸载清理、特殊字符／UNC／跨根地址、注册失败回滚、迟到插槽、旧指南兼容和隐藏标题更新。角标也覆盖同节点数结果变化与自动归档排除。
+- 删除第三方侧栏运行依赖及旧标题桥接声明；新增官方原生侧栏类型和随客户端打包的纯路径工具。客户端约 **590.17 kB**，gzip 约 **131.95 kB**。Host 文件读写、撤销、外部定位协议和业务存储键未变。
+- 使用真正的 Desktop rc.2 窗口、隔离的 DSH_HOME 与 Electron 数据目录验收，生产 Profile 未改动。测试代码的 `lib/client.js` SHA-256 为 `4A534A60D9C9E37C6E38C827A2FA39737A37E9C86EB6FF5642A3FE7A9E292A7A`；安装后的文件哈希与构建产物一致。
+- 完全未安装 better-sidebar 的环境可从原生 ＋ 引导打开文件审查，展示主区域多仓库页签，打开真实工作区文件；八种审查范围入口可见，未提交范围读取实际 Git 改动。正文非活动时切换 zh/en，标题与角标继续更新，返回时保留审查范围。
+- 从旧 v0.2.0 安装包实际打开审查、文件及指南标签，再升级新包；旧审查与文件标签恢复，指南恢复为兼容页，并可打开新弹窗。没有批量改写或清空旧布局存储。
+- better-sidebar 启用时可共存，两种加载顺序均已检查；停用并重启后审查正文继续工作。真机停用本插件后正文显示宿主的不可用回退，重新启用恢复审查和角标，不积累重复注册。真实聊天尾部的整轮及单文件入口能展开对应第 13 轮差异；关闭后重开、收起后展开、重复目标和全屏正常。分栏中的文件打开仍进入来源审查窗格。
+- 中英文手册均以 Markdown 和截图显示，放大图片后 Esc 先关闭图片，再关闭指南；深色手册、仓库标题、范围菜单及评论编辑器可读。单行选择、Shift+F10 范围菜单、评论编辑及取消已检查，未向用户会话发送测试意见。
+- 最终 tgz 包含 12 张手册截图及双语手册；不包含临时方案或旧标题声明。181 个长期文档本地链接检查通过。最终包在隔离 Profile 安装后重新启动，真实 Git 数据和指南加载正常；停用／重新启用及共存也使用该最终客户端产物验证。
+
+以上包含真实 Desktop 操作，区别于下文早期组件夹具验证。真机尚未覆盖全部跨会话同名文件与异步切换组合、流式角标变化、强制原生服务重建及注册异常；这些边界中的部分由自动测试覆盖。本次没有重新启动外部 IDE，也没有发送真实模型审查请求，沿用下文既有验证及本次自动回归结果。关闭 Tab 释放页面临时状态；隐藏 Tab 保留状态；评论、讨论、确认和阅读偏好继续按原规则保存。其他平台未验证。
+
+#### 2026-10-03 功能与性能基线
 
 日期：2026-10-03。环境：Windows、Node.js 24.19.0、pnpm 11.25.0、项目锁定依赖。对照基线为本次开发开始时的 v0.1.2。
 

@@ -12,9 +12,6 @@ type LocationRemote = Partial<
     (request: ReviewLocationRequest) => Promise<RemoteResult<ReviewLocationResult>>
   >
 >
-interface FileSidebar {
-  openFile(scope: { sessionId: string }, path: string, title?: string): void
-}
 
 export function referenceRequest(
   anchor: ReviewCommentAnchor,
@@ -48,10 +45,4 @@ export async function reviewLocation(
   if (!remote?.[method]) return { state: 'error' }
   const result = await remote[method](request)
   return result.ok ? result.value : { state: 'error' }
-}
-export function openReviewFile(ctx: Context, sessionId: string, path: string): boolean {
-  const sidebar = (ctx as Context & { betterSidebar?: FileSidebar }).betterSidebar
-  if (!sidebar?.openFile) return false
-  sidebar.openFile({ sessionId }, path, path.replaceAll('\\', '/').split('/').at(-1))
-  return true
 }

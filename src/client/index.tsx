@@ -6,7 +6,7 @@
  *    files · +M -K / Undo / Review"), registered into the
  *    'conversation.chat.turnTail' list under its own id, alongside the built-in
  *    changed-files entry (the native deliverables registry stays enabled); and
- * 2. the 'file-review' better-sidebar tab (per-session change list + inline
+ * 2. the native 'file-review' right-sidebar tab (per-session change list + inline
  *    red/green diffs + per-turn/per-file undo).
  *
  * The Host half's undo/redo capability reaches both surfaces through the
@@ -21,23 +21,18 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type {} from 'dsh-better-sidebar/client/service'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import type { TabDescriptor } from 'dsh-better-sidebar/client/service'
 import type { FileReviewRequest, FileReviewResult } from '../change-types.ts'
 import { TYPERT_REMOTE } from '../remote.ts'
-import { FileReviewTab } from './FileReviewTab.tsx'
-import { UserGuideTab } from './UserGuideTab.tsx'
+import { registerNativeSidebar } from './native-sidebar.ts'
+import { openReviewTab } from './sidebar-navigation.ts'
 import { RepositorySettings } from './RepositorySettings.tsx'
 import { ProducedFiles } from './ProducedFiles.tsx'
-import { normalizeSnapshot } from './snapshot-compat.ts'
 import { attachLocale, en, LOCALE_NS, t, zh } from './locales.ts'
-import { publishFileReviewSeed } from './deep-link.ts'
 import { en as chatEn, NS as CHAT_NS, zh as chatZh, type DeliverablesKey } from './chat-locales.ts'
-import { countChangedFiles, deriveSessionChanges, splitArchivedTurns } from './session-changes.ts'
 import { deliverablesDefinition, selectProducedFiles } from './turn-deliverables.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -54,7 +49,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
  * `deliverables` definition and `chatFileMentions` service.
  */
 export const inject = [
-  'betterSidebar',
+  'sidebarRight',
+  'sidebarRightTabs',
   'sessions',
   'locale',
   'remote',
@@ -63,78 +59,9 @@ export const inject = [
   'conversation',
 ]
 
-/** The tab icon: a modest line-diff glyph drawn at the host-given size. */
-function FileReviewIcon({ size }: { readonly size: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5.25 2.75h6l3.5 3.5v10a1 1 0 0 1-1 1h-8.5a1 1 0 0 1-1-1V3.75a1 1 0 0 1 1-1Z" />
-      <path d="M11.25 2.75v3.5h3.5" />
-      <path d="M7 10h2.5M10.5 10H12M7 13h5" />
-    </svg>
-  )
-}
-
 interface FileReviewRemote {
   status(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   apply(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
-}
-
-/**
- * The tab-strip badge: the number of distinct files this session changed.
- * The sidebar re-renders the tab bar constantly (and streams publish a fresh
- * snapshot reference per event), so the derivation is memoized by a cheap
- * structural fingerprint per session — streaming token flushes keep the
- * fingerprint stable and skip the full re-derive.
- */
-const badgeMemo = new Map<string, { fingerprint: string; count: number | null }>()
-
-function snapshotFingerprint(snapshot: ConversationSnapshot | null): string {
-  if (snapshot === null) return 'none'
-  const view = normalizeSnapshot(snapshot)
-  if (view === undefined) return 'none'
-  let lastEnd = 0
-  for (const endSeq of view.turnEnds.values()) lastEnd = endSeq
-  return `${view.nodes.length}:${view.turnEnds.size}:${lastEnd}`
-}
-
-/** The slice of `ctx.uiConversation` the badge needs. */
-interface BadgeConversationFace {
-  binding(id: SessionId): { readonly snapshot: { getSnapshot(): ConversationSnapshot } }
-}
-
-function badgeCount(ctx: Context, sessionId: string): number | null {
-  // DSH 0.2: the Conversation projection lives on the uiConversation
-  // binding, not on the Session face (whose snapshot is session lifecycle).
-  const uiConversation = (ctx as unknown as { get(name: string): unknown }).get(
-    'uiConversation',
-  ) as BadgeConversationFace | undefined
-  let snapshot: ConversationSnapshot | null = null
-  try {
-    snapshot = uiConversation?.binding(sessionId as SessionId).snapshot.getSnapshot() ?? null
-  } catch {
-    // No binding yet: no badge rather than a thrown tab-bar render.
-    return null
-  }
-  const fingerprint = snapshotFingerprint(snapshot)
-  const hit = badgeMemo.get(sessionId)
-  if (hit !== undefined && hit.fingerprint === fingerprint) return hit.count
-  // The badge counts the MAIN list only — auto-archived turns already read
-  // their review and left the tab's active section (issue #5).
-  const { main } = splitArchivedTurns(deriveSessionChanges(snapshot))
-  const count = countChangedFiles(main)
-  const value = count === 0 ? null : count
-  badgeMemo.set(sessionId, { fingerprint, count: value })
-  return value
 }
 
 /**
@@ -201,7 +128,7 @@ export function apply(ctx: Context): void {
   )
 
   // DSH 0.2 exposes an ordered list: our review action lives alongside (not
-  // instead of) the built-in changes card and better-sidebar contributions.
+  // instead of) the built-in changes card and other sidebar contributions.
   ctx.effect(
     () =>
       ctx.slots.inject('conversation.chat.turnTail', () =>
@@ -236,21 +163,8 @@ export function apply(ctx: Context): void {
                 projectRoot,
                 inspectChanges: (request: FileReviewRequest) => invoke('status', request),
                 applyChanges: (request: FileReviewRequest) => invoke('apply', request),
-                // 审查 button / per-file chip: publish the target through the
-                // plugin's own seed channel, then open (or focus) the sidebar tab by
-                // type. better-sidebar 0.24.1 preserves an already-open tab's meta;
-                // the seed channel reliably delivers repeated links to that tab. The native
-                // open still reveals the right panel (revealIfOpened), and the
-                // mounted/existing tab replays the newest seed.
                 openInSidebarTab: (paths: readonly string[], turn?: number) => {
-                  const sidebar = ctx.betterSidebar
-                  if (sidebar === undefined || paths.length === 0) return
-                  publishFileReviewSeed(sessionId, paths, turn)
-                  const scope = {
-                    sessionId,
-                    ...(projectRoot !== undefined ? { cwd: projectRoot } : {}),
-                  }
-                  sidebar.openTab({ type: 'file-review' }, scope)
+                  openReviewTab(ctx.sidebarRight, sessionId, paths, turn)
                 },
               }
             },
@@ -284,45 +198,5 @@ export function apply(ctx: Context): void {
     'file-review-tab: turn-tail row',
   )
 
-  ctx.effect(
-    () =>
-      ctx.betterSidebar.registerTab({
-        id: 'file-review',
-        title: () => t('tabTitle'),
-        icon: (size: number) => <FileReviewIcon size={size} />,
-        order: 35,
-        single: true,
-        badge: (badgeCtx, scope) => badgeCount(badgeCtx as unknown as Context, scope.sessionId),
-        component: ({ ctx: tabCtx, scope, visible, tab }) => (
-          <FileReviewTab
-            ctx={tabCtx as unknown as Context}
-            sessionId={scope.sessionId}
-            cwd={scope.cwd}
-            visible={visible}
-            tab={tab}
-          />
-        ),
-      } satisfies TabDescriptor),
-    'file-review-tab: register tab',
-  )
-
-  ctx.effect(
-    () =>
-      ctx.betterSidebar.registerTab({
-        id: 'file-review-guide',
-        title: () => t('userGuide'),
-        hidden: true,
-        single: true,
-        icon: (size: number) => <FileReviewIcon size={size} />,
-        component: ({ ctx: tabCtx, scope, visible, tab }) => (
-          <UserGuideTab
-            ctx={tabCtx as unknown as Context}
-            sessionId={scope.sessionId}
-            visible={visible}
-            tabId={tab.id}
-          />
-        ),
-      } satisfies TabDescriptor),
-    'file-review-tab: register user guide',
-  )
+  ctx.effect(() => registerNativeSidebar(ctx), 'file-review-tab: native sidebar')
 }

@@ -5,21 +5,21 @@
 .root h3 { font-size: 14px; margin: 20px 0 10px; }
 .hint { color: var(--dsw-alias-label-secondary); line-height: 1.7; margin: 8px 0 16px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
-.root button { cursor: pointer; padding: 7px 14px; color: inherit; background: var(--dsw-alias-background-l1); border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; font: inherit; }
+.root button { cursor: pointer; padding: 7px 14px; color: inherit; background: var(--dsw-alias-bg-layer-1); border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; font: inherit; }
 .root button:hover:not(:disabled) { background: var(--dsw-alias-border-l1); }
 .root button:disabled { opacity: .5; cursor: default; }
 .root .primary { margin-left: auto; font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 7px; margin: 16px 0; font-weight: 500; }
-.field input, .field textarea, .field select { box-sizing: border-box; width: 100%; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: inherit; background: var(--dsw-alias-background-l1); padding: 8px 10px; font: inherit; font-weight: 400; }
+.field input, .field textarea, .field select { box-sizing: border-box; width: 100%; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: inherit; background: var(--dsw-alias-bg-layer-1); padding: 8px 10px; font: inherit; font-weight: 400; }
 .field textarea { resize: vertical; font-family: monospace; }
-.field input:read-only { cursor: default; background: var(--dsw-alias-background-l2, var(--dsw-alias-background-l1)); }
+.field input:read-only { cursor: default; background: var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-layer-1)); }
 .form { border: 0; padding: 0; margin: 0; min-width: 0; }
 .check { display: flex; align-items: center; gap: 8px; }
 .activation { margin: 20px 0; }
 .repoEditor { display: grid; gap: 8px; margin: 12px 0; }
 .repoHeader, .repoRow { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(220px, 2fr) 156px; gap: 10px; align-items: center; }
 .repoHeader { font-weight: 500; }
-.repoRow input { box-sizing: border-box; min-width: 0; width: 100%; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: inherit; background: var(--dsw-alias-background-l1); padding: 8px 10px; font: inherit; }
+.repoRow input { box-sizing: border-box; min-width: 0; width: 100%; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: inherit; background: var(--dsw-alias-bg-layer-1); padding: 8px 10px; font: inherit; }
 .pathCell { position: relative; min-width: 0; }
 .pathCell.temporaryPath input { padding-inline-end: 58px; }
 .temporaryBadge { position: absolute; inset-inline-end: 10px; top: 50%; transform: translateY(-50%); padding: 2px 5px; border-radius: 4px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2, #f3f4f6); font-size: 11px; line-height: 1.4; white-space: nowrap; }

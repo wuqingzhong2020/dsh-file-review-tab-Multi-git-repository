@@ -39,7 +39,7 @@ The **File Review** tab brings together session code changes and Git diffs. You 
 | Search and navigation | Search recorded code in either version and jump to matches or changes |
 | Basic syntax highlighting | Highlight C/C++, JavaScript, TypeScript, Python 3, JSON, and Markdown source |
 | Code references | Select a line or a contiguous range and copy a code reference or path and line range |
-| Editor navigation | Open files in the built-in editor or navigate to after-version code in VS Code or Antigravity |
+| Editor navigation | Open files in the built-in viewer or navigate to after-version code in VS Code or Antigravity |
 | Feedback and discussions | Add line, range, or whole-file comments, submit them together, read linked replies, and follow up |
 | Turn management | Confirm reviewed turns and undo or reapply supported session changes |
 | Reading settings | Configure context expansion, fonts, line height, colors, file shortcuts, and large-file virtualization |
@@ -50,14 +50,18 @@ Git scopes provide viewing and commenting without staging files, committing, or 
 
 ### 2.1 Opening the plugin
 
-1. Install and enable this plugin and **dsh-better-sidebar**. This guide targets DeepSeek Harness Desktop **0.2.0-rc.2** with dsh-better-sidebar **0.24.1**.
+1. Install and enable this plugin. This guide targets DeepSeek Harness Desktop **0.2.0-rc.2** and its native right sidebar; dsh-better-sidebar is optional.
 2. After installation or an update, fully quit Desktop, including its tray process, and start it again. The plugin manager should show **v0.2.0**.
-3. Open a session in the target project. Click **＋** at the top of the better-sidebar panel and choose **File Review**.
+3. Open a session in the target project. Click **＋** at the top of the native right sidebar and choose **File Review** from the guide.
 4. After the Agent finishes a turn that changes files, you can also click **Review** in the end-of-turn “Edited N files” row. Clicking an individual file name opens that file's changes.
 
 See the [README installation instructions](../README.en.md#installation). **Multi-repository management** is a conversation tab beside Chat and Trajectory; it is separate from the File Review settings dialog.
 
-**Open this guide at any time:** click **User guide** beside the review-scope dropdown in the File Review header. The User guide tab displays the manual with Markdown formatting and screenshots. Click a screenshot to enlarge it, then press Esc or click the close button to return. It displays `USER_GUIDE.en.md` when **Settings → General settings → Language** is English, or `USER_GUIDE.md` when it is Chinese. An open guide also follows language changes. Both manuals and the screenshots ship with the plugin, so you can open them from any project.
+**Open this guide at any time:** click **User guide** beside the review-scope dropdown in the File Review header. The plugin dialog displays the manual with Markdown formatting and screenshots. Click a screenshot to enlarge it, then press Esc or click the close button to return. It displays `USER_GUIDE.en.md` when **Settings → General settings → Language** is English, or `USER_GUIDE.md` when it is Chinese. An open guide also follows language changes. Both manuals and the screenshots ship with the plugin, so you can open them from any project.
+
+Press Esc in an enlarged image to close the image first; press Esc again to close the guide and return focus to its button. A guide tab restored from an older layout provides **User guide** and **Close legacy tab** buttons. New guides open as dialogs.
+
+Switching to another sidebar tab preserves expanded diffs, searches, selected lines, drafts and scrolling while pausing review polling. Closing the review tab releases its temporary page state; reopening starts a new page. Saved comments, discussions, confirmations and reading preferences keep their existing storage rules.
 
 ### 2.2 Trying the workflow with existing changes
 
@@ -273,7 +277,7 @@ Figure 9: The path field identifies the executable itself, not the code file to 
 
 The plugin checks whether the file still matches the reference before opening it. Results appear inside the context menu. If the uniquely matching reference has moved, click **Go to line N** to confirm navigation to its new location.
 
-**The two editor actions:** **Open in editor** beside a file heading opens the file in the host's built-in editor. **Open selection in external IDE** in the context menu launches your configured external program with the verified line number.
+**The two editor actions:** **Open in built-in viewer** beside a file heading opens the file in the host's built-in viewer. **Open selection in external IDE** in the context menu launches your configured external program with the verified line number.
 
 ### 9.3 When navigation cannot proceed
 
@@ -394,16 +398,16 @@ Local records do not automatically become Git review records or synchronize betw
 
 | Question | What to check |
 | --- | --- |
-| I cannot find File Review | Enable this plugin and better-sidebar, then open it with the sidebar's ＋ menu. Fully restart the host after an update |
+| I cannot find File Review | Enable this plugin, then open it from the native right sidebar's ＋ guide. Fully restart the host after an update |
 | User guide does not open | Fully quit Desktop, including the tray process, and restart after updating. Check that the plugins are enabled and the installed package includes the manuals |
-| Only screenshot descriptions appear, without images | Fully quit Desktop, including the tray process, and restart. Click **User guide** in the File Review header to use the guide tab with screenshots; click a screenshot to enlarge it |
+| Only screenshot descriptions appear, without images | Fully quit Desktop, including the tray process, and restart. Click **User guide** in the File Review header to use the guide dialog with screenshots; click a screenshot to enlarge it |
 | My manual code edits do not appear | Save the files, choose Uncommitted or Unstaged, and refresh. Last turn shows session tool changes |
 | Last turn is empty, but local files changed | The most recent turn may not have edited files. Use This session for tool history or Uncommitted for disk changes |
 | Multiple repositories do not appear | Check the session's project, whether configuration was generated, repository enablement, and recognized status |
 | Save is disabled after selecting repositories | With an existing configuration and no list edits, saving is disabled. Make a change before saving |
 | Historical context cannot expand | The session record did not contain that code. Inspect Git history or the current file; missing history is not automatically replaced |
 | I selected code but cannot find Comment on selection | Right-click the blue selection or its line numbers, or focus a line number and press Shift+F10 |
-| I cannot find the external-editor action | Right-click after-version code or line numbers and choose Open selection in external IDE. The file-heading action opens the built-in editor |
+| I cannot find the external-editor action | Right-click after-version code or line numbers and choose Open selection in external IDE. The file-heading action opens the built-in viewer |
 | The Agent does not reply after I save a comment | Comment only saves a draft. Click Submit review comments; if the Agent is busy, check the queued state |
 | Submit is disabled | Check for pending comments, an ongoing submission, or a comment editor that needs to be saved or cancelled |
 | Mark resolved did not change the code | Resolution only tracks review status. Submit feedback for actual changes and inspect the Agent's results |

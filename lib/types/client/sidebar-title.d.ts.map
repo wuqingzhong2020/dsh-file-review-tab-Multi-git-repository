@@ -1,1 +1,0 @@
-{"version":3,"file":"sidebar-title.d.ts","sourceRoot":"","sources":["../../../src/client/sidebar-title.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,oBAAoB,EAAE,MAAM,mCAAmC,CAAA;AAG7E,kFAAkF;AAClF,wBAAgB,oBAAoB,CAClC,OAAO,EAAE,IAAI,CAAC,oBAAoB,EAAE,WAAW,CAAC,EAChD,GAAG,EAAE;IAAE,QAAQ,CAAC,EAAE,EAAE,MAAM,CAAC;IAAC,QAAQ,CAAC,KAAK,EAAE,MAAM,CAAA;CAAE,GACnD,MAAM,IAAI,CAUZ"}

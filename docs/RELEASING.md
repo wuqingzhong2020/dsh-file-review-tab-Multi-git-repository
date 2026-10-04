@@ -15,7 +15,7 @@
 | GitHub Release 标签 | `v0.2.0` |
 | Release 安装资产 | `dsh-file-review-tab-multi-git-repository-0.2.0.tgz` |
 | 适配宿主 | DeepSeek Harness Desktop 0.2.0-rc.2 |
-| 适配侧栏 | dsh-better-sidebar 0.24.1 |
+| 侧栏接入 | Desktop 原生右侧栏；dsh-better-sidebar 可选 |
 
 两类文件的用途不同：
 
@@ -114,7 +114,7 @@ data/plugins/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml
 
 再提交 PR 到 `awesome-dsh-plugin/awesome-dsh-plugin`。模板中的 `tarball` 指向本工程的 `v0.2.0` Release；提交前需要先发布 Release、上传同名资产并确认地址可以下载。目录规则以 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
-PR 说明应写明：基于 `Lzh3070/dsh-file-review-tab` 扩展，增加工程级多仓库配置、跨仓库 Git 差异、评论及轮次确认，并针对 Desktop 0.2.0-rc.2 / better-sidebar 0.24.1 适配。README 已保留直接上游及原始实现的来源说明。
+PR 说明应写明：基于 `Lzh3070/dsh-file-review-tab` 扩展，增加工程级多仓库配置、跨仓库 Git 差异、评论及轮次确认，并针对 Desktop 0.2.0-rc.2 原生右侧栏适配。README 已保留直接上游及原始实现的来源说明。
 
 不要修改目录仓库由脚本生成的 README。维护者审核合并后，目录会更新；重新打开插件市场，再按插件名搜索。审核合并和数据同步是两个步骤，不应把「PR 已提交」写成「市场已收录」。
 

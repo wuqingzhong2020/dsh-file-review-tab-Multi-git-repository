@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { FileReviewService } from '../lib/index.js'
 import { FILE_REVIEW_INVOCATIONS } from '../src/typert-descriptors.ts'
-import { openUserGuide, loadUserGuide, guideImageResolver } from '../src/client/user-guide.ts'
+import { loadUserGuide, guideImageResolver } from '../src/client/user-guide.ts'
 import { attachLocale, t } from '../src/client/locales.ts'
 
 test('Host opens shipped manuals outside the active project and never accepts a caller file path', async () => {
@@ -31,59 +31,35 @@ test('manual RPC requires an agent scope and validates the language and result o
   assert.equal(descriptor.result.create().safeParse('').success, false)
 })
 
-test('clicks follow the current host language and target the originating session in the guide tab', async () => {
-  let active = 'zh-CN'
-  const detach = attachLocale({ getSnapshot: () => ({ active }) })
-  const opened = [], requested = []
-  const ctx = {
-    sessions: { scope(id) {
-      assert.equal(id, 'review-session')
-      return { get(namespace) {
-        assert.equal(namespace, 'remote.fileReview')
-        return { async userGuide(language) {
-          requested.push(language)
-          const path = await FileReviewService.prototype.userGuide.call({}, {}, language)
-          return { ok: true, value: path }
-        } }
+test('guide requests use the selected language and originating session without a sidebar service', async () => {
+  const requested = []
+  const ctx = { sessions: { scope(id) {
+    assert.equal(id, 'review-session')
+    return { get(namespace) {
+      assert.equal(namespace, 'remote.fileReview')
+      return { async userGuideDocument(language) {
+        requested.push(language)
+        return { ok: true, value: { path: language, markdown: '# Guide', images: {} } }
       } }
-    } },
-    betterSidebar: { openTab(...args) { opened.push(args) } },
-  }
-  try {
-    await openUserGuide(ctx, 'review-session')
-    active = 'en'
-    await openUserGuide(ctx, 'review-session')
-    assert.deepEqual(requested, ['zh', 'en'])
-    assert.deepEqual(opened.map(args => args[1]), [{ sessionId: 'review-session' }, { sessionId: 'review-session' }])
-    assert.equal(opened[0][0].type, 'file-review-guide')
-    assert.equal(opened[1][0].type, 'file-review-guide')
-    assert.match(opened[0][0].path, /[\\/]docs[\\/]USER_GUIDE\.md$/)
-    assert.match(opened[1][0].path, /[\\/]docs[\\/]USER_GUIDE\.en\.md$/)
-  } finally { detach() }
+    } }
+  } } }
+  for (const language of ['zh', 'en']) assert.equal((await loadUserGuide(ctx, 'review-session', language)).path, language)
+  assert.deepEqual(requested, ['zh', 'en'])
 })
 
-test('missing host service or viewer reports a localized error instead of silently opening a relative path', async () => {
+test('missing guide service and failed or disconnected requests preserve localized failures', async () => {
   let active = 'zh'
   const detach = attachLocale({ getSnapshot: () => ({ active }) })
-  const sidebar = { openTab() { assert.fail('No tab may be opened without the service') } }
   try {
     for (const language of ['zh', 'en']) {
       active = language
-      await assert.rejects(openUserGuide({ sessions: { scope: () => undefined }, betterSidebar: sidebar }, 'session'), { message: t('userGuideServiceUnavailable') })
-      await assert.rejects(openUserGuide({ sessions: { scope: () => ({ get: () => ({}) }) }, betterSidebar: sidebar }, 'session'), { message: t('userGuideServiceUnavailable') })
-      await assert.rejects(openUserGuide({}, 'session'), { message: t('userGuideViewerUnavailable') })
+      await assert.rejects(loadUserGuide({ sessions: { scope: () => undefined } }, 'session', language), { message: t('userGuideServiceUnavailable') })
+      await assert.rejects(loadUserGuide({ sessions: { scope: () => ({ get: () => ({}) }) } }, 'session', language), { message: t('userGuideServiceUnavailable') })
+    }
+    for (const userGuideDocument of [async () => ({ ok: false, error: { message: 'Manual is missing' } }), async () => { throw new Error('Host disconnected') }]) {
+      await assert.rejects(loadUserGuide({ sessions: { scope: () => ({ get: () => ({ userGuideDocument }) }) } }, 'session', 'en'), /Manual is missing|Host disconnected/)
     }
   } finally { detach() }
-})
-
-test('failed or disconnected manual RPC preserves the failure without calling the file viewer', async () => {
-  for (const userGuide of [async () => ({ ok: false, error: { message: 'Manual is missing from the installed package' } }), async () => { throw new Error('Host disconnected') }]) {
-    const ctx = {
-      sessions: { scope: () => ({ get: () => ({ userGuide }) }) },
-      betterSidebar: { openTab() { assert.fail('Failed requests must not open a tab') } },
-    }
-    await assert.rejects(openUserGuide(ctx, 'session'), /Manual is missing|Host disconnected/)
-  }
 })
 
 test('both shipped guides include their original Markdown and exactly the packaged JPEG bytes', async () => {

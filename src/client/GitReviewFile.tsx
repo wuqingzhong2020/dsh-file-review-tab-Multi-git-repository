@@ -1,4 +1,5 @@
-import type { Context } from '@deepseek-ai/cordis'
+import { useState } from 'react'
+import { useReviewFileOpener } from './review-navigation.tsx'
 import type { GitReviewDiff, GitReviewFile as GitReviewFileChange } from '../git-review-types.ts'
 import { UnifiedDiff } from './UnifiedDiff.tsx'
 import { t } from './locales.ts'
@@ -9,8 +10,6 @@ import type { ReviewCommentTarget } from './review-comments.ts'
 import css from './FileReviewTab.module.css'
 
 interface GitReviewFileProps {
-  readonly ctx: Context
-  readonly sessionId: string
   readonly file: GitReviewFileChange
   readonly target: ReviewCommentTarget
   readonly sourceKey: string
@@ -21,8 +20,6 @@ interface GitReviewFileProps {
 
 /** Controlled Git file display; comparison requests and loading stay in the panel. */
 export function GitReviewFile({
-  ctx,
-  sessionId,
   file,
   target,
   sourceKey,
@@ -30,19 +27,12 @@ export function GitReviewFile({
   diff,
   onToggle,
 }: GitReviewFileProps) {
+  const openFile = useReviewFileOpener()
+  const [openError, setOpenError] = useState<string | null>(null)
   const openInEditor = () => {
-    const sidebar = (
-      ctx as Context & {
-        betterSidebar?: {
-          openFile(scope: { sessionId: string }, path: string, title?: string): void
-        }
-      }
-    ).betterSidebar
-    sidebar?.openFile(
-      { sessionId },
-      resolveSessionPath(file.repository, file.path),
-      file.path.split('/').at(-1),
-    )
+    setOpenError(null)
+    try { openFile(resolveSessionPath(file.repository, file.path)) }
+    catch (error) { setOpenError(error instanceof Error ? error.message : t('sidebarOpenFailed')) }
   }
   return (
     <li className={css.fileItem}>
@@ -80,6 +70,7 @@ export function GitReviewFile({
         )}
       </div>
       <ReviewFileCommentThread target={target} />
+      {openError && <p role="alert">{t('sidebarOpenFailed')} {openError}</p>}
       {open && (
         <div className={css.diffWrap}>
           <GitReviewFileDiff diff={diff} sourceKey={sourceKey} target={target} />

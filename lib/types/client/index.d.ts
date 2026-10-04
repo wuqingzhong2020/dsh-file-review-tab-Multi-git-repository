@@ -6,7 +6,7 @@
  *    files · +M -K / Undo / Review"), registered into the
  *    'conversation.chat.turnTail' list under its own id, alongside the built-in
  *    changed-files entry (the native deliverables registry stays enabled); and
- * 2. the 'file-review' better-sidebar tab (per-session change list + inline
+ * 2. the native 'file-review' right-sidebar tab (per-session change list + inline
  *    red/green diffs + per-turn/per-file undo).
  *
  * The Host half's undo/redo capability reaches both surfaces through the

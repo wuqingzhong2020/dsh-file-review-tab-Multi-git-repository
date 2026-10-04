@@ -2,8 +2,7 @@
  * Chat → sidebar deep-link channel.
  *
  * The chat turn-tail row knows which paths (and which turn) the user wants to
- * inspect, but better-sidebar's native right Sidebar mints its own tab ids
- * and preserves an already-open tab's `meta` (including on a new navigation).
+ * inspect; the native right sidebar creates its own tab instance ids.
  * A package-local channel delivers repeated selections without coupling to
  * those native tab ids or storing transient selection in persisted tab state.
  *
@@ -49,6 +48,17 @@ export function publishFileReviewSeed(
 /** The most recent seed for a session, if the tab has not consumed it yet. */
 export function currentFileReviewSeed(sessionId: string): FileReviewSeed | undefined {
   return latest.get(sessionId)
+}
+
+/** Only the request that actually completed may remove the session's latest target. */
+export function discardFileReviewSeed(sessionId: string, consumedNonce?: number): void {
+  const seed = latest.get(sessionId)
+  if (consumedNonce === undefined || seed?.nonce === consumedNonce) latest.delete(sessionId)
+}
+
+export function clearFileReviewSeeds(): void {
+  latest.clear()
+  listeners.clear()
 }
 
 /** Observe every publish; the caller filters by session. */

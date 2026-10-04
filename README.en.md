@@ -4,13 +4,13 @@
 
 Current version: **v0.2.0**.
 
-**dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 and [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 0.24.1.**
+**dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 using its native right sidebar, without a third-party sidebar requirement.**
 
 Building on the original file review sidebar tab and end-of-turn review row, this plugin adds project-level repository configuration, review across repositories, review comments, and turn confirmations. The host's built-in change summaries, review page, and file mentions remain enabled.
 
 ## User documentation
 
-Read the [Plugin user guide](docs/USER_GUIDE.en.md) ([Chinese version](docs/USER_GUIDE.md)) for step-by-step instructions and screenshots covering review scopes, multiple repositories, diff reading, external editor navigation, feedback and discussions. The **User guide** button beside the review scope opens the manual using the host's language setting, with Markdown formatting and screenshots. Click a screenshot to enlarge it.
+Read the [Plugin user guide](docs/USER_GUIDE.en.md) ([Chinese version](docs/USER_GUIDE.md)) for step-by-step instructions and screenshots covering review scopes, multiple repositories, diff reading, external editor navigation, feedback and discussions. The **User guide** button beside the review scope opens the manual in a plugin dialog using the host's language setting, with Markdown formatting and screenshots. Click a screenshot to enlarge it.
 
 ## Developer documentation
 
@@ -40,12 +40,14 @@ Release maintainers should also read the [Public release and plugin marketplace 
 - **Large-file virtualization**: Visible blocks over 400 rows render a window of rows with measured wrapping and comment heights. Split cells are measured together, and editing rows remain mounted. Search and change navigation still cover complete recorded content. Virtualization can be disabled in Settings.
 - **Session isolation**: Each session reviews files using its own project configuration. Status polling pauses while the tab is hidden.
 - **Host language setting**: File review, multi-repository management, settings dialogs, comments, and the end-of-turn review row follow Chinese or English in General settings → Language. Changes apply immediately while preserving expanded diffs, comment drafts, and unsaved repository edits. Plugin notices and recognized error explanations switch language as well; paths, code, and user input keep their original text.
-- **Narrow-container support**: In a half-width sidebar, turn headers wrap and secondary details such as line statistics and Open in editor yield space, keeping filenames and undo actions visible.
+- **Narrow-container support**: In a half-width sidebar, turn headers wrap and secondary details such as line statistics and Open in built-in viewer yield space, keeping filenames and undo actions visible.
 - **Style isolation**: CSS Modules and the host's `--dsw-alias-*` theme tokens keep styles isolated from the conversation area and other plugins.
 
 ## Installation
 
-Supported versions: **DeepSeek Harness Desktop 0.2.0-rc.2** + **dsh-better-sidebar 0.24.1**. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
+Supported versions: **DeepSeek Harness Desktop 0.2.0-rc.2**. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
+
+The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
 The public package is named `dsh-file-review-tab-multi-git-repository-0.2.0.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
@@ -57,7 +59,7 @@ For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `
 pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.2.0.tgz"
 ```
 
-Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open Multi-repository management at the top of the session, and open File review from the ＋ menu in the better-sidebar sidebar.
+Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open Multi-repository management at the top of the session, and open File Review from the native right sidebar's ＋ guide.
 
 ### Standalone Web Profile
 
@@ -182,7 +184,7 @@ Tests require neither Desktop nor the maintainer's project directories. Git inte
 
 This plugin modifies and extends [Lzh3070/dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab). Thanks to its author for the file review sidebar tab, conversation review row, and related foundations.
 
-The upstream core diff renderer and undo service originate from [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review) (MIT License, © ZhangWenChao). Sidebar integration uses the public `ctx.betterSidebar` registration API provided by [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar).
+The upstream core diff renderer and undo service originate from [left0ver/dsh-file-review](https://github.com/left0ver/dsh-file-review) (MIT License, © ZhangWenChao). Sidebar integration uses the host’s native tab registry and body/title slots. Thanks to [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) for the earlier integration reference.
 
 ## License
 

@@ -4,7 +4,7 @@
  * provided by `@deepseek-ai/dsh-client-locale`) through {@link attachLocale},
  * and `t()` resolves the active locale from it. Without an attached service
  * (standalone/test compositions) the browser language is used. Mirrors the
- * dsh-better-sidebar locales pattern.
+ * the host locale subscription pattern.
  */
 
 /** The dictionary namespace this plugin owns in the DSH locale registry. */
@@ -18,7 +18,14 @@ export const zh = {
   userGuide: '操作指南', userGuideOpening: '正在打开…', userGuideHint: '打开支持图片预览的使用手册',
   userGuideFailed: '无法打开操作指南。',
   userGuideServiceUnavailable: '使用手册服务不可用；安装或更新插件后，请完整退出并重启 Desktop，再重试。',
-  userGuideViewerUnavailable: '操作指南页签不可用，请检查 dsh-better-sidebar 是否启用。',
+  userGuideClose: '关闭操作指南', userGuideCloseLegacy: '关闭此旧标签',
+  userGuideLegacyHint: '操作指南已改为插件弹窗；此标签仅兼容之前保存的布局。',
+  sidebarGuideDescription: '按轮次及 Git 范围审查多仓库文件改动',
+  sidebarUnavailable: '原生文件查看器尚未就绪，请重新打开文件审查。',
+  sidebarSessionNotVisible: '请先切换到目标会话，再打开文件审查。',
+  sidebarWorkspaceUnavailable: '当前会话的工作目录不可用。',
+  sidebarOpenFailed: '无法在内置查看器中打开文件。',
+  sidebarTargetMissing: '该审查目标已不存在，或不在当前已加载的会话记录中。',
   userGuideImageOpen: '查看图片', userGuideImageDialog: '截图预览', userGuideImageClose: '关闭图片',
   userGuideImageLoading: '正在加载图片…', userGuideImageFailed: '图片加载失败', userGuideCodeCopy: '复制代码', userGuideFootnotes: '脚注',
   commentAddLine: '添加行评论', commentAddFile: '评论', commentWholeFile: '整个文件',
@@ -75,7 +82,7 @@ export const zh = {
   undoPartial: '部分文件未能撤销',
   redoPartial: '部分文件未能重新应用',
   toggleError: '操作失败',
-  openInEditor: '在编辑器中打开',
+  openInEditor: '在内置查看器中打开',
   open: '打开 {name}',
   copy: '复制差异',
   copied: '已复制',
@@ -161,7 +168,14 @@ export const en: Record<CopyKey, string> = {
   userGuide: 'User guide', userGuideOpening: 'Opening…', userGuideHint: 'Open the user guide with screenshot previews',
   userGuideFailed: 'Failed to open the user guide.',
   userGuideServiceUnavailable: 'The user guide service is unavailable. Fully quit and restart Desktop after installing or updating the plugin, then try again.',
-  userGuideViewerUnavailable: 'The user guide tab is unavailable. Check that dsh-better-sidebar is enabled.',
+  userGuideClose: 'Close user guide', userGuideCloseLegacy: 'Close this old tab',
+  userGuideLegacyHint: 'The user guide now opens in a plugin dialog. This tab preserves an older saved layout.',
+  sidebarGuideDescription: 'Review multi-repository changes by turn or Git scope',
+  sidebarUnavailable: 'The native file viewer is not ready. Reopen File Review.',
+  sidebarSessionNotVisible: 'Switch to the target session before opening File Review.',
+  sidebarWorkspaceUnavailable: 'The working directory for this session is unavailable.',
+  sidebarOpenFailed: 'Failed to open the file in the built-in viewer.',
+  sidebarTargetMissing: 'This review target no longer exists or is outside the loaded session history.',
   userGuideImageOpen: 'View image', userGuideImageDialog: 'Screenshot preview', userGuideImageClose: 'Close image',
   userGuideImageLoading: 'Loading image…', userGuideImageFailed: 'Failed to load image', userGuideCodeCopy: 'Copy code', userGuideFootnotes: 'Footnotes',
   commentAddLine: 'Add line comment', commentAddFile: 'Comment', commentWholeFile: 'Entire file',
@@ -218,7 +232,7 @@ export const en: Record<CopyKey, string> = {
   undoPartial: 'Some files could not be undone',
   redoPartial: 'Some files could not be reapplied',
   toggleError: 'Operation failed',
-  openInEditor: 'Open in editor',
+  openInEditor: 'Open in built-in viewer',
   open: 'Open {name}',
   copy: 'Copy diff',
   copied: 'Copied',

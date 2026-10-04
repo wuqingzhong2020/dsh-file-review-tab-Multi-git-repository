@@ -17,6 +17,17 @@
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   font: var(--dsw-font-xs-13, 13px sans-serif);
 }
+.modal {
+  width: min(1100px, 100%);
+  max-height: 100%;
+  padding-bottom: 0;
+  gap: 0;
+  background: var(--dsw-alias-bg-layer-2, #fff);
+  color: var(--dsw-alias-label-primary, #111);
+}
+.modalContent { min-height: 0; flex: 1; }
+.modalContent > div:last-child { min-height: 0; padding: 0; margin-top: 0; overflow: hidden; }
+.modal .root { height: min(75vh, 850px); }
 .header span { color: var(--dsw-alias-label-secondary); }
 .header button {
   margin-left: auto;

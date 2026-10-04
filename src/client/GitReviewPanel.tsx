@@ -292,8 +292,6 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
                       return (
                         <GitReviewFile
                           key={key}
-                          ctx={ctx}
-                          sessionId={sessionId}
                           file={file}
                           target={commentTarget}
                           sourceKey={JSON.stringify([

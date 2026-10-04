@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { ARCHIVE_PAGE_TURNS, splitArchivedTurns, type TurnFileChanges } from './session-changes.ts'
-import { currentFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
+import { currentFileReviewSeed, discardFileReviewSeed, subscribeFileReviewSeed, type FileReviewSeed } from './deep-link.ts'
 import { stateKey, type ReviewMode } from './file-review-model.ts'
 
 interface PendingScroll {
   readonly rowKey: string
   readonly turn: number | null
+  readonly nonce?: number
 }
 
 interface DeepLinkOptions {
   readonly sessionId: string
   readonly turns: readonly TurnFileChanges[]
   readonly visible: boolean
+  readonly ready: boolean
   readonly meta: unknown
   readonly expanded: ReadonlySet<string>
   readonly flatKey: string
@@ -22,6 +24,7 @@ interface DeepLinkOptions {
   readonly setArchivePages: Dispatch<SetStateAction<number>>
   readonly setExpanded: Dispatch<SetStateAction<ReadonlySet<string>>>
   readonly setCollapsedRepositories: Dispatch<SetStateAction<ReadonlySet<string>>>
+  readonly onMissing: () => void
 }
 
 /** Replay chat links without replacing the user's expansion or scrolling the sidebar shell. */
@@ -29,6 +32,7 @@ export function useFileReviewDeepLink({
   sessionId,
   turns,
   visible,
+  ready,
   meta,
   expanded,
   flatKey,
@@ -38,6 +42,7 @@ export function useFileReviewDeepLink({
   setArchivePages,
   setExpanded,
   setCollapsedRepositories,
+  onMissing,
 }: DeepLinkOptions) {
   const turnsRef = useRef(turns)
   turnsRef.current = turns
@@ -50,11 +55,11 @@ export function useFileReviewDeepLink({
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const lastSeedNonceRef = useRef<number | undefined>(undefined)
   const pendingScrollRef = useRef<PendingScroll | null>(null)
+  const [seed, setSeed] = useState<FileReviewSeed | undefined>(() => currentFileReviewSeed(sessionId))
 
-  // The seed channel supports repeated links because better-sidebar may retain
-  // an existing tab's meta. Merge expansions instead of replacing user choices.
+  // Native instances are separate from transient chat requests. Preserve existing expansions.
   const replayLink = useCallback(
-    (paths: readonly string[], targetTurn: number | undefined) => {
+    (paths: readonly string[], targetTurn: number | undefined, nonce?: number) => {
       if (paths.length === 0) return
       setReviewMode('session')
       setRepositoryFilter('*')
@@ -109,31 +114,43 @@ export function useFileReviewDeepLink({
           : {
               rowKey: stateKey(first.turn, first.path),
               turn: paths.length > 1 ? first.turn : null,
+              ...(nonce !== undefined ? { nonce } : {}),
             }
     },
     [sessionId],
   )
 
   useEffect(() => {
-    const replay = (seed: FileReviewSeed): void => {
-      if (lastSeedNonceRef.current === seed.nonce) return
-      lastSeedNonceRef.current = seed.nonce
-      replayLink(seed.paths, seed.turn)
-    }
-    const pending = currentFileReviewSeed(sessionId)
-    if (pending !== undefined) replay(pending)
+    pendingScrollRef.current = null
+    lastSeedNonceRef.current = undefined
+    setSeed(currentFileReviewSeed(sessionId))
     return subscribeFileReviewSeed((ownerSessionId, seed) => {
-      if (ownerSessionId === sessionId) replay(seed)
+      if (ownerSessionId !== sessionId) return
+      pendingScrollRef.current = null
+      setSeed(seed)
     })
-  }, [sessionId, replayLink])
+  }, [sessionId])
 
-  // Legacy meta fallback (better-sidebar versions that still deliver
-  // `expandPaths` through meta); harmless when no meta is ever written.
+  useEffect(() => {
+    if (!visible || !ready || !seed || lastSeedNonceRef.current === seed.nonce) return
+    const matched = turns.some(turn => (seed.turn === undefined || turn.turn === seed.turn) &&
+      turn.files.some(file => seed.paths.includes(file.path)))
+    if (!matched && turns.some(turn => turn.live)) return
+    lastSeedNonceRef.current = seed.nonce
+    if (matched) replayLink(seed.paths, seed.turn, seed.nonce)
+    else {
+      pendingScrollRef.current = null
+      discardFileReviewSeed(sessionId, seed.nonce)
+      onMissing()
+    }
+  }, [visible, ready, seed, turns, sessionId, replayLink, onMissing])
+
+  // Bounded legacy navigation fallback; current actions use the seed channel.
   useEffect(() => {
     if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return
     const raw = (meta as { expandPaths?: unknown }).expandPaths
     if (!Array.isArray(raw)) return
-    const paths = raw.filter((value): value is string => typeof value === 'string')
+    const paths = raw.slice(0, 1000).filter((value): value is string => typeof value === 'string' && value.length <= 4096)
     const turnNo = (meta as { turn?: unknown }).turn
     const targetTurn = typeof turnNo === 'number' && Number.isInteger(turnNo) ? turnNo : undefined
     replayLink(paths, targetTurn)
@@ -159,10 +176,11 @@ export function useFileReviewDeepLink({
       container.scrollTo({ top: container.scrollTop + delta - 8, behavior: 'smooth' })
     }
     scroll()
+    if (pending.nonce !== undefined) discardFileReviewSeed(sessionId, pending.nonce)
     const timer = window.setTimeout(scroll, 150)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, expanded, meta, flatKey])
+  }, [visible, expanded, meta, flatKey, seed, sessionId])
 
   return { rowRefs, turnRefs, bodyRef }
 }

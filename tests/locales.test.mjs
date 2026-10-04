@@ -4,7 +4,6 @@ import { attachLocale, en, getLocaleSnapshot, subscribeLocale, t, zh } from '../
 import { en as chatEn, zh as chatZh } from '../src/client/chat-locales.ts'
 import { localizeReviewMessage } from '../src/client/message-locales.ts'
 import { Config } from '../src/repository-config.ts'
-import { followReviewTabTitle } from '../src/client/sidebar-title.ts'
 
 function source(active) {
   return {
@@ -108,44 +107,4 @@ test('existing diagnostics switch language at render and preserve paths and unkn
 test('Host configuration descriptions provide both Chinese and English metadata', () => {
   assert.deepEqual(Config.dict.enabled.meta.description, { zh: '是否启用多代码仓管理', en: 'Enable multi-repository management' })
   assert.deepEqual(Config.dict.projects.inner.dict.enabled.meta.description, { zh: '是否启用该项目的多代码仓管理', en: 'Enable multi-repository management for this project' })
-})
-
-test('restored native sidebar chips follow language without replacing tabs or their state', () => {
-  const host = source('en'); const detach = attachLocale(host)
-  const meta = { expandPaths: ['D:/demo/file.ts'], draft: '评论草稿' }
-  const tabs = new Map([
-    ['native-review-1', { id: 'native-review-1', title: '文件审查', meta }],
-    ['native-review-2', { id: 'native-review-2', title: 'File Review', meta: { scope: 'staged' } }],
-    ['editor', { id: 'editor', title: '中文文件.ts' }],
-  ])
-  const calls = []
-  const sidebar = {
-    updateTab(id, patch) {
-      assert.equal(this, sidebar)
-      calls.push({ id, patch })
-      Object.assign(tabs.get(id), patch)
-    },
-  }
-  const firstTab = tabs.get('native-review-1')
-  const stopFirst = followReviewTabTitle(sidebar, firstTab)
-  const stopSecond = followReviewTabTitle(sidebar, tabs.get('native-review-2'))
-  try {
-    assert.equal(firstTab.title, 'File Review', 'a restored Chinese title is corrected on mount')
-    assert.equal(calls.length, 1, 'an already-correct title needs no update')
-    host.set('zh'); host.set('zh-CN')
-    assert.equal(firstTab.title, '文件审查')
-    assert.equal(tabs.get('native-review-2').title, '文件审查')
-    assert.equal(calls.length, 3, 'equivalent Chinese locales do not write again')
-    host.set('en')
-    assert.equal(firstTab.title, 'File Review')
-    assert.equal(tabs.get('native-review-2').title, 'File Review')
-    assert.equal(tabs.get('editor').title, '中文文件.ts')
-    assert.equal(tabs.get('native-review-1'), firstTab)
-    assert.equal(firstTab.meta, meta)
-    assert.ok(calls.every(call => Object.keys(call.patch).join() === 'title'))
-    stopFirst(); stopSecond()
-    const count = calls.length
-    host.set('zh')
-    assert.equal(calls.length, count, 'closed tabs unsubscribe from language changes')
-  } finally { stopFirst(); stopSecond(); detach() }
 })

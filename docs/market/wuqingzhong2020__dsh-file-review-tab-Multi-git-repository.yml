@@ -3,6 +3,6 @@ url: https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
 name: wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
 category: git
 description:
-  en: Multi-repository file review for DeepSeek Harness Desktop, with project-local configuration, Git diffs, review comments, and turn confirmation.
-  zh: 为 DeepSeek Harness Desktop 提供多 Git 仓库管理、工程配置、差异审查、修改意见和轮次确认。
+  en: Multi-repository file review in the native DeepSeek Harness Desktop sidebar, with project-local configuration, Git diffs, review comments, and turn confirmation.
+  zh: 直接接入 DeepSeek Harness Desktop 原生侧栏，提供多 Git 仓库管理、工程配置、差异审查、修改意见和轮次确认。
 tarball: https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.2.0/dsh-file-review-tab-multi-git-repository-0.2.0.tgz

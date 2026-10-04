@@ -4,7 +4,7 @@
  * provided by `@deepseek-ai/dsh-client-locale`) through {@link attachLocale},
  * and `t()` resolves the active locale from it. Without an attached service
  * (standalone/test compositions) the browser language is used. Mirrors the
- * dsh-better-sidebar locales pattern.
+ * the host locale subscription pattern.
  */
 /** The dictionary namespace this plugin owns in the DSH locale registry. */
 export declare const LOCALE_NS = "fileReviewTab";
@@ -16,7 +16,15 @@ export declare const zh: {
     readonly userGuideHint: "打开支持图片预览的使用手册";
     readonly userGuideFailed: "无法打开操作指南。";
     readonly userGuideServiceUnavailable: "使用手册服务不可用；安装或更新插件后，请完整退出并重启 Desktop，再重试。";
-    readonly userGuideViewerUnavailable: "操作指南页签不可用，请检查 dsh-better-sidebar 是否启用。";
+    readonly userGuideClose: "关闭操作指南";
+    readonly userGuideCloseLegacy: "关闭此旧标签";
+    readonly userGuideLegacyHint: "操作指南已改为插件弹窗；此标签仅兼容之前保存的布局。";
+    readonly sidebarGuideDescription: "按轮次及 Git 范围审查多仓库文件改动";
+    readonly sidebarUnavailable: "原生文件查看器尚未就绪，请重新打开文件审查。";
+    readonly sidebarSessionNotVisible: "请先切换到目标会话，再打开文件审查。";
+    readonly sidebarWorkspaceUnavailable: "当前会话的工作目录不可用。";
+    readonly sidebarOpenFailed: "无法在内置查看器中打开文件。";
+    readonly sidebarTargetMissing: "该审查目标已不存在，或不在当前已加载的会话记录中。";
     readonly userGuideImageOpen: "查看图片";
     readonly userGuideImageDialog: "截图预览";
     readonly userGuideImageClose: "关闭图片";
@@ -112,7 +120,7 @@ export declare const zh: {
     readonly undoPartial: "部分文件未能撤销";
     readonly redoPartial: "部分文件未能重新应用";
     readonly toggleError: "操作失败";
-    readonly openInEditor: "在编辑器中打开";
+    readonly openInEditor: "在内置查看器中打开";
     readonly open: "打开 {name}";
     readonly copy: "复制差异";
     readonly copied: "已复制";

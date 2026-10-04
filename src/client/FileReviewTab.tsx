@@ -8,8 +8,8 @@ import { basename, resolveSessionPath, type TurnFileChanges } from './session-ch
 import { summarizeDiffs, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import { t, type CopyKey } from './locales.ts'
 import { useReviewLocale } from './use-review-locale.ts'
-import { followReviewTabTitle } from './sidebar-title.ts'
-import { openUserGuide } from './user-guide.ts'
+import { UserGuideDialog } from './UserGuideTab.tsx'
+import { useReviewFileOpener } from './review-navigation.tsx'
 import { localizeReviewMessage } from './message-locales.ts'
 import type { ReviewWorkspace } from '../repository-types.ts'
 import { fileRepository } from './repository-paths.ts'
@@ -41,7 +41,7 @@ import css from './FileReviewTab.module.css'
 const SUCCESS_NOTICE_DURATION = 3000
 const ERROR_NOTICE_DURATION = 8000
 
-/** Tab component props (a narrowing of better-sidebar's TabComponentProps). */
+/** Review business props supplied by the native sidebar adapter. */
 export interface FileReviewTabProps {
   readonly ctx: Context
   readonly sessionId: string
@@ -53,7 +53,7 @@ export interface FileReviewTabProps {
    * channel; meta.expandPaths is still accepted for older links. Both expand
    * the requested diffs and scroll this tab's own container to the first file.
    */
-  readonly tab: { readonly id: string; readonly title: string; readonly meta?: unknown }
+  readonly meta?: unknown
 }
 
 interface Notice {
@@ -69,9 +69,9 @@ function emptyStateMessage(mode: ReviewMode, repositoryFilter: string): CopyKey 
 }
 
 /** The sidebar tab body; all hooks remain unconditional across review scopes. */
-export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewTabProps) {
+export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReviewTabProps) {
   useReviewLocale()
-  useEffect(() => followReviewTabTitle(ctx.betterSidebar, tab), [ctx, tab.id])
+  const openFile = useReviewFileOpener()
   const sessions = (ctx as unknown as { readonly sessions: ISessions }).sessions
   const [states, setStates] = useState<ReadonlyMap<string, FileReviewFileState>>(() => new Map())
   const [statusPending, setStatusPending] = useState(false)
@@ -81,7 +81,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     () => new Set(),
   )
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [guideBusy, setGuideBusy] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const closeGuide = useCallback(() => setGuideOpen(false), [])
+  useEffect(() => { if (!visible) closeGuide() }, [visible, closeGuide])
   const [tick, setTick] = useState(0)
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
@@ -138,7 +140,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     }
   }, [sessions, sessionId, visible, tick])
 
-  const { snapshot, turns } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
+  const { snapshot, turns, ready } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
   const repositories = workspace?.repositories ?? []
   const scopeTurns = useMemo(
     () => scopeBehavior.select({ snapshot, turns, confirmed: confirmationSnapshot.confirmed }),
@@ -190,22 +192,6 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     () => flat.map(item => `${item.turn}|${item.path}|${item.diffs.length}`).join(';'),
     [flat],
   )
-
-  const { rowRefs, turnRefs, bodyRef } = useFileReviewDeepLink({
-    sessionId,
-    turns,
-    visible,
-    meta: tab.meta,
-    expanded,
-    flatKey,
-    setReviewMode,
-    setRepositoryFilter,
-    setArchiveOpen,
-    setArchivePages,
-    setExpanded,
-    setCollapsedRepositories,
-  })
-
   const showNotice = useCallback((tone: Notice['tone'], key: CopyKey, details?: string) => {
     noticeSeqRef.current += 1
     const seq = noticeSeqRef.current
@@ -218,6 +204,29 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
     )
     setNotice({ seq, tone, key, details })
   }, [])
+
+  const onMissingTarget = useCallback(() => {
+    showNotice('error', 'sidebarTargetMissing')
+  }, [showNotice])
+
+  const { rowRefs, turnRefs, bodyRef } = useFileReviewDeepLink({
+    sessionId,
+    turns,
+    visible,
+    ready,
+    meta,
+    expanded,
+    flatKey,
+    setReviewMode,
+    setRepositoryFilter,
+    setArchiveOpen,
+    setArchivePages,
+    setExpanded,
+    setCollapsedRepositories,
+    onMissing: onMissingTarget,
+  })
+
+
 
   useEffect(
     () => () => {
@@ -251,20 +260,10 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
   const openInEditor = useCallback(
     (path: string) => {
       const absolute = resolveSessionPath(cwd, path)
-      const sidebar = (
-        ctx as unknown as {
-          betterSidebar?: {
-            openFile(scope: { sessionId: string; cwd?: string }, path: string, title?: string): void
-          }
-        }
-      ).betterSidebar
-      sidebar?.openFile(
-        { sessionId, ...(cwd !== undefined ? { cwd } : {}) },
-        absolute,
-        basename(absolute),
-      )
+      try { openFile(absolute) }
+      catch (error) { showNotice('error', 'sidebarOpenFailed', error instanceof Error ? error.message : undefined) }
     },
-    [ctx, cwd, sessionId],
+    [openFile, cwd, showNotice],
   )
 
   const totalStats = useMemo(
@@ -298,17 +297,6 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
       view={turnView}
     />
   )
-  const openGuide = async () => {
-    setGuideBusy(true)
-    try {
-      await openUserGuide(ctx, sessionId)
-    } catch (error) {
-      showNotice('error', 'userGuideFailed', error instanceof Error ? error.message : undefined)
-    } finally {
-      setGuideBusy(false)
-    }
-  }
-
   return (
     <div className={css.root}>
       <header className={css.header}>
@@ -330,9 +318,8 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
         <button
           type="button"
           className={css.guideButton}
-          disabled={guideBusy}
           title={t('userGuideHint')}
-          onClick={openGuide}
+          onClick={() => setGuideOpen(true)}
         >
           <svg
             width="14"
@@ -347,7 +334,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           >
             <path d="M10 4v13M10 5C7 3 4 3 2 4v12c3-1 5-1 8 1 3-2 5-2 8-1V4c-2-1-5-1-8 1Z" />
           </svg>
-          {t(guideBusy ? 'userGuideOpening' : 'userGuide')}
+          {t('userGuide')}
         </button>
         {!isGitMode && flat.length > 0 && <FileReviewStats stats={totalStats} />}
         <button
@@ -362,6 +349,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, tab }: FileReviewT
           ⟳
         </button>
       </header>
+      {guideOpen && visible && <UserGuideDialog ctx={ctx} sessionId={sessionId} onClose={closeGuide} />}
       <ReviewCommentsProvider
         key={sessionId}
         ctx={ctx}

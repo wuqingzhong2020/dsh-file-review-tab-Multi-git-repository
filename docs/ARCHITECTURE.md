@@ -2,7 +2,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.2.0**，DeepSeek Harness Desktop **0.2.0-rc.2**，`dsh-better-sidebar` **0.24.1**。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.2.0**，DeepSeek Harness Desktop **0.2.0-rc.2**；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
 
@@ -14,7 +14,7 @@
 
 | 入口 | 组件 | 作用 |
 | --- | --- | --- |
-| better-sidebar 的「文件审查」Tab | [FileReviewTab.tsx](../src/client/FileReviewTab.tsx) | 选择审查范围、查看差异、确认轮次、撤销和提交修改意见 |
+| 原生右侧栏「文件审查」Tab | [NativeReviewTab.tsx](../src/client/NativeReviewTab.tsx) → [FileReviewTab.tsx](../src/client/FileReviewTab.tsx) | 适配会话／可见性，选择范围、查看差异、确认轮次、撤销和提交意见 |
 | 会话顶部「多代码仓管理」页签 | [RepositorySettings.tsx](../src/client/RepositorySettings.tsx) | 编辑当前工程的仓库列表，保存工程配置文件 |
 | 对话轮次末尾的审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx) | 展示工具改动摘要，撤销或定位到侧栏的文件差异 |
 | 审查标题行的「操作指南」按钮 | [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) | 打开安装包内的双语手册，预览截图并点击放大 |
@@ -36,7 +36,7 @@ flowchart TB
   subgraph Desktop["DeepSeek Harness Desktop / Web 宿主"]
     subgraph Browser["浏览器界面"]
       Slots["conversation.view / turnTail 插槽"]
-      Sidebar["better-sidebar"]
+      Sidebar["原生右侧栏"]
       UI["React 页面与差异渲染"]
       Snapshot["会话 Conversation snapshot"]
       Local["浏览器 localStorage"]
@@ -78,8 +78,8 @@ flowchart TB
 1. 注册中英文文案。
 2. 挂载 `TYPERT_REMOTE`。
 3. 注册工程配置页、插件自己的 Conversation 数据定义和轮次尾部审查行。
-4. 通过 `ctx.betterSidebar.registerTab` 注册 `file-review` Tab。
-5. 注册隐藏的 `file-review-guide` 单例页签，由审查页的操作指南按钮打开。
+4. 委托 `native-sidebar.ts` 注册原生 `file-review` 类型、正文和标题插槽，键为插件 implementation id。
+5. 注册无引导卡片的旧 `file-review-guide` 兼容页；日常操作指南由插件弹窗打开。
 
 注册使用 `ctx.effect` 管理清理，供插件禁用和热重载使用。新增全局监听或宿主注册时，也需要提供对应的释放逻辑。
 
@@ -87,7 +87,11 @@ flowchart TB
 
 `attachLocale` 在 `ctx.effect` 中接入 `ctx.locale.getSnapshot/subscribe`，以宿主「通用设置 → 语言」的选择为准。`useReviewLocale` 让插件界面实时刷新文案，不重新挂载页面或清空编辑状态。服务替换、插件禁用及 HMR 都释放旧订阅；仅独立预览或测试未接入宿主时使用浏览器语言。已显示的通知保存词典键或原始错误信息，在渲染时翻译；Host 返回的差异、路径及状态契约保持原样。
 
-原生侧栏标签另有打开时保存的标题，不能只依赖 Tab 描述符的 `title()`。`FileReviewTab` 挂载时通过 `followReviewTabTitle` 修正已保存的标题，并用 `betterSidebar.updateTab` 随语言变化更新；仅修改标题，保留标签 ID、深链、展开状态和草稿，卸载时释放订阅。
+原生标题插槽由 `NativeReviewTitle` 独立订阅宿主语言和会话快照，正文隐藏时仍同步标题与文件数角标。角标只统计未自动归档轮次的去重文件，按实际不可变快照缓存，不以节点数推断内容是否变化。原生 `keepMounted` 保留切换标签时的阅读和草稿状态，隐藏时暂停状态检查，关闭时卸载。注册单元在失败时逆序回滚；插件卸载释放类型、插槽及跳转 seed。
+
+标题通过 `sessions.retainInfo(sessionId)` 观察既有会话绑定的代际变化，不为了显示角标主动加载历史或保留会话。正文读取 `useTabInfo()` 提供的可见性、取消信号及绑定当前窗格的导航动作；类型、正文和标题使用相同 implementation id，服务迟到时由 `slots.inject` 等待插槽声明。
+
+原生主题背景使用宿主的 `--dsw-alias-bg-layer-1/2` 变量。仓库标题、评论卡片和选区菜单应使用这些真实令牌，避免旧变量在深色主题中退回白色。
 
 ### 2.3 包与构建边界
 
@@ -100,7 +104,7 @@ flowchart TB
 | `./typert` | `src/typert.host.ts` | `lib/typert.host.js`，Host 通信模型 |
 | `./remote` | `src/remote.ts` | `lib/remote.js`，远程贡献定义 |
 
-Host 输出为 ESM，目标为 Node ES2024。浏览器代码输出为 CJS，再包装进宿主的 `window.__ModuleLoader__.load`；不是独立网页应用。React 由宿主提供，`diff` 与 `zod` 随浏览器产物打包。
+Host 输出为 ESM，目标为 Node ES2024。浏览器代码输出为 CJS，再包装进宿主的 `window.__ModuleLoader__.load`；不是独立网页应用。React 由宿主提供，`diff`、`zod` 和官方 `dsh-util-workspace-path` 中实际使用的纯路径函数随浏览器产物打包。路径工具没有客户端入口，不作为宿主注入服务。
 
 CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `data-plugin-css` 标识的 `style`，相同标识避免重复注入。界面使用宿主 `--dsw-alias-*` 主题变量和容器查询。修改布局优先在对应 `.module.css` 中进行，不给宿主页面添加全局样式。
 
@@ -315,9 +319,9 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 客户端先获取 `sessions.scope(sessionId)`，再用 `scope.get('remote.fileReview')` 获取动态服务。响应为 `RemoteResult`：先检查 `ok`，失败读取 `error.message`，成功读取 `value`。异步挂载未完成或插件服务缺失时必须提供可见错误，不能在组件渲染期间无条件访问会抛异常的动态服务 getter。
 
-文件审查标题行的「操作指南」由 [user-guide.ts](../src/client/user-guide.ts) 读取宿主当前语言，调用 `userGuide(language)` 验证随包手册路径，然后通过 `betterSidebar.openTab` 打开单例 `file-review-guide` 页签。[UserGuideTab.tsx](../src/client/UserGuideTab.tsx) 通过 Agent 作用域 `userGuideDocument(language)` 读取手册和截图，复用宿主 `MarkdownText` 排版及 `MarkdownDelegateProvider` 的点击放大能力。打开后跟随宿主语言变化，也可手动刷新；请求失效后不会覆盖新语言的文档。
+文件审查标题行的「操作指南」打开 [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) 中的宿主 Modal 弹窗。[UserGuideContent.tsx](../src/client/UserGuideContent.tsx) 通过 Agent 作用域 `userGuideDocument(language)` 读取手册和截图，保留宿主 Markdown 排版、图片放大、刷新、焦点返回及 Esc。语言变化重载正文，关闭或来源 Tab 隐藏时卸载文档与图片层，旧请求不写回。旧保存布局的 `file-review-guide` 兼容页只提供打开同一弹窗和关闭自身，不再出现在引导页；Host 的旧路径 RPC 保留兼容。
 
-Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_GUIDE.en.md`，只接受两种语言值和 12 张固定命名的 JPEG 截图；不会把当前工程里的同名文件当作插件手册。截图转换为 data URL，经 `pathImages` / `fileImages` 的显式图片解析器交给宿主渲染，避免 Desktop 的 `dsh-app://` 地址被普通 Markdown 图片协议白名单拒绝。RPC 对内容长度、图片键和媒体类型作校验，不接受调用方的任意本地路径；图片数据只保留在页签内存中，不写入页签持久化元数据。未新增 Markdown 渲染运行时依赖；差异视图保持原有代码展示方式。
+Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_GUIDE.en.md`，只接受两种语言值和 12 张固定命名的 JPEG 截图；不会把当前工程里的同名文件当作插件手册。截图转换为 data URL，经 `pathImages` / `fileImages` 的显式图片解析器交给宿主渲染，避免 Desktop 的 `dsh-app://` 地址被普通 Markdown 图片协议白名单拒绝。RPC 对内容长度、图片键和媒体类型作校验，不接受调用方的任意本地路径；图片数据只保留在弹窗内存中，不写入布局持久化元数据。未新增 Markdown 渲染运行时依赖；差异视图保持原有代码展示方式。
 
 新增远程方法时，应同时修改领域类型、Zod schema、描述符、Host 方法、`remote.ts` 类型扩展和调用页面。仅给 service 增加一个方法不会自动使它成为可调用 RPC。
 
@@ -410,7 +414,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 
 确认记录使用整轮文件差异的修订标识。只能确认已完成且有改动的轮次；该轮后续补录或改变差异，修订标识变化后自动重新进入「待确认」。撤销、Git 状态与确认记录分别处理。
 
-`repository-events.ts` 是当前浏览器插件实例中的通知通道，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 用插件自己的目标通道配合 better-sidebar 打开 Tab，解决已打开 Tab 的 meta 不更新问题；定位归档轮次时自动打开归档并加载所需页。
+`repository-events.ts` 是当前浏览器插件实例中的通知通道，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 按会话保存最新跳转目标，以 nonce 区分重复点击，完成滚动后消费；定位归档轮次时自动打开归档并加载所需页。`sidebar-navigation.ts` 检查顶层控制器的当前会话，审查正文则通过自己的 `tab.actions.openResource` 打开文件；统一导航 Provider 供文件头和选区菜单使用，避免异步操作误打开到其他会话。
 
 ## 9. 文件写入边界与性能约束
 
@@ -516,7 +520,7 @@ pnpm pack --pack-destination dist
 
 | 现象 | 优先排查 |
 | --- | --- |
-| 「文件审查」Tab 不出现 | better-sidebar 依赖和注册、`dsh.client` 加载、`client/index` 日志、安装包是否为本次产物 |
+| 「文件审查」Tab 不出现 | 原生类型／插槽注册、`dsh.client` 加载、`client/index` 日志、安装包是否为本次产物 |
 | `remote.fileReview` 不可用 | `$mount` 错误、Host 插件与 Typert 模型加载、会话 scope 是否存在、两端版本是否一致 |
 | 会话有旧修改但「上一轮」为空 | 最新轮次是否实际修改文件；按定义不会回退到更早轮次 |
 | Code Mode 改动缺失 | 嵌套调用是否成功、结果是否有 before/after、rootCallId 归属、Host 记录是否因重启或上限丢失 |

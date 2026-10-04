@@ -12,6 +12,7 @@ import { basename, type ProducedFileReview } from './turn-deliverables.ts'
 import type { NS } from './chat-locales.ts'
 import { useReviewLocale } from './use-review-locale.ts'
 import { localizeReviewMessage } from './message-locales.ts'
+import { t as reviewText } from './locales.ts'
 import { summarizeDiffs, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import { ProducedFilesSummary } from './produced-files-summary.tsx'
 import { ResultToast, type NoticeFile, type ToggleNotice } from './produced-files-toast.tsx'
@@ -69,6 +70,7 @@ export function ProducedFiles({
   const [statusPending, setStatusPending] = useState(true)
   const [togglePending, setTogglePending] = useState(false)
   const [toast, setToast] = useState<ToggleNotice | null>(null)
+  const [navigationError, setNavigationError] = useState<string | null>(null)
   const toastSeqRef = useRef(0)
 
   const reviewsWithStats = useMemo(
@@ -230,10 +232,17 @@ export function ProducedFiles({
         toggleAction={toggleAction}
         onToggle={runToggle}
         onReview={paths => {
-          openInSidebarTab?.(paths, turnNumber)
+          setNavigationError(null)
+          try { openInSidebarTab?.(paths, turnNumber) }
+          catch (error) {
+            console.error('[file-review] review navigation failed:', error)
+            setNavigationError(error instanceof Error ? error.message : reviewText('sidebarUnavailable'))
+          }
         }}
         t={t}
       />
+
+      {navigationError && <p role="alert">{navigationError}</p>}
 
       {toast !== null && (
         <ResultToast

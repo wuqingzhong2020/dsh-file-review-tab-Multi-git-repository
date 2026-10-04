@@ -7,7 +7,8 @@ import type { CopyKey } from './locales.ts'
 import { contextSelection, type DiffReferenceSelection } from './review-context-selection.ts'
 import type { ReviewCommentTarget } from './review-comments.ts'
 import { formatReviewReference, rangeReference } from './review-reference.ts'
-import { openReviewFile, referenceRequest, reviewLocation } from './review-file-opener.ts'
+import { referenceRequest, reviewLocation } from './review-file-opener.ts'
+import { useReviewFileOpener } from './review-navigation.tsx'
 import type { UnifiedLine } from './unified-diff-model.ts'
 
 type ReferenceSide = 'old' | 'new'
@@ -38,6 +39,7 @@ export function useDiffSelection({
   container,
   lineElements,
 }: DiffSelectionOptions) {
+  const openFile = useReviewFileOpener()
   const [selection, setSelection] = useState<DiffReferenceSelection | null>(null)
   const selected = selection?.identity === identity ? selection : null
   const reference = useMemo(() => {
@@ -307,9 +309,8 @@ export function useDiffSelection({
   }
   const openInternalFile = () => {
     if (!reference || !interactions) return
-    if (openReviewFile(interactions.ctx, interactions.sessionId, reference.absolutePath))
-      closeMenu()
-    else setEditorResult({ state: 'error' })
+    try { openFile(reference.absolutePath); closeMenu() }
+    catch { setEditorResult({ state: 'error' }) }
   }
   const rowSelected = (row: UnifiedLine, targetSide: ReferenceSide | 'unified') => {
     if (!reference) return false

@@ -45,7 +45,8 @@
     "README.md",
     "README.en.md",
     "docs/",
-    "!docs/PLUGIN_COMPARISON_PLAN.md"
+    "!docs/PLUGIN_COMPARISON_PLAN.md",
+    "!docs/NATIVE_RIGHT_SIDEBAR_MIGRATION_PLAN.md"
   ],
   "dsh": {
     "bundle": {
@@ -61,7 +62,7 @@
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-primitives",
-        "dsh-better-sidebar"
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
       ],
       "platform": "web"
     }
@@ -78,6 +79,7 @@
     ]
   },
   "dependencies": {
+    "@deepseek-ai/dsh-util-workspace-path": "0.2.0-rc.2",
     "diff": "^9.0.0",
     "zod": "^4.4.3"
   },
@@ -93,20 +95,15 @@
     "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-system-prompt": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-typert-protocol": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-typert-registry": "^0.2.0-rc.2",
-    "dsh-better-sidebar": "^0.24.1",
     "react": "^18.2.0",
     "@deepseek-ai/dsh-settings": "^0.2.0-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4"
-  },
-  "peerDependenciesMeta": {
-    "dsh-better-sidebar": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
@@ -123,6 +120,7 @@
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.0-rc.2",
     "@deepseek-ai/dsh-host-webserver": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
@@ -135,7 +133,6 @@
     "@types/node": "^24.0.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
-    "dsh-better-sidebar": "0.24.1",
     "lightningcss": "^1.32.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

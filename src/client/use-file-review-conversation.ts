@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -40,10 +40,15 @@ export function useFileReviewConversation(
     conversationSource = undefined
   }
   const subscribe = useCallback(
-    (listener: () => void) => conversationSource?.subscribe(listener) ?? (() => {}),
-    [conversationSource],
+    (listener: () => void) => visible ? conversationSource?.subscribe(listener) ?? (() => {}) : () => {},
+    [conversationSource, visible],
   )
-  const snapshot = useSyncExternalStore(subscribe, () => conversationSource?.getSnapshot() ?? null)
+  const retainedSnapshot = useRef<ConversationSnapshot | null>(null)
+  const getSnapshot = useCallback(() => {
+    if (visible) retainedSnapshot.current = conversationSource?.getSnapshot() ?? null
+    return retainedSnapshot.current
+  }, [conversationSource, visible])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
   // Code Mode (run_code) roots and their Host-recorded mutations: nested
   // dispatches carry no reuseable views, so each root's file changes are
@@ -52,6 +57,7 @@ export function useFileReviewConversation(
   const roots = useMemo(() => (snapshot === null ? [] : deriveSessionRoots(snapshot)), [snapshot])
   const rootsKey = useMemo(() => roots.map(root => root.rootCallId).join('|'), [roots])
   const [recorded, setRecorded] = useState<readonly RecordedMutation[]>(() => [])
+  const [recordedKey, setRecordedKey] = useState<string | null>(null)
   useEffect(() => {
     if (!visible || roots.length === 0) return
     let active = true
@@ -67,6 +73,7 @@ export function useFileReviewConversation(
         .then(result => {
           if (!result.ok || !active) return
           setRecorded(result.value.mutations)
+          setRecordedKey(rootsKey)
         })
         .catch(() => {
           // Transient fetch failure: keep the previous record; the next
@@ -85,5 +92,5 @@ export function useFileReviewConversation(
     [snapshot, roots, recorded],
   )
 
-  return { snapshot, turns }
+  return { snapshot, turns, ready: snapshot !== null && (roots.length === 0 || recordedKey === rootsKey) }
 }
