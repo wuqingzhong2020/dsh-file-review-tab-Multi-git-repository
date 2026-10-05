@@ -107,19 +107,21 @@ export function registerLifecycleCapture(ctx: Context, service: FileReviewServic
     if (!agent || !cwd) return next()
     const paths = capturePaths(ctx, exec)
     if (!paths.length || paths.length > CAPTURE_PATH_LIMIT) return next()
-    let roots: readonly string[]
+    let captures: (BeforeCapture | null)[]
     try {
-      roots = (await service.workspace(agent)).roots
-    } catch {
-      return next()
-    }
-    const captures = await Promise.all(paths.map(path => captureBefore(cwd, path, roots)))
+      const owners = await service.resolvePaths(agent, paths)
+      captures = await Promise.all(paths.map((path, index) => {
+        const owner = owners[index]
+        return owner?.state === 'managed' && owner.target ? captureBefore(cwd, path, [owner.target.path]) : null
+      }))
+    } catch { return next() }
     const result = await next()
     if (result.isError) return result
     const records: LifecycleRecord[] = []
     for (const capture of captures) {
       if (!capture) continue
       try {
+        if (!(await service.approvedRoots(agent, capture.path)).length) continue
         const record = await finishCapture(exec, String(agent.session.header.id), capture)
         if (record) records.push(record)
       } catch {

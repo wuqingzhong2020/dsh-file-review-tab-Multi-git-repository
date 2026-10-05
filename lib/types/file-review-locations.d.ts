@@ -3,6 +3,7 @@ import type { ReviewWorkspace } from './repository-types.ts';
 interface ReferenceFileAccess {
     workspace(): Promise<ReviewWorkspace>;
     cwd(): string;
+    approvedRoots?(): Promise<string[]>;
 }
 interface ReferenceEditorAccess extends ReferenceFileAccess {
     locateReference(): Promise<ReviewLocationResult>;

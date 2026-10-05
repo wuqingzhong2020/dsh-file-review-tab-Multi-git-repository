@@ -1,3 +1,2 @@
-export declare function repositoriesChanged(): void;
-export declare function subscribeRepositories(listener: () => void): () => void;
+export * from 'dsh-multi-git-repo-manager/events';
 //# sourceMappingURL=repository-events.d.ts.map

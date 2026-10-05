@@ -29,9 +29,8 @@ import type { FileReviewRequest, FileReviewResult } from '../change-types.ts'
 import { TYPERT_REMOTE } from '../remote.ts'
 import { registerNativeSidebar } from './native-sidebar.ts'
 import { openReviewTab } from './sidebar-navigation.ts'
-import { RepositorySettings } from './RepositorySettings.tsx'
 import { ProducedFiles } from './ProducedFiles.tsx'
-import { attachLocale, en, LOCALE_NS, t, zh } from './locales.ts'
+import { attachLocale, en, LOCALE_NS, zh } from './locales.ts'
 import { en as chatEn, NS as CHAT_NS, zh as chatZh, type DeliverablesKey } from './chat-locales.ts'
 import { deliverablesDefinition, selectProducedFiles } from './turn-deliverables.ts'
 import { registerReviewEnhancements } from './review-enhancements.tsx'
@@ -103,23 +102,6 @@ export function apply(ctx: Context): void {
       if (disposeRemote !== undefined) void disposeRemote()
     }
   }, 'file-review-tab: typert remote')
-
-  ctx.effect(
-    () =>
-      ctx.slots.inject('conversation.view', () =>
-        ctx.slots.register(
-          {
-            name: 'conversation.view',
-            id: 'repositories',
-            order: 200,
-            label: () => t('projectTab'),
-            inject: (sessionId: string) => ({ ctx, sessionId }),
-          },
-          RepositorySettings,
-        ),
-      ),
-    'file-review-tab: repository conversation view',
-  )
 
   // Plugin-owned Turn data uses a separate key from DSH 0.2's built-in
   // `deliverables` definition and its native file-mention service.

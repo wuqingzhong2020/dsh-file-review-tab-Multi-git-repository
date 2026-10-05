@@ -1,4 +1,3 @@
-import type { NamedReviewRepository } from './repository-types.ts';
-/** Read names and paths from supported manifests without touching the filesystem. */
-export declare function parseRepositoryManifest(text: string, filename: string): NamedReviewRepository[];
+/** Compatibility export; implementation belongs to dsh-multi-git-repo-manager. */
+export { parseRepositoryManifest } from "dsh-multi-git-repo-manager";
 //# sourceMappingURL=repository-manifest.d.ts.map

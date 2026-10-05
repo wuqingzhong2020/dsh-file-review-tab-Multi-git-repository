@@ -1,7 +1,9 @@
-import type { TurnFileChanges } from './session-changes.ts';
+import type { SessionFileChange, TurnFileChanges } from './session-changes.ts';
 /** Identify the complete recorded turn, independent of repository filtering. */
 export declare function turnConfirmationRevision(turn: TurnFileChanges): string;
-export declare function isTurnConfirmed(turn: TurnFileChanges, confirmed: ReadonlyMap<number, string>): boolean;
+export declare function fileConfirmationRevision(turn: TurnFileChanges, file: SessionFileChange): string;
+export declare function isFileConfirmed(fullTurn: TurnFileChanges, file: SessionFileChange, confirmed: ReadonlyMap<number, string>): boolean;
+export declare function isTurnConfirmed(turn: TurnFileChanges, confirmed: ReadonlyMap<number, string>, fullTurn?: TurnFileChanges): boolean;
 export declare function pendingTurnChanges(turns: readonly TurnFileChanges[], confirmed: ReadonlyMap<number, string>): readonly TurnFileChanges[];
 interface ConfirmationStorage {
     getItem(key: string): string | null;
@@ -20,7 +22,7 @@ export declare class ReviewConfirmationStore {
     constructor(storage?: ConfirmationStorage, key?: string);
     getSnapshot: () => ReviewConfirmationSnapshot;
     subscribe: (listener: () => void) => (() => void);
-    setConfirmed(turn: TurnFileChanges, confirm: boolean): boolean;
+    setConfirmed(turn: TurnFileChanges, confirm: boolean, fullTurn?: TurnFileChanges): boolean;
 }
 export declare function confirmationStoreFor(sessionId: string): ReviewConfirmationStore;
 export {};

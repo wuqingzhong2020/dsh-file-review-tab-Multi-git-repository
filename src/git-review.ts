@@ -11,6 +11,7 @@ import type {
   GitReviewResult,
 } from './git-review-types.ts'
 import { inside, pathKey } from './repository-workspace.ts'
+import { resolveTargetPaths } from 'dsh-multi-git-repo-manager'
 import { REVIEW_SCOPES, usesWorkingTree } from './review-scopes.ts'
 import {
   GIT_DIFF_FLAGS,
@@ -31,13 +32,27 @@ export { parseGitNames } from './git-review-parser.ts'
 
 const MAX_FILES = 1000
 const REPOSITORY_BATCH_SIZE = 4
+type AdmitGitPaths = (paths: string[]) => Promise<string[]>
+
+function gitPathAdmission(workspace: ReviewWorkspace, cwd: string, root: string): AdmitGitPaths {
+  return async paths => {
+    if (workspace.targets === undefined) return paths
+    const owners = await resolveTargetPaths(workspace, cwd, paths.map(path => resolve(root, path)))
+    return paths.filter((_, index) => {
+      const owner = owners[index]
+      return owner?.state === 'managed' && owner.target?.kind === 'git' && pathKey(owner.target.path) === pathKey(root)
+    })
+  }
+}
 
 async function resolveApprovedRepositories(
   workspace: ReviewWorkspace,
   cwd: string,
 ): Promise<GitReviewRepository[]> {
   const candidates =
-    workspace.project === null
+    workspace.targets !== undefined
+      ? workspace.targets.filter(target => target.state === 'ready' && target.capabilities.git)
+      : workspace.project === null
       ? [{ name: basename(cwd), path: cwd, state: 'ready' }]
       : workspace.repositories.filter(repo => repo.state === 'ready')
   const repositories: GitReviewRepository[] = []
@@ -99,14 +114,17 @@ function textLineCount(text: string): number {
 async function includeUnbornWorkingTreeChanges(
   root: string,
   files: GitReviewFile[],
+  admit: AdmitGitPaths,
 ): Promise<void> {
   const names = await runReviewGit(root, ['diff', ...GIT_DIFF_FLAGS, '--name-status', '-z', '--'])
   const unstaged = parseGitNames(names, root)
   for (const file of unstaged) {
     if (!files.some(item => item.path === file.path)) files.push(file)
   }
+  const approved = new Set(await admit(files.map(file => file.path)))
   for (let index = files.length - 1; index >= 0; index--) {
     const file = files[index]!
+    if (!approved.has(file.path)) { files.splice(index, 1); continue }
     let content
     try {
       content = await readUntrackedFile(root, file.path)
@@ -123,10 +141,11 @@ async function includeUnbornWorkingTreeChanges(
   }
 }
 
-async function appendUntrackedFiles(root: string, files: GitReviewFile[]): Promise<void> {
-  const paths = (await runReviewGit(root, ['ls-files', '--others', '--exclude-standard', '-z']))
+async function appendUntrackedFiles(root: string, files: GitReviewFile[], admit: AdmitGitPaths): Promise<void> {
+  const names = (await runReviewGit(root, ['ls-files', '--others', '--exclude-standard', '-z']))
     .split('\0')
     .filter(Boolean)
+  const paths = await admit(names.filter(path => !path.endsWith('/')))
   if (paths.length + files.length > MAX_FILES) {
     throw new Error(`Review exceeds ${MAX_FILES} files; select a smaller scope`)
   }
@@ -150,6 +169,7 @@ async function appendUntrackedFiles(root: string, files: GitReviewFile[]): Promi
 async function listChangedFiles(
   root: string,
   request: GitReviewRequest,
+  admit: AdmitGitPaths,
 ): Promise<{ files: GitReviewFile[]; comparison: string; args: string[] }> {
   request = await resolveDefaultBranchRequest(root, request)
   const comparison = await resolveGitComparison(root, request)
@@ -161,7 +181,9 @@ async function listChangedFiles(
     '-z',
     '--',
   ])
-  const files = parseGitNames(names, root)
+  const parsed = parseGitNames(names, root)
+  const approved = new Set(await admit(parsed.flatMap(file => [file.path, ...(file.oldPath ? [file.oldPath] : [])])))
+  const files = parsed.filter(file => approved.has(file.path) && (!file.oldPath || approved.has(file.oldPath)))
   const numstat = await runReviewGit(root, [
     'diff',
     ...GIT_DIFF_FLAGS,
@@ -173,10 +195,10 @@ async function listChangedFiles(
   applyGitNumstat(numstat, files)
   // An unborn HEAD requires index + worktree changes to obtain the combined view.
   if (request.mode === 'uncommitted' && comparison.args.includes('--cached')) {
-    await includeUnbornWorkingTreeChanges(root, files)
+    await includeUnbornWorkingTreeChanges(root, files, admit)
   }
   if (usesWorkingTree(request.mode)) {
-    await appendUntrackedFiles(root, files)
+    await appendUntrackedFiles(root, files, admit)
   }
   if (files.length > MAX_FILES)
     throw new Error(`Review exceeds ${MAX_FILES} files; select a smaller scope`)
@@ -237,7 +259,7 @@ export async function gitReview(
         if (request.repository && pathKey(repo.path) !== pathKey(request.repository)) return
         try {
           await loadRepositoryMetadata(repo, request)
-          const changes = await listChangedFiles(repo.path, request)
+          const changes = await listChangedFiles(repo.path, request, gitPathAdmission(workspace, cwd, repo.path))
           result.files.push(...changes.files)
           result.comparisons.push(`${repo.name}: ${changes.comparison}`)
         } catch (error) {
@@ -250,6 +272,10 @@ export async function gitReview(
   result.files.sort(
     (a, b) => a.repository.localeCompare(b.repository) || a.path.localeCompare(b.path),
   )
+  if (workspace.targets !== undefined) {
+    const owners = await resolveTargetPaths(workspace, cwd, result.files.map(file => resolve(file.repository, file.path)))
+    result.files = result.files.filter((file, index) => owners[index]?.state === 'managed' && owners[index]?.target?.kind === 'git' && pathKey(owners[index]!.target!.path) === pathKey(file.repository))
+  }
   return result
 }
 
@@ -262,8 +288,12 @@ export async function gitReviewDiff(
     repo => pathKey(repo.path) === pathKey(request.repository),
   )
   if (!repo) throw new Error('Repository is outside this session')
-  resolveRepositoryFile(repo.path, request.path)
-  const changes = await listChangedFiles(repo.path, request)
+  const filename = resolveRepositoryFile(repo.path, request.path)
+  if (workspace.targets !== undefined) {
+    const [owner] = await resolveTargetPaths(workspace, cwd, [filename])
+    if (owner?.state !== 'managed' || owner.target?.kind !== 'git' || pathKey(owner.target.path) !== pathKey(repo.path)) throw new Error('File belongs to another target or an unmanaged boundary')
+  }
+  const changes = await listChangedFiles(repo.path, request, gitPathAdmission(workspace, cwd, repo.path))
   const file = changes.files.find(item => item.path === request.path)
   if (!file) throw new Error('This file changed; refresh the review')
   if (file.binary) {

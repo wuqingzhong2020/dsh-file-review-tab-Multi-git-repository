@@ -10,7 +10,7 @@
 export declare const LOCALE_NS = "fileReviewTab";
 /** The zh dictionary (the key-set source of truth). */
 export declare const zh: {
-    readonly tabTitle: "文件审查";
+    readonly tabTitle: "文件审查（多git仓）";
     readonly userGuide: "操作指南";
     readonly userGuideOpening: "正在打开…";
     readonly userGuideHint: "打开支持图片预览的使用手册";
@@ -71,7 +71,7 @@ export declare const zh: {
     readonly confirmTurn: "确认本轮";
     readonly unconfirmTurn: "取消确认";
     readonly turnConfirmed: "已确认";
-    readonly confirmTurnHint: "确认本轮全部仓库的改动（{count} 个文件），从“待确认”中隐藏";
+    readonly confirmTurnHint: "确认当前范围内的改动（{count} 个文件），从“待确认”中隐藏";
     readonly unconfirmTurnHint: "将本轮重新放回“待确认”";
     readonly confirmTurnLive: "本轮仍在修改代码，结束后才能确认";
     readonly confirmationStorageError: "确认状态目前仅保留在内存中，本地存储不可用或已损坏；重启后需重新确认。";
@@ -215,11 +215,16 @@ export declare const zh: {
     readonly repoReady: "可用";
     readonly repoMissing: "路径不存在";
     readonly repoNotGit: "不是 Git 根目录";
-    readonly repoAll: "全部仓库";
-    readonly repoOther: "其他文件";
+    readonly repoAll: "全部 Git 仓库";
+    readonly unmanagedOperation: "文件归属尚未纳管，无法打开或修改。";
+    readonly repoDirectories: "全部非 Git 目录";
+    readonly directoryKind: "非 Git 目录";
+    readonly directorySessionOnly: "非 Git 目录仅支持最近一轮、会话和待确认审查；Git 比较模式不可用。";
+    readonly confirmSelectedFiles: "确认当前范围 {count} 个文件";
+    readonly repoOther: "归属待处理";
     readonly repoScope: "{name} · {count} 个仓库";
     readonly repoFilterEmpty: "此仓库暂无会话文件改动";
-    readonly repoSettingsHint: "仓库来源和维护范围可在会话的“多代码仓管理”页签中配置";
+    readonly repoSettingsHint: "仓库来源和维护范围可在右侧“开始”页打开“多代码仓管理”Tab 配置";
     readonly appearance: string;
     readonly diffFontSize: string;
     readonly diffFontFamily: string;

@@ -6,11 +6,57 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
-- [v0.3.0](#v030) · [验证矩阵](../MIGRATION_VERIFICATION.md)
+- [v0.3.2](#v032) · [非 Git 目录验证](../NON_GIT_VERIFICATION.md)
+- [v0.3.1](#v031) · [验证矩阵](../MIGRATION_VERIFICATION.md)
+- [v0.3.0](#v030)
 - [v0.2.0](#v020) · [验证记录 / Validation](#v020-验证记录)
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
+
+## v0.3.2
+
+**Git 仓库与非 Git 目录统一管理 / Managed Git repositories and ordinary directories — 本地交付 / local artifacts**
+
+### 中文
+
+- 精确依赖公共管理插件 `dsh-multi-git-repo-manager@0.1.2`，公共配置、发现、目标分类和文件归属统一由管理插件负责。
+- 普通目录支持命名、保存、重载和会话外部临时目标；新增可配置容器的直接子目录发现。首次从 v1 写入目录配置时升级到 v2 并保留原文件备份。
+- 审查范围增加非 Git 汇总和单目录；普通目录只使用宿主记录的会话改动，Git 五种比较模式仅适用于 Git 目标。
+- 确认按文件改动身份保存，当前范围确认不影响隐藏文件；旧整轮确认只在原修订精确匹配时迁移。
+- Host 在捕获、撤销、重做和定位前复核具体文件归属；未知子仓、异常目标、元数据路径和越界链接不能被父根兜底授权。
+- 管理 49 项、审查 172 项 Node 测试和 8 项浏览器测试通过；双包隔离联装、实际指定 Desktop 目录保存和范围切换完成。详细证据和验证限制见 [验证记录](../NON_GIT_VERIFICATION.md)。
+
+### English
+
+- Require `dsh-multi-git-repo-manager@0.1.2` for shared target configuration, direct-child discovery, classification and authoritative file ownership.
+- Persist ordinary directory targets in v2 project files, preserving original v1 bytes on first migration. External typed targets remain session-only.
+- Review all ordinary directories or one directory using recorded session changes; Git comparisons remain available only for Git targets.
+- Confirm individual file revisions in the selected scope and migrate legacy turn confirmations only when the original revision still matches.
+- Revalidate ownership before capture, undo/reapply and navigation. Unknown nested repositories, unavailable targets, metadata and escaping links block parent fallback.
+- Passed 49 manager tests, 172 review tests and 8 browser tests, isolated package installation and actual Windows Desktop checks. See [validation evidence](../NON_GIT_VERIFICATION.md) for scope and limits.
+
+Assets: `dsh-file-review-tab-multi-git-repository-0.3.2.tgz` and `dsh-multi-git-repo-manager-0.1.2.tgz`, with their SHA256 files. Install and enable both plugins.
+
+## v0.3.1
+
+### 中文
+
+- 精确依赖公共管理插件 `dsh-multi-git-repo-manager@0.1.1`。
+- 多代码仓管理从原会话页签迁到右侧原生 Tab；开始页入口、标题、正文和卸载流程与文件审查一致。
+- 管理页在隐藏及切换 Tab 时保留未保存表单，窄侧栏布局按容器宽度调整。
+- 更新审查提示、安装说明及中英文手册的管理入口。
+- 开始页入口、右侧 Tab 和页面标题统一为「文件审查（多git仓）」；英文为「File Review (Multi-Git)」。
+
+### English
+
+- Pin the shared manager plugin to `dsh-multi-git-repo-manager@0.1.1`.
+- Repository management moves from the conversation header to a native right-sidebar tab, with a Start-page entry, native title/body, and clean unloading.
+- Preserve unsaved drafts when switching tabs and adapt the editor to narrow sidebar containers.
+- Update review hints, installation instructions, and bilingual guide entry points.
+- Name the Start-page entry, sidebar tab, and page heading File Review (Multi-Git), with the Chinese label 文件审查（多git仓）.
+
+Assets: `dsh-file-review-tab-multi-git-repository-0.3.1.tgz` and `dsh-multi-git-repo-manager-0.1.1.tgz` (with their SHA256 files). Install and enable both plugins.
 
 ## v0.3.0
 

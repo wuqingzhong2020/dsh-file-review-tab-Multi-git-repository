@@ -1,8 +1,10 @@
 # File Review Plugin User Guide
 
+The Multi-repository management tab in this guide is now provided by **dsh-multi-git-repo-manager v0.1.1**. Install and enable both the manager and file review plugins. Existing project files remain compatible and the editor workflow is unchanged. See [dependency notes](REPOSITORY_MANAGER.md).
+
 [简体中文](USER_GUIDE.md) | [English](USER_GUIDE.en.md)
 
-Applies to **dsh-file-review-tab-multi-git-repository v0.3.0**.
+Applies to **dsh-file-review-tab-multi-git-repository v0.3.1**.
 
 This guide explains the plugin's features, where to find them, how to use them, and what each action does. Instructions use the English interface labels. Choose English in the host's General settings to see those labels.
 
@@ -55,11 +57,11 @@ Git scopes provide viewing and commenting without staging files, committing, or 
 ### 2.1 Opening the plugin
 
 1. Install and enable this plugin. This guide targets DeepSeek Harness Desktop **0.2.0-rc.2** and its native right sidebar; dsh-better-sidebar is optional.
-2. After installation or an update, fully quit Desktop, including its tray process, and start it again. The plugin manager should show **v0.3.0**. See the [validation record](MIGRATION_VERIFICATION.md) for tested environments.
-3. Open a session in the target project. Click **＋** at the top of the native right sidebar and choose **File Review** from the guide.
+2. After installation or an update, fully quit Desktop, including its tray process, and start it again. The plugin manager should show review **v0.3.1** and manager **v0.1.1**. See the [validation record](MIGRATION_VERIFICATION.md) for tested environments.
+3. Open a session in the target project. Click **＋** at the top of the native right sidebar and choose **File Review (Multi-Git)** from the guide.
 4. After the Agent finishes a turn that changes files, you can also click **Review** in the end-of-turn “Edited N files” row. Clicking an individual file name opens that file's changes.
 
-See the [README installation instructions](../README.en.md#installation). **Multi-repository management** is a conversation tab beside Chat and Trajectory; it is separate from the File Review settings dialog.
+See the [README installation instructions](../README.en.md#installation). Open **Multi-repository management** from the right sidebar’s **Start** page. It opens as a native tab, like File Review; the former conversation-header tab has been removed.
 
 **Open this guide at any time:** click **User guide** beside the review-scope dropdown in the File Review header. The plugin dialog displays the manual with Markdown formatting and screenshots. Click a screenshot to enlarge it, then press Esc or click the close button to return. It displays `USER_GUIDE.en.md` when **Settings → General → Language** is English, or `USER_GUIDE.md` when it is Chinese. An open guide also follows language changes. Both manuals and the screenshots ship with the plugin, so you can open them from any project.
 
@@ -85,6 +87,8 @@ To try commenting without asking for code changes, you can enter: “Please expl
 Figure 1: Review scope and reading controls appear above changes grouped by turn, repository, and file.
 
 ## 3. Choosing a review scope
+
+The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed. See [non-Git directory support](NON_GIT_DIRECTORIES.en.md).
 
 Use the dropdown beside the File Review title to choose the changes you want to inspect.
 
@@ -113,7 +117,7 @@ These scopes read Git status without changing the index, creating a commit, or c
 
 ### 4.1 Adding and saving repositories inside a project
 
-1. Open a session in the target project and select **Multi-repository management** at the top of the conversation.
+1. Open a session in the target project, then choose **Multi-repository management** from the native right sidebar's **Start** page. The former conversation tab has been removed. Older screenshots may show its previous position; configuration files and management operations remain compatible.
 2. Check **Current project directory**. Relative repository paths use this directory as their base. The session determines the directory and project name; they cannot be changed on this page.
 3. Select **Enable multi-repository management**. Keep **Also review files within the project root** selected if you want to review files at the project root as well.
 4. Click **Add repository** and enter a name and path. For a project at `D:\demo\OrderProject`, two child repositories might use `core` and `cli`.
@@ -364,11 +368,11 @@ Replies are linked using the submission request and actual processing turn. Comm
 ### 12.1 Confirming reviewed turns
 
 1. Choose **Pending review** and inspect a turn's files.
-2. Once the turn has finished, click **Confirm turn** in its heading.
+2. Once the turn has finished, click **Confirm N files in this scope** in its heading.
 3. The turn disappears from Pending review. It still appears with a **confirmed** label in This session or Last turn.
 4. To review it again, click **Undo confirmation** in This session or Last turn.
 
-Confirmation applies to the whole turn, across all its repositories. A running turn cannot be confirmed. If new changes are later added to the same turn, it becomes pending again. Confirmation tracks review progress without changing code, clearing comments, or creating a Git commit.
+Confirmation applies only to files displayed in the current selection. Hidden files remain pending. A running turn cannot be confirmed. Late changes reopen only the changed or newly recorded files. Confirmation tracks review progress without changing code, clearing comments, or creating a Git commit.
 
 ### 12.2 Undoing and reapplying changes
 

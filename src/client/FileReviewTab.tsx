@@ -12,6 +12,8 @@ import { UserGuideDialog } from './UserGuideTab.tsx'
 import { useReviewFileOpener } from './review-navigation.tsx'
 import { localizeReviewMessage } from './message-locales.ts'
 import type { ReviewWorkspace } from '../repository-types.ts'
+import { useTargetOwnership } from './use-target-ownership.ts'
+import { ALL_DIRECTORIES, defaultTargetFilter, targetSelection, selectionIncludes, isDirectorySelection } from './review-target-selection.ts'
 import { fileRepository } from './repository-paths.ts'
 import { subscribeRepositories } from './repository-events.ts'
 import { GitReviewPanel } from './GitReviewPanel.tsx'
@@ -88,6 +90,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
   const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
+  const lastSessionMode = useRef<ReviewMode>('session')
+  const selection = targetSelection(repositoryFilter, workspace?.targets ?? [])
+  const directorySelection = isDirectorySelection(selection)
   const isGitMode = isGitReviewMode(reviewMode)
   const scopeBehavior = sessionScopeBehavior(reviewMode)
   const confirmationStore = useMemo(() => confirmationStoreFor(sessionId), [sessionId])
@@ -118,7 +123,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   useEffect(() => {
     if (!visible) return
     let active = true
-    const remote = sessions.scope(sessionId as SessionId)?.get('remote.fileReview') as
+    const remote = sessions.scope(sessionId as SessionId)?.get('remote.multiGitRepoManager') as
       | FileReviewRemote
       | undefined
     void remote
@@ -127,8 +132,11 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
         if (active && result.ok) {
           setWorkspace(result.value)
           setRepositoryFilter(current => {
-            if (current === '*' || current === '?') return current
-            return result.value.repositories.some(repo => repo.path === current) ? current : '*'
+            const targets = result.value.targets
+            const defaultValue = defaultTargetFilter(targets)
+            if (current === '*') return defaultValue
+            if (current === '?' || current === ALL_DIRECTORIES) return current
+            return (targets ?? result.value.repositories).some(target => target.path === current && target.state === 'ready') ? current : defaultValue
           })
         }
       })
@@ -142,11 +150,24 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
 
   const { snapshot, turns, ready, recordedWarnings } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
   const repositories = workspace?.repositories ?? []
+  const targets = workspace?.targets ?? []
+  const ownership = useTargetOwnership(sessions, sessionId, cwd, visible, workspace, turns)
+  useEffect(() => {
+    if (!isGitMode) lastSessionMode.current = reviewMode
+    else if (directorySelection) setReviewMode(lastSessionMode.current)
+  }, [reviewMode, isGitMode, directorySelection])
   const scopeTurns = useMemo(
     () => scopeBehavior.select({ snapshot, turns, confirmed: confirmationSnapshot.confirmed }),
     [snapshot, turns, scopeBehavior, confirmationSnapshot.confirmed],
   )
   const filteredTurns = useMemo(() => {
+    if (workspace?.targets) {
+      const selected = targetSelection(repositoryFilter, workspace.targets)
+      return scopeTurns.map(turn => ({
+        ...turn,
+        files: turn.files.filter(file => selectionIncludes(selected, ownership.owners.get(file.path))),
+      })).filter(turn => turn.files.length > 0)
+    }
     if (repositoryFilter === '*') return scopeTurns
     return scopeTurns
       .map(turn => ({
@@ -160,7 +181,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
         }),
       }))
       .filter(turn => turn.files.length > 0)
-  }, [scopeTurns, repositoryFilter, workspace, cwd])
+  }, [scopeTurns, repositoryFilter, workspace, cwd, ownership.owners])
 
   const {
     mainTurns,
@@ -213,7 +234,12 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     sessionId,
     turns,
     visible,
-    ready,
+    ready: ready && ownership.ready,
+    resolveFilter: paths => {
+      if (!workspace?.targets) return '*'
+      const owner = ownership.owners.get(paths[0] ?? '')
+      return owner?.state === 'managed' && owner.target ? owner.target.path : '?'
+    },
     meta,
     expanded,
     flatKey,
@@ -259,11 +285,15 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
 
   const openInEditor = useCallback(
     (path: string) => {
+      if (workspace?.targets && ownership.owners.get(path)?.state !== 'managed') {
+        showNotice('error', 'unmanagedOperation')
+        return
+      }
       const absolute = resolveSessionPath(cwd, path)
       try { openFile(absolute) }
       catch (error) { showNotice('error', 'sidebarOpenFailed', error instanceof Error ? error.message : undefined) }
     },
-    [openFile, cwd, showNotice],
+    [openFile, cwd, showNotice, workspace, ownership.owners],
   )
 
   const totalStats = useMemo(
@@ -279,6 +309,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     sessionId,
     cwd,
     workspace,
+    ownership: ownership.owners,
     reviewMode,
     expansion: { expanded, collapsedRepositories, setExpanded, setCollapsedRepositories },
     actions,
@@ -310,7 +341,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
           }}
         >
           {REVIEW_MODES.map(mode => (
-            <option key={mode} value={mode}>
+            <option key={mode} value={mode} disabled={directorySelection && isGitReviewMode(mode)}>
               {t(REVIEW_SCOPES[mode].label)}
             </option>
           ))}
@@ -361,11 +392,11 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
             {localizeReviewMessage(message)}
           </p>
         ))}
-        {!isGitMode && workspace?.project !== null && workspace?.project !== undefined && (
+        {workspace !== null && (workspace.project !== null || targets.length > 0) && (
           <div className={css.repositoryBar}>
-            <span title={workspace.project.root}>
+            <span title={(workspace.project?.root ?? cwd ?? '')}>
               {t('repoScope', {
-                name: workspace.project.name || basename(workspace.project.root),
+                name: (workspace.project?.name ?? '') || basename(workspace.project?.root ?? cwd ?? ''),
                 count: repositories.filter(repo => repo.state === 'ready').length,
               })}
             </span>
@@ -377,14 +408,16 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
               }}
             >
               <option value="*">{t('repoAll')}</option>
-              {repositories
-                .filter(repo => repo.state === 'ready' || repo.source === 'project')
+              {(workspace.targets ? targets.filter(target => target.kind === 'git') : repositories)
+                .filter(repo => repo.state === 'ready')
                 .map(repo => (
                   <option key={repo.path} value={repo.path}>
                     {repo.name}
                   </option>
                 ))}
-              <option value="?">{t('repoOther')}</option>
+              {targets.some(target => target.kind === 'directory') && <option value={ALL_DIRECTORIES}>{t('repoDirectories')}</option>}
+              {targets.filter(target => target.kind === 'directory' && target.state === 'ready').map(target => <option key={target.id} value={target.path}>{target.name} ({t('directoryKind')})</option>)}
+              {turns.some(turn => turn.files.some(file => ownership.owners.get(file.path)?.state !== 'managed')) && <option value="?">{t('repoOther')}</option>}
             </select>
             <small title={workspace.warnings.map(localizeReviewMessage).join('\n')}>
               {t('repoSettingsHint')}
@@ -392,6 +425,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
             </small>
           </div>
         )}
+        {directorySelection && <p className={css.pendingHint}>{t('directorySessionOnly')}</p>}
         {!isGitMode && confirmationSnapshot.storageError && (
           <div className={`${css.notice} ${css.noticeError}`} role="alert">
             {t('confirmationStorageError')}
@@ -413,6 +447,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
             mode={reviewMode}
             visible={visible}
             tick={tick}
+            repositoryFilter={repositoryFilter}
           />
         ) : (
           <div className={css.body} ref={bodyRef}>

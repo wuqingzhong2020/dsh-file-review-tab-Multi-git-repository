@@ -1,4 +1,4 @@
-import type { TurnFileChanges } from './session-changes.ts'
+import type { SessionFileChange, TurnFileChanges } from './session-changes.ts'
 
 const revisions = new WeakMap<TurnFileChanges, string>()
 
@@ -29,13 +29,27 @@ export function turnConfirmationRevision(turn: TurnFileChanges): string {
   return revision
 }
 
-export function isTurnConfirmed(turn: TurnFileChanges, confirmed: ReadonlyMap<number, string>): boolean {
-  const revision = confirmed.get(turn.turn)
-  return !turn.live && revision !== undefined && revision === turnConfirmationRevision(turn)
+export function fileConfirmationRevision(turn: TurnFileChanges, file: SessionFileChange): string {
+  return turnConfirmationRevision({ ...turn, files: [file] })
+}
+function fileDecisions(value: string | undefined): Map<string, string> {
+  return value?.startsWith('f2:') ? new Map(JSON.parse(value.slice(3)) as [string, string][]) : new Map()
+}
+export function isFileConfirmed(fullTurn: TurnFileChanges, file: SessionFileChange, confirmed: ReadonlyMap<number, string>): boolean {
+  if (fullTurn.live) return false
+  const value = confirmed.get(fullTurn.turn)
+  if (value?.startsWith('r1:')) return value === turnConfirmationRevision(fullTurn)
+  return fileDecisions(value).get(file.path) === fileConfirmationRevision(fullTurn, file)
+}
+export function isTurnConfirmed(turn: TurnFileChanges, confirmed: ReadonlyMap<number, string>, fullTurn = turn): boolean {
+  return turn.files.length > 0 && turn.files.every(file => isFileConfirmed(fullTurn, file, confirmed))
 }
 
 export function pendingTurnChanges(turns: readonly TurnFileChanges[], confirmed: ReadonlyMap<number, string>): readonly TurnFileChanges[] {
-  return turns.filter(turn => !isTurnConfirmed(turn, confirmed))
+  return turns.map(turn => {
+    const files = turn.files.filter(file => !isFileConfirmed(turn, file, confirmed))
+    return files.length === turn.files.length ? turn : { ...turn, files }
+  }).filter(turn => turn.files.length > 0)
 }
 
 interface ConfirmationStorage { getItem(key: string): string | null; setItem(key: string, value: string): void }
@@ -46,12 +60,17 @@ export interface ReviewConfirmationSnapshot {
 
 function parseConfirmations(raw: string): ReadonlyMap<number, string> {
   const value = JSON.parse(raw) as { version?: unknown; confirmed?: unknown } | null
-  if (value?.version !== 1 || !Array.isArray(value.confirmed)) throw new Error('Invalid review confirmations')
+  if ((value?.version !== 1 && value?.version !== 2) || !Array.isArray(value.confirmed)) throw new Error('Invalid review confirmations')
   const confirmed = new Map<number, string>()
   for (const entry of value.confirmed) {
     if (!Array.isArray(entry) || entry.length !== 2 || !Number.isSafeInteger(entry[0]) || entry[0] < 1
-      || typeof entry[1] !== 'string' || !/^r1:[0-9a-f]{16}$/.test(entry[1]) || confirmed.has(entry[0])) {
+      || typeof entry[1] !== 'string' || confirmed.has(entry[0])) {
       throw new Error('Invalid review confirmation')
+    }
+    if (!/^r1:[0-9a-f]{16}$/.test(entry[1])) {
+      if (!entry[1].startsWith('f2:')) throw new Error('Invalid review confirmation')
+      const rows = JSON.parse(entry[1].slice(3)) as unknown
+      if (!Array.isArray(rows) || rows.length > 4096 || rows.some(row => !Array.isArray(row) || row.length !== 2 || typeof row[0] !== 'string' || typeof row[1] !== 'string' || !/^r1:[0-9a-f]{16}$/.test(row[1]))) throw new Error('Invalid file confirmation')
     }
     confirmed.set(entry[0], entry[1])
   }
@@ -73,15 +92,24 @@ export class ReviewConfirmationStore {
   }
   getSnapshot = (): ReviewConfirmationSnapshot => this.snapshot
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
-  setConfirmed(turn: TurnFileChanges, confirm: boolean): boolean {
+  setConfirmed(turn: TurnFileChanges, confirm: boolean, fullTurn = turn): boolean {
     if (!Number.isSafeInteger(turn.turn) || turn.turn < 1 || (confirm && (turn.live || turn.files.length === 0))) return false
     const confirmed = new Map(this.snapshot.confirmed)
-    if (confirm) confirmed.set(turn.turn, turnConfirmationRevision(turn))
+    const decisions = fileDecisions(confirmed.get(turn.turn))
+    // Expand an exact legacy full-turn decision only when its complete revision still matches.
+    if (confirmed.get(turn.turn) === turnConfirmationRevision(fullTurn)) {
+      for (const file of fullTurn.files) decisions.set(file.path, fileConfirmationRevision(fullTurn, file))
+    }
+    for (const file of turn.files) {
+      if (confirm) decisions.set(file.path, fileConfirmationRevision(fullTurn, file))
+      else decisions.delete(file.path)
+    }
+    if (decisions.size) confirmed.set(turn.turn, `f2:${JSON.stringify([...decisions])}`)
     else confirmed.delete(turn.turn)
     let storageError = false
     try {
       if (!this.storage) storageError = true
-      else this.storage.setItem(this.key, JSON.stringify({ version: 1, confirmed: [...confirmed] }))
+      else this.storage.setItem(this.key, JSON.stringify({ version: 2, confirmed: [...confirmed] }))
     } catch { storageError = true }
     this.snapshot = { confirmed, storageError }
     for (const listener of this.listeners) listener()

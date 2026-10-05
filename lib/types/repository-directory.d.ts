@@ -1,3 +1,3 @@
-/** An empty, malformed, inaccessible or non-directory entry opens at the project. */
-export declare function resolveDirectoryStart(projectRoot: string, requestedPath: string): Promise<string>;
+/** Compatibility export; implementation belongs to dsh-multi-git-repo-manager. */
+export * from "dsh-multi-git-repo-manager/directory";
 //# sourceMappingURL=repository-directory.d.ts.map

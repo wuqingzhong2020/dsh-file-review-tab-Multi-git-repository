@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { FileReviewService } from './file-review-service.ts'
 import type { FileReviewConfig } from './repository-config.ts'
-import { RepositorySettings } from './repository-settings.ts'
+import type {} from 'dsh-multi-git-repo-manager'
 import { registerLifecycleCapture } from './lifecycle-capture.ts'
 
 export type * from './change-types.ts'
@@ -22,7 +22,7 @@ export { Config } from './repository-config.ts'
 export { FileReviewService, transformFile } from './file-review-service.ts'
 
 /** Services required for the model guidance paired with the browser renderer. */
-export const inject = ['systemPrompt', 'tools']
+export const inject = ['systemPrompt', 'tools', 'multiGitRepoManager']
 
 /** Stable final-response guidance owned by the matching renderer. */
 const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, mention the primary outputs in your final response. '
@@ -42,7 +42,9 @@ const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, men
  * @param ctx - host context carrying the system-prompt registry and tool runtime.
  */
 export function apply(ctx: Context, config: FileReviewConfig): void {
-  const service = new FileReviewService(ctx, new RepositorySettings(ctx, config?.projects ?? []))
+  const projects = Array.isArray(config?.projects) ? config.projects : config?.projects?.get() ?? []
+  ctx.multiGitRepoManager.adoptLegacyProjects(projects)
+  const service = new FileReviewService(ctx, ctx.multiGitRepoManager)
   registerLifecycleCapture(ctx, service)
   ctx.systemPrompt.section({
     name: 'ui:file-review-tab-multi-git-repository:references',

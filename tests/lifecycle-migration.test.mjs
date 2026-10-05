@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import Tools, { defineTool } from '@deepseek-ai/dsh-tools'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import * as repositoryManager from 'dsh-multi-git-repo-manager'
 import { apply, inject, FileReviewService } from '../lib/index.js'
 import { lifecycleFromContent, boundedLifecycle, MARKER_MAX_BYTES } from '../src/lifecycle-record.ts'
 import { applyLifecycle, captureImage } from '../src/file-lifecycle.ts'
@@ -37,6 +38,7 @@ async function fixture(run, { ptc = false, programFail = false } = {}) {
       },
     })
     await ctx.plugin(Tools, { mode: ptc ? 'both' : 'native' })
+    await ctx.plugin(repositoryManager, { projects: [] }).await()
     const mounted = ctx.plugin({ apply, inject }, { projects: [] })
     await mounted.await()
     const session = Session.create('fixture-session', [], { ...Session.create('fixture-session').header, cwd: root })
@@ -136,7 +138,7 @@ test('real official run_code bridge persists accepted nested identities and excl
   assert.equal(events[2].data.isError, true)
   const durable = JSON.parse(JSON.stringify(agent.session.snapshotEvents()))
   const restored = { ...agent, session: Session.create(agent.session.id, durable, agent.session.header) }
-  const other = new Context(), replay = new FileReviewService(other)
+  const other = new Context(), replay = new FileReviewService(other, new repositoryManager.MultiGitRepoManager(other))
   try {
     const mutations = (await replay.recorded(restored, { rootCallIds: [callId] })).mutations
     assert.equal(mutations.length, 2)
@@ -175,7 +177,7 @@ test('a failing PTC program retains previously accepted nested file records', ()
 test('only complete Host-owned identities authorize lifecycle writes, including after durable JSON replay', () => fixture(async ({ root, agent, mutate }) => {
   const record = await mutate('replay.txt', 'persisted')
   const replayContext = new Context()
-  const replay = new FileReviewService(replayContext)
+  const replay = new FileReviewService(replayContext, new repositoryManager.MultiGitRepoManager(replayContext))
   const durable = JSON.parse(JSON.stringify(agent.session.snapshotEvents()))
   agent.session = Session.create(agent.session.id, durable, agent.session.header)
   const file = { path: record.path, diffs: [{ path: record.path, oldText: null, newText: record.after.text, recordId: record.recordId }] }

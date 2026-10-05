@@ -58,12 +58,12 @@ test('running and empty turns cannot be confirmed; previously stored decisions c
   assert.deepEqual(pendingTurnChanges([running], store.getSnapshot().confirmed), [running])
 })
 
-test('confirmation applies to the complete round across repositories rather than a filtered fragment', () => {
+test('confirmation applies only to selected files and leaves hidden files pending', () => {
   const store = new ReviewConfirmationStore(storage(), 'session-a')
   const full = turn(1, ['core/index.ts', 'editor/index.ts'])
   const fragment = { ...full, files: [full.files[0]] }
   store.setConfirmed(fragment, true)
-  assert.deepEqual(pendingTurnChanges([full], store.getSnapshot().confirmed), [full])
+  assert.deepEqual(pendingTurnChanges([full], store.getSnapshot().confirmed)[0].files.map(file => file.path), ['editor/index.ts'])
   store.setConfirmed(full, true)
   assert.deepEqual(pendingTurnChanges([full], store.getSnapshot().confirmed), [])
   assert.notEqual(turnConfirmationRevision(full), turnConfirmationRevision(fragment))
@@ -71,7 +71,7 @@ test('confirmation applies to the complete round across repositories rather than
 
 test('corrupt or unavailable storage cannot silently hide rounds; decisions remain usable in memory', () => {
   const first = turn(1)
-  for (const raw of ['{broken', '{"version":2,"confirmed":[]}', JSON.stringify({ version: 1, confirmed: [[1, 'bogus']] }), JSON.stringify({ version: 1, confirmed: [[1, turnConfirmationRevision(first)], [1, turnConfirmationRevision(first)]] })]) {
+  for (const raw of ['{broken', '{"version":3,"confirmed":[]}', JSON.stringify({ version: 1, confirmed: [[1, 'bogus']] }), JSON.stringify({ version: 1, confirmed: [[1, turnConfirmationRevision(first)], [1, turnConfirmationRevision(first)]] })]) {
     const store = new ReviewConfirmationStore({ getItem: () => raw, setItem: () => { throw new Error('quota') } }, 'session-a')
     assert.equal(store.getSnapshot().storageError, true)
     assert.deepEqual(pendingTurnChanges([first], store.getSnapshot().confirmed), [first])
@@ -103,3 +103,23 @@ test('pending review shares comment anchors with session ranges and confirming a
   assert.equal(restored.getSnapshot().comments[0].text, 'Handle the error')
   assert.throws(() => parseReviewComments(JSON.stringify({ version: 1, comments: [{ ...restored.getSnapshot().comments[0], anchor: { ...anchor, turn: undefined } }] })))
 })
+
+ test('legacy full-turn decisions expand only when the original complete revision matches', () => {
+   const full = turn(1, ['a.txt', 'b.txt'])
+   const disk = storage()
+   disk.setItem('legacy', JSON.stringify({ version: 1, confirmed: [[1, turnConfirmationRevision(full)]] }))
+   const store = new ReviewConfirmationStore(disk, 'legacy')
+   assert.equal(isTurnConfirmed(full, store.getSnapshot().confirmed), true)
+   const fragment = { ...full, files: [full.files[0]] }
+   store.setConfirmed(fragment, false, full)
+   assert.deepEqual(pendingTurnChanges([full], store.getSnapshot().confirmed)[0].files.map(file => file.path), ['a.txt'])
+   const changed = turn(1, ['a.txt', 'b.txt', 'new.txt'])
+   const legacy = new ReviewConfirmationStore({ getItem: () => JSON.stringify({ version: 1, confirmed: [[1, turnConfirmationRevision(full)]] }), setItem: () => {} })
+   assert.equal(pendingTurnChanges([changed], legacy.getSnapshot().confirmed)[0].files.length, 3)
+ })
+ test('late changes reopen only the changed or new file, preserving other file decisions', () => {
+   const full = turn(1, ['a.txt', 'b.txt']); const store = new ReviewConfirmationStore(storage(), 'files')
+   store.setConfirmed(full, true)
+   const next = { ...full, files: [{ ...full.files[0], diffs: [{ ...full.files[0].diffs[0], newText: 'late' }] }, full.files[1], ...turn(1, ['c.txt']).files] }
+   assert.deepEqual(pendingTurnChanges([next], store.getSnapshot().confirmed)[0].files.map(file => file.path), ['a.txt', 'c.txt'])
+ })

@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  dsh-multi-git-repo-manager: link:../dsh-multi-git-repo-manager
+
 importers:
 
   .:
@@ -14,6 +17,9 @@ importers:
       diff:
         specifier: ^9.0.0
         version: 9.0.0
+      dsh-multi-git-repo-manager:
+        specifier: link:../dsh-multi-git-repo-manager
+        version: link:../dsh-multi-git-repo-manager
       zod:
         specifier: ^4.4.3
         version: 4.4.3

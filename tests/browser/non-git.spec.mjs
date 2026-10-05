@@ -1,0 +1,37 @@
+import { test, expect } from '@playwright/test'
+
+for (const lang of ['zh', 'en']) {
+  test(`mixed directories share filtering, modes, confirmations and discovery (${lang})`, async ({ page }) => {
+    const errors = []; page.on('pageerror', error => errors.push(error.message))
+    await page.goto(`/?lang=${lang}&managed=1`)
+    const surface = page.locator('#review-surface')
+    const selector = surface.getByRole('combobox', { name: lang === 'zh' ? '仓库' : 'Repository', exact: true })
+    await expect(surface.getByText('service.ts', { exact: true })).toHaveCount(2)
+    await expect(surface.getByText('plain.ts', { exact: true })).toHaveCount(0)
+    await selector.selectOption('@directories')
+    await expect(surface.getByText('plain.ts', { exact: true })).toBeVisible()
+    const modes = surface.getByRole('combobox', { name: lang === 'zh' ? '审查范围' : 'Review scope' })
+    await expect(modes.locator('option:disabled')).toHaveCount(5)
+    await expect(surface.getByText('service.ts', { exact: true })).toHaveCount(0)
+    await surface.getByRole('button', { name: lang === 'zh' ? '确认当前范围 1 个文件' : 'Confirm 1 files in this scope', exact: true }).click()
+    await modes.selectOption('pending')
+    await expect(surface.getByText('plain.ts', { exact: true })).toHaveCount(0)
+    await selector.selectOption('*')
+    await expect(surface.getByText('service.ts', { exact: true })).toHaveCount(2)
+    await modes.selectOption('unstaged')
+    await selector.selectOption('@directories')
+    await expect(modes).toHaveValue('pending')
+    await selector.selectOption('?')
+    await expect(surface.getByText('unknown/unmanaged.ts', { exact: true })).toBeVisible()
+    const managerTitle = lang === 'zh' ? '多代码仓管理' : 'Multi-repository management'
+    await page.locator('#start-guides').getByRole('button', { name: managerTitle, exact: true }).click()
+    const manager = page.locator('#repositories-surface')
+    await manager.getByRole('textbox', { name: lang === 'zh' ? '发现容器（每行一个工程内路径）' : 'Discovery containers (one project path per line)' }).fill('project')
+    await manager.getByRole('button', { name: lang === 'zh' ? '预览发现结果' : 'Preview discovery', exact: true }).click()
+    await manager.getByRole('button', { name: lang === 'zh' ? '添加到列表' : 'Add to list', exact: true }).click()
+    await manager.getByRole('button', { name: lang === 'zh' ? '保存配置' : 'Save configuration', exact: true }).click()
+    await expect(manager.getByRole('status')).toContainText(lang === 'zh' ? '项目配置已保存' : 'Project configuration saved')
+    expect(await page.evaluate(() => window.fixture.projectPage().project.directories.map(entry => entry.name))).toEqual(['Local', 'Discovered'])
+    expect(errors).toEqual([])
+  })
+}

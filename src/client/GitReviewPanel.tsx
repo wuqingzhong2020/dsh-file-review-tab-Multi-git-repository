@@ -41,6 +41,7 @@ interface GitReviewPanelProps {
   readonly sessionId: string
   readonly mode: GitReviewMode
   readonly visible: boolean
+  readonly repositoryFilter: string
   readonly tick: number
 }
 
@@ -50,7 +51,7 @@ async function unwrap<T>(promise: Promise<RemoteResult<T>>): Promise<T> {
   return result.value
 }
 /** Own the comparison epoch and loading queue; individual files only render their state. */
-export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitReviewPanelProps) {
+export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repositoryFilter }: GitReviewPanelProps) {
   useReviewLocale()
   const sessions = (ctx as Context & { sessions: ISessions }).sessions
   const remote = (): GitRemote => {
@@ -60,7 +61,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
     if (!value) throw new Error(t('remoteUnavailable'))
     return value
   }
-  const [repository, setRepository] = useState('*')
+  const repository = repositoryFilter
   const [ref, setRef] = useState('')
   const [data, setData] = useState<GitReviewResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -80,10 +81,9 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
     ...(ref ? { ref } : {}),
   })
   useEffect(() => {
-    setRepository('*')
     setRef('')
     setCollapsedRepositories(new Set())
-  }, [sessionId, mode])
+  }, [sessionId, mode, repository])
   useEffect(() => {
     if (!visible) return
     const current = ++version.current
@@ -183,10 +183,6 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
   const allExpanded =
     allFileContentsExpanded(expanded, (data?.files ?? []).map(keyOf)) &&
     groupKeys.every(key => !collapsedRepositories.has(key))
-  const selectRepository = (path: string) => {
-    setRepository(path)
-    setRef('')
-  }
   const toggleAllContents = () => {
     if (data === null) return
     setContents(data.files, !allExpanded)
@@ -198,20 +194,6 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
   return (
     <div className={css.gitPanel}>
       <div className={css.repositoryBar}>
-        <select
-          aria-label={t('repository')}
-          value={repository}
-          onChange={event => {
-            selectRepository(event.target.value)
-          }}
-        >
-          <option value="*">{t('repoAll')}</option>
-          {data?.repositories.map(repo => (
-            <option key={repo.path} value={repo.path}>
-              {repo.name}
-            </option>
-          ))}
-        </select>
         {referenceSelector !== null && (
           <select
             aria-label={t(referenceSelector.label)}

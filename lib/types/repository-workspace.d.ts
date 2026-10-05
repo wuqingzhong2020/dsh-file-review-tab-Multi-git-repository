@@ -1,8 +1,3 @@
-import type { ReviewProject, ReviewWorkspace } from './repository-types.ts';
-export { inside } from './repository-path-policy.ts';
-export { parseRepositoryManifest } from './repository-manifest.ts';
-export declare function pathKey(path: string): string;
-export declare function previewProject(project: ReviewProject): Promise<ReviewWorkspace>;
-/** Most-specific project wins; a repo-root session also belongs to its aggregate. */
-export declare function resolveReviewWorkspace(cwd: string, projects: ReviewProject[]): Promise<ReviewWorkspace>;
+/** Compatibility export; implementation belongs to dsh-multi-git-repo-manager. */
+export * from "dsh-multi-git-repo-manager/workspace";
 //# sourceMappingURL=repository-workspace.d.ts.map

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react'
 import type { FileReviewAction, FileReviewFileState } from '../change-types.ts'
+import type { TargetPathResolution } from 'dsh-multi-git-repo-manager/types'
 import type { ReviewWorkspace } from '../repository-types.ts'
 import { isSessionReviewMode } from '../review-scopes.ts'
 import {
@@ -50,6 +51,7 @@ export interface FileReviewTurnView {
   readonly sessionId: string
   readonly cwd: string | undefined
   readonly workspace: ReviewWorkspace | null
+  readonly ownership: ReadonlyMap<string, TargetPathResolution>
   readonly reviewMode: ReviewMode
   readonly expansion: FileReviewExpansion
   readonly actions: FileReviewActions
@@ -149,6 +151,17 @@ function LazyDiff({ children }: { children: ReactNode }) {
   return <div ref={holderRef}>{inView ? children : <div style={{ minHeight: '96px' }} />}</div>
 }
 
+function ownerOfReviewFile(view: FileReviewTurnView, path: string) {
+  if (view.workspace?.targets) {
+    const owner = view.ownership.get(path)
+    return owner?.state === 'managed' ? owner.target : undefined
+  }
+  return fileRepository(resolveSessionPath(view.cwd, path), view.workspace?.repositories ?? [])
+}
+function canOperateFile(view: FileReviewTurnView, path: string): boolean {
+  return !view.workspace?.targets || view.ownership.get(path)?.state === 'managed'
+}
+
 /** A filtered turn retains its complete original turn for confirmation identity. */
 export function FileReviewTurn({
   turn,
@@ -172,7 +185,7 @@ export function FileReviewTurn({
   const { expanded, collapsedRepositories, setExpanded, setCollapsedRepositories } = expansion
   const { states, statusPending, busyKey, runToggle } = actions
   const ownerOf = (path: string) =>
-    fileRepository(resolveSessionPath(cwd, path), workspace?.repositories ?? [])
+    ownerOfReviewFile(view, path)
 
   const repositoryGroups = groupReviewFiles(turn.files, file => {
     const repository = ownerOf(file.path)
@@ -187,12 +200,12 @@ export function FileReviewTurn({
   const allExpanded =
     allFileContentsExpanded(expanded, fileKeys) &&
     groupKeys.every(key => !collapsedRepositories.has(key))
-  const confirmed = isTurnConfirmed(fullTurn, confirmationSnapshot.confirmed)
+  const confirmed = isTurnConfirmed(turn, confirmationSnapshot.confirmed, fullTurn)
   const turnStats = turn.files.reduce<UnifiedDiffStats>(
     (total, file) => addStats(total, summarizeDiffs(file.diffs)),
     { added: 0, removed: 0 },
   )
-  const reversible = turn.files.filter(isReversible)
+  const reversible = turn.files.filter(file => isReversible(file) && canOperateFile(view, file.path))
   const allUndone =
     reversible.length > 0 &&
     reversible.every(file => states.get(stateKey(turn.turn, file.path)) === 'undone')
@@ -203,7 +216,7 @@ export function FileReviewTurn({
     ? t('confirmTurnLive')
     : confirmed
       ? t('unconfirmTurnHint')
-      : t('confirmTurnHint', { count: fullTurn.files.length })
+      : t('confirmTurnHint', { count: turn.files.length })
   const copyFiles = (files: readonly SessionFileChange[]): AggregateDiffFile[] => files.map(file => ({
     repository: ownerOf(file.path)?.path ?? cwd ?? '?',
     path: file.path,
@@ -247,10 +260,10 @@ export function FileReviewTurn({
             disabled={fullTurn.live || busyKey !== null}
             title={confirmTitle}
             onClick={() => {
-              confirmationStore.setConfirmed(fullTurn, !confirmed)
+              confirmationStore.setConfirmed(turn, !confirmed, fullTurn)
             }}
           >
-            {t(confirmed ? 'unconfirmTurn' : 'confirmTurn')}
+            {t(confirmed ? 'unconfirmTurn' : 'confirmSelectedFiles', { count: turn.files.length })}
           </button>
           <button
             type="button"
@@ -261,7 +274,7 @@ export function FileReviewTurn({
               runToggle(
                 turnKey,
                 turn.files
-                  .filter(file => file.deleted !== true)
+                  .filter(file => file.deleted !== true && canOperateFile(view, file.path))
                   .map(file => ({
                     turn: turn.turn,
                     path: file.path,
@@ -324,7 +337,6 @@ function FileReviewFile({
   const {
     sessionId,
     cwd,
-    workspace,
     reviewMode,
     expansion,
     actions,
@@ -335,11 +347,11 @@ function FileReviewFile({
   const { expanded } = expansion
   const { states, statusPending, busyKey, runToggle } = actions
   const ownerOf = (path: string) =>
-    fileRepository(resolveSessionPath(cwd, path), workspace?.repositories ?? [])
+    ownerOfReviewFile(view, path)
   const key = stateKey(turn.turn, file.path)
   const isOpen = expanded.has(key)
   const state = states.get(key)
-  const reversible = isReversible(file)
+  const reversible = isReversible(file) && canOperateFile(view, file.path)
   const fileAction: FileReviewAction = state === 'undone' ? 'redo' : 'undo'
   const fileBusy = busyKey === key
   const stats = summarizeDiffs(file.diffs)
@@ -401,6 +413,7 @@ function FileReviewFile({
           <button
             type="button"
             className={`${css.smallButton} ${css.editorButton}`}
+            disabled={!canOperateFile(view, file.path)}
             onClick={event => {
               event.stopPropagation()
               openInEditor(file.path)

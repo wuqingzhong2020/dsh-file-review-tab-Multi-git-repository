@@ -16,6 +16,7 @@ const MAX_REFERENCE_FILE_BYTES = 16 * 1024 * 1024
 interface ReferenceFileAccess {
   workspace(): Promise<ReviewWorkspace>
   cwd(): string
+  approvedRoots?(): Promise<string[]>
 }
 
 interface ReferenceEditorAccess extends ReferenceFileAccess {
@@ -27,7 +28,7 @@ export async function locateReferenceOnDisk(
   access: ReferenceFileAccess,
 ): Promise<ReviewLocationResult> {
   try {
-    const { roots } = await access.workspace()
+    const roots = access.approvedRoots ? await access.approvedRoots() : (await access.workspace()).roots
     const repository = await realpath(request.repository)
     if (!roots.some(root => pathKey(root) === pathKey(repository))) {
       return { state: 'unsupported', reason: 'scope' }
@@ -76,7 +77,7 @@ export async function openReferenceInEditor(
     return { state: 'changed' }
   }
   try {
-    const { roots } = await access.workspace()
+    const roots = access.approvedRoots ? await access.approvedRoots() : (await access.workspace()).roots
     const file = await resolveReviewFile(access.cwd(), request.path, roots)
     if (!inside(await realpath(request.repository), file.filename)) {
       return { state: 'unsupported', reason: 'scope' }

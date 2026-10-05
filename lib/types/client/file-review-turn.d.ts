@@ -1,4 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { TargetPathResolution } from 'dsh-multi-git-repo-manager/types';
 import type { ReviewWorkspace } from '../repository-types.ts';
 import { type TurnFileChanges } from './session-changes.ts';
 import { type UnifiedDiffStats } from './UnifiedDiff.tsx';
@@ -16,6 +17,7 @@ export interface FileReviewTurnView {
     readonly sessionId: string;
     readonly cwd: string | undefined;
     readonly workspace: ReviewWorkspace | null;
+    readonly ownership: ReadonlyMap<string, TargetPathResolution>;
     readonly reviewMode: ReviewMode;
     readonly expansion: FileReviewExpansion;
     readonly actions: FileReviewActions;

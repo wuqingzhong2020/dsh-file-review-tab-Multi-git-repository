@@ -148,6 +148,7 @@ test('packaged client boots without a third-party sidebar and restores review pl
   assert.equal(h.types.get('file-review').guide.length, 1)
   assert.equal(h.types.get('file-review-guide').guide, undefined)
   for (const start of [...h.pending]) start()
+  assert.ok(!h.seats.has('conversation.view:repositories'), 'management tab belongs to the manager plugin')
   const title = h.seats.get('sidebar.right.pane.tab.title:dsh-file-review-tab-multi-git-repository:file-review')
   const props = title.options.inject('A')
   // No body is rendered: inactive labels still read the current host language.

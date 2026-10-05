@@ -1,8 +1,14 @@
 # dsh-file-review-tab-multi-git-repository
 
+Git repositories and ordinary directories now share managed targets, discovery and Host admission. See [non-Git directories](docs/NON_GIT_DIRECTORIES.en.md) for filtering and file-scoped confirmation.
+
+Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.2](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.2` and uses its shared service for repository scope. Install and enable both plugins; existing `dsh-file-review-repositories.json` files remain compatible. See [dependency and migration notes](docs/REPOSITORY_MANAGER.md).
+
+See the [validation record](docs/NON_GIT_VERIFICATION.md) for automated checks, isolated package installation and actual Windows Desktop checks, including their limits.
+
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.3.0**.
+Current version: **v0.3.2**.
 
 **dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 using its native right sidebar, without a third-party sidebar requirement.**
 
@@ -31,7 +37,7 @@ Release maintainers should also read the [Public release and plugin marketplace 
 - **External line navigation**: Open selections in the configured external IDE. VS Code is recommended; Antigravity IDE is also supported on Windows. The Host checks the session's permitted repository paths and current disk content before passing a new-version line number. Relocated references require confirmation. Ambiguous matches, old-version lines, deleted files and missing editors display explanations and retain the built-in file viewer.
 - **Review settings**: Configure expansion count N (20 by default), fonts, appearance, editor path, scoped shortcuts, discussions and virtualization. Layout, wrapping and enhancement switches share the official Profile form; machine-specific preferences remain local. Save applies edited fields; Cancel or Esc discards edits. All eight scopes share the controls.
 - **Two diff layouts**: Unified/split and wrapping remain selectable. A split preference temporarily uses unified below 480px of actual diff width, restores when widened, and ignores hidden zero-width observations. Search, context, selection and comment drafts remain intact.
-- **Multi-repository management session tab**: Next to the conversation and trace tabs, add, edit, or remove repositories maintained by the current project. Save them to `dsh-file-review-repositories.json` in the project root. Switching projects loads the corresponding configuration. File review shows each file's repository and repository-relative path, with filtering by repository. Supports the main repository, nested repositories, and external repositories used temporarily in the current session.
+- **Multi-repository management sidebar tab**: Open it from the native right sidebar's Start page, provided by the manager plugin. Add, edit, or remove repositories maintained by the current project and save them to `dsh-file-review-repositories.json` in the project root. Switching tabs preserves unsaved drafts; switching projects loads the corresponding configuration. File review supports repository filtering, nested repositories, and external repositories used temporarily in the current session.
 - **Deleted files remain visible**: dsh has no file deletion tool, so deletions happen through terminal commands. The plugin parses literal path arguments in commands such as `rm`, `rmdir`, `unlink`, `Remove-Item`, `del`, and `rd`. Deleted files appear with a deleted marker in both review entry points. Their content is no longer available, so there is no line diff or undo. Deletions using wildcards (`rm *.log`) or command substitution (`rm $(...)`) are not recognized because the affected files cannot be enumerated afterward.
 - **Automatic archiving**: The main list keeps the latest five turns; turns in progress are never archived. Older completed turns move into a collapsed Archived turns section at the bottom. Archived contents are not rendered while collapsed. Expanding it loads ten turns per page, with Load more for subsequent pages. Diff rows also mount lazily, avoiding dozens of diff groups mounting at once in long sessions. Deep links to archived turns automatically expand and locate them. Expansion state is remembered per session; the tab badge counts only the main list.
 - **Trusted tool lifecycle**: Capture exact UTF-8 before/after images through official execution and final acceptance seams for native and nested PTC calls. Host identities persist in official results/dispatch logs and replay after reload. Empty/nonempty creations and create-then-edit sequences support safe undo/recreation. Missing, oversized, externally changed or permission-mismatched images refuse writes; legacy hunks retain their existing checks. See the [implementation and verification record](docs/MIGRATION_VERIFICATION.md).
@@ -47,30 +53,30 @@ The **input comment Dock and Send with input reference chip** share sidebar draf
 
 ## Installation
 
-Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as a tested channel. Plugin v0.3.0 is installed and tested in the actual Windows Desktop 0.2.0-rc.2, covering multiple repositories, all eight scopes, diff reading, both comment submission routes, linked replies, confirmation, undo/reapply and shared settings. See the [verification matrix](docs/MIGRATION_VERIFICATION.md). Stable/newer stable versions and a full Web host remain unverified. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
+Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as a tested channel. Plugin v0.3.0 was tested in the actual Windows Desktop 0.2.0-rc.2, covering multiple repositories, all eight scopes, diff reading, both comment submission routes, linked replies, confirmation, undo/reapply and shared settings. Additional v0.3.2 validation focuses on the shared manager service and its native sidebar tab. See the [verification matrix](docs/MIGRATION_VERIFICATION.md). Stable/newer stable versions and a full Web host remain unverified. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.3.0.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.2.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.0.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.2.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.2.tgz"
 ```
 
-Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open Multi-repository management at the top of the session, and open File Review from the native right sidebar's ＋ guide.
+Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open the native right sidebar's Start page using ＋, then select Multi-repository management or File Review (Multi-Git).
 
-For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.0 label alone does not establish that the latest build is loaded.
+For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.2 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.0/dsh-file-review-tab-multi-git-repository-0.3.0.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.2/dsh-file-review-tab-multi-git-repository-0.3.2.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -95,7 +101,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.0 package has not been published). The bilingual [Release notes](docs/releases/version.md#v030) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.2 package has not been published). The bilingual [Release notes](docs/releases/version.md#v031) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 
@@ -104,7 +110,7 @@ The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plu
 The dropdown beside the File review title defaults to **Last turn**. Available scopes are:
 
 - **Last turn / This session**: Tool-produced changes from the latest turn or the entire session, with undo and reapply. If the latest turn changed no files, the view is empty; it does not fall back to an earlier turn.
-- **Pending review**: Unconfirmed tool-produced changes in the current session, grouped by turn. For example, after five turns of edits, confirming the first three with Confirm turn leaves only turns four and five in this scope. Confirmation applies to the whole turn across all repositories. A turn must finish before it can be confirmed. This session and Last turn show a confirmed marker, with Undo confirmation to return the turn to Pending review. Confirmations are stored locally per session; they do not change files or Git state and do not clear review comments. If additional changes are recorded for the same turn later, it becomes pending again. This scope retains safe undo and reapply. Older unconfirmed turns load ten at a time through Load more, rather than going into the collapsed archive.
+- **Pending review**: Unconfirmed tool-produced changes in the current session, grouped by turn. For example, after five turns of edits, confirming the first three with Confirm N files in this scope leaves only turns four and five in this scope. Confirmation applies only to files displayed in the current selection; hidden files stay pending. A turn must finish before it can be confirmed. This session and Last turn show a confirmed marker, with Undo confirmation to return the turn to Pending review. Confirmations are stored locally per session; they do not change files or Git state and do not clear review comments. If additional changes are recorded for the same turn later, it becomes pending again. This scope retains safe undo and reapply. Older unconfirmed turns load ten at a time through Load more, rather than going into the collapsed archive.
 - **Uncommitted**: The combined diff from HEAD to the current worktree, including untracked files.
 - **Unstaged**: The diff from the index to the worktree, including untracked files.
 - **Staged**: The diff from HEAD to the index.

@@ -1,8 +1,9 @@
 import schema from '@deepseek-ai/schemastery';
 import type { ReviewProject } from './repository-types.ts';
+import type { Volatile } from '@deepseek-ai/cordis';
 export interface FileReviewConfig {
-    enabled?: boolean;
-    projects: ReviewProject[];
+    /** @deprecated Read only to migrate the previous Profile index to the manager. */
+    projects: ReviewProject[] | Volatile<ReviewProject[]>;
     reviewSettings?: {
         layout: 'unified' | 'split';
         wrap: boolean;

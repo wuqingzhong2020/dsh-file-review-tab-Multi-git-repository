@@ -1,35 +1,11 @@
 /** Host-side, workspace-contained undo / redo service for produced text diffs. */
 
-import { realpath } from 'node:fs/promises'
-import { basename, isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type {
-  FileReviewFileResult,
-  FileReviewRequest,
-  FileReviewResult,
-  RecordedMutation,
-  RecordedRequest,
-  RecordedResult,
-} from './change-types.ts'
-import type { RepositorySettings } from './repository-settings.ts'
-import type {
-  NamedReviewRepository,
-  ReviewProject,
-  ReviewProjectPage,
-  ReviewWorkspace,
-  SaveReviewProject,
-} from './repository-types.ts'
-import { pathKey, previewProject, resolveReviewWorkspace } from './repository-workspace.ts'
-import {
-  findProjectFile,
-  PROJECT_FILE_NAME,
-  readProjectFile,
-  writeProjectFile,
-} from './repository-project-file.ts'
-import { canonicalRepositoryPath } from './repository-path-policy.ts'
-import { resolveDirectoryStart } from './repository-directory.ts'
+import { resolveTargetPaths, sessionCwd, type MultiGitRepoManager, type TargetPathResolution } from 'dsh-multi-git-repo-manager'
+import type { FileReviewFileResult, FileReviewRequest, FileReviewResult, RecordedMutation, RecordedRequest, RecordedResult } from './change-types.ts'
+import type { ReviewWorkspace } from './repository-types.ts'
 import { gitReview, gitReviewDiff } from './git-review.ts'
 import type {
   GitReviewDiff,
@@ -49,14 +25,6 @@ import { applyLifecycle } from './file-lifecycle.ts'
 // Preserve the existing Host entry point for callers of the pure transform.
 export { transformFile } from './file-review-files.ts'
 
-function sessionCwd(agent: Agent): string {
-  const cwd = agent.session.header.cwd
-  if (cwd === undefined || cwd.trim() === '') {
-    throw new Error('session has no workspace directory')
-  }
-  return cwd
-}
-
 /** Per-agent cap on recorded Code Mode mutations (oldest evicted first). */
 const RECORDED_PER_AGENT_CAP = 4000
 
@@ -68,54 +36,31 @@ function agentKey(agent: Agent): string {
 export class FileReviewService extends TypertRemoteService {
   /** Per-agent record of Code Mode (`run_code`) file mutations, dispatch order. */
   private readonly recordLog = new Map<string, RecordedMutation[]>()
-  private readonly temporaryRepositories = new Map<string, NamedReviewRepository[]>()
   private readonly lifecycleLog = new Map<string, LifecycleRecordCache>()
   private readonly lifecycleIdentities = new Map<string, LifecycleImage>()
 
   constructor(
     ctx: Context,
-    private readonly projectSettings?: RepositorySettings,
+    private readonly repositoryManager: Pick<MultiGitRepoManager, 'workspace'> & Partial<Pick<MultiGitRepoManager, 'resolveTargetPaths'>>,
   ) {
     super(ctx, 'fileReview')
   }
 
-  /** Read only the project selected by this Agent's authoritative directory. */
-  async project(agent: Agent): Promise<ReviewProjectPage> {
-    const settings = this.projectSettings?.get() ?? { projects: [], revision: 0 }
-    const cwd = sessionCwd(agent)
-    const root = await realpath(cwd)
-    const localFile = await findProjectFile(root)
-    const matched = await resolveReviewWorkspace(cwd, settings.projects)
-    let project: ReviewProject
-    if (localFile !== null) {
-      project = localFile.project
-    } else if (matched.project !== null) {
-      project = { ...matched.project, name: basename(matched.project.root) }
-    } else {
-      project = {
-        name: basename(root),
-        root,
-        includeProjectRoot: true,
-        configFiles: [],
-        repositories: [],
-        enabled: true,
-      }
-    }
-    const workspace =
-      localFile !== null && project.enabled !== false
-        ? await this.workspace(agent)
-        : await previewProject(project)
-    return {
-      project,
-      revision: settings.revision,
-      configured: localFile !== null,
-      workspace,
-      fileRevision: localFile?.revision ?? '',
-      temporaryRepositories:
-        localFile !== null
-          ? (this.temporaryRepositories.get(agentKey(agent)) ?? localFile.temporaryRepositories)
-          : [],
-    }
+  /** Every review operation uses the manager's authoritative session scope. */
+  async workspace(agent: Agent): Promise<ReviewWorkspace> {
+    return this.repositoryManager.workspace(agent)
+  }
+
+  async resolvePaths(agent: Agent, paths: string[]): Promise<TargetPathResolution[]> {
+    return this.repositoryManager?.resolveTargetPaths
+      ? this.repositoryManager.resolveTargetPaths(agent, paths)
+      : resolveTargetPaths(await this.workspace(agent), sessionCwd(agent), paths)
+  }
+
+  /** Every read/capture/write gets the concrete owner's root, never a parent fallback. */
+  async approvedRoots(agent: Agent, path: string): Promise<string[]> {
+    const [owner] = await this.resolvePaths(agent, [path])
+    return owner?.state === 'managed' && owner.target ? [owner.target.path] : []
   }
 
   /** Read Git differences only in repositories belonging to this session. */
@@ -125,11 +70,6 @@ export class FileReviewService extends TypertRemoteService {
 
   async gitReviewDiff(agent: Agent, request: GitReviewFileRequest): Promise<GitReviewDiff> {
     return gitReviewDiff(await this.workspace(agent), sessionCwd(agent), request)
-  }
-
-  async directoryStart(agent: Agent, path: string): Promise<string> {
-    const current = await this.project(agent)
-    return resolveDirectoryStart(current.project.root, path)
   }
 
   /** Open the shipped manual, independently of the session's project directory. */
@@ -151,6 +91,7 @@ export class FileReviewService extends TypertRemoteService {
     return locateReferenceOnDisk(request, {
       workspace: () => this.workspace(agent),
       cwd: () => sessionCwd(agent),
+      approvedRoots: () => this.approvedRoots(agent, request.path),
     })
   }
 
@@ -158,124 +99,10 @@ export class FileReviewService extends TypertRemoteService {
     return openReferenceInEditor(request, {
       workspace: () => this.workspace(agent),
       cwd: () => sessionCwd(agent),
+      approvedRoots: () => this.approvedRoots(agent, request.path),
       // Revalidation goes through the service method on every check.
       locateReference: () => this.locateReference(agent, request),
     })
-  }
-
-  /** Preview and save cannot choose another project's root through the wire. */
-  async preview(agent: Agent, project: ReviewProject): Promise<ReviewWorkspace> {
-    const current = await this.project(agent)
-    if (pathKey(await realpath(project.root)) !== pathKey(current.project.root)) {
-      throw new Error('Project root does not belong to this session')
-    }
-    return previewProject({ ...project, name: current.project.name, root: current.project.root })
-  }
-
-  async saveProject(agent: Agent, request: SaveReviewProject): Promise<ReviewProjectPage> {
-    const preview = await this.preview(agent, {
-      ...request.project,
-      configFiles: [],
-      repositories: [],
-    })
-    const project = preview.project!
-    await writeProjectFile(
-      {
-        ...project,
-        enabled: request.project.enabled ?? project.enabled ?? true,
-        namedRepositories: project.namedRepositories?.filter(entry => !isAbsolute(entry.path)),
-      },
-      request.fileRevision,
-    )
-    if (this.projectSettings !== undefined) {
-      const settings = this.projectSettings.get()
-      const index = settings.projects.findIndex(
-        item => pathKey(item.root) === pathKey(project.root),
-      )
-      const projects = [...settings.projects]
-      const indexEntry = {
-        name: project.name,
-        root: project.root,
-        includeProjectRoot: project.includeProjectRoot,
-        configFiles: [PROJECT_FILE_NAME],
-        repositories: [],
-        enabled: request.project.enabled ?? project.enabled ?? true,
-      }
-      if (index === -1) {
-        projects.push(indexEntry)
-      } else {
-        projects[index] = indexEntry
-      }
-      // The project-local file is authoritative; the profile keeps its index.
-      try {
-        await this.projectSettings.save({ projects, revision: settings.revision })
-      } catch {
-        // The local file remains usable if updating the profile index fails.
-      }
-    }
-    return this.project(agent)
-  }
-
-  async workspace(agent: Agent): Promise<ReviewWorkspace> {
-    const indexed = this.projectSettings?.get().projects ?? []
-    const active: ReviewProject[] = []
-    for (const project of indexed) {
-      if (!project.configFiles.includes(PROJECT_FILE_NAME) || project.enabled === false) continue
-      try {
-        const local = await readProjectFile(project.root)
-        if (local !== null && local.project.enabled !== false) active.push(local.project)
-      } catch {
-        // Invalid or unavailable project files never expand another session's scope.
-      }
-    }
-    const base = await resolveReviewWorkspace(sessionCwd(agent), active)
-    const temporary = this.temporaryRepositories.get(agentKey(agent)) ?? []
-    if (base.project === null || temporary.length === 0) return base
-    const extra = await previewProject({
-      name: base.project.name,
-      root: base.project.root,
-      includeProjectRoot: false,
-      configFiles: [],
-      repositories: [],
-      namedRepositories: temporary,
-    })
-    const repositories = [...base.repositories]
-    const seen = new Set(repositories.map(repo => pathKey(repo.path)))
-    for (const repo of extra.repositories) {
-      if (seen.has(pathKey(repo.path))) continue
-      seen.add(pathKey(repo.path))
-      repositories.push({ ...repo, source: 'temporary' })
-    }
-    return {
-      ...base,
-      repositories,
-      warnings: [...base.warnings, ...extra.warnings],
-      roots: [
-        ...new Map([...base.roots, ...extra.roots].map(root => [pathKey(root), root])).values(),
-      ],
-    }
-  }
-
-  /** All repositories outside the project live only in this agent's session. */
-  async setTemporaryRepositories(
-    agent: Agent,
-    entries: NamedReviewRepository[],
-  ): Promise<ReviewWorkspace> {
-    const current = await this.project(agent)
-    if (!current.configured) {
-      throw new Error('Enable this project before adding temporary repositories')
-    }
-    const root = current.project.root
-    const normalized: NamedReviewRepository[] = []
-    for (const entry of entries) {
-      const path = await canonicalRepositoryPath(root, entry.path)
-      if (!isAbsolute(entry.path) || !isAbsolute(path)) {
-        throw new Error('Temporary repositories must use absolute paths outside the project')
-      }
-      normalized.push({ ...entry, path })
-    }
-    this.temporaryRepositories.set(agentKey(agent), normalized)
-    return this.workspace(agent)
   }
 
   /** Append one nested (Code Mode) file mutation for the receiving agent. */
@@ -345,11 +172,14 @@ export class FileReviewService extends TypertRemoteService {
   /** Inspect current disk state without changing files. */
   async status(agent: Agent, request: FileReviewRequest): Promise<FileReviewResult> {
     const cwd = sessionCwd(agent)
-    const { roots } = await this.workspace(agent)
+    const owners = await this.resolvePaths(agent, request.files.map(file => file.path))
     const history = request.files.some(file => file.diffs.some(diff => diff.recordId))
       ? this.lifecycleHistory(agent)
       : undefined
-    const files = await Promise.all(request.files.map(file => {
+    const files = await Promise.all(request.files.map(async (file, index) => {
+      const owner = owners[index]
+      const roots = owner?.state === 'managed' && owner.target ? [owner.target.path] : []
+      if (!roots.length) return { path: file.path, state: 'unsupported' as const, changed: false, reason: 'File is outside the managed target scope' }
       const records = history?.sequence(file) ?? null
       return records === null
         ? inspectReviewFile(cwd, file, roots)
@@ -362,12 +192,13 @@ export class FileReviewService extends TypertRemoteService {
   async apply(agent: Agent, request: FileReviewRequest): Promise<FileReviewResult> {
     return agent.runMaintenance(async () => {
       const cwd = sessionCwd(agent)
-      const { roots } = await this.workspace(agent)
       const history = request.files.some(file => file.diffs.some(diff => diff.recordId))
         ? this.lifecycleHistory(agent)
         : undefined
       const files: FileReviewFileResult[] = []
       for (const file of request.files) {
+        const roots = await this.approvedRoots(agent, file.path)
+        if (!roots.length) { files.push({ path: file.path, state: 'unsupported', changed: false, reason: 'File is outside the managed target scope' }); continue }
         const records = history?.sequence(file) ?? null
         const result = records === null
           ? await applyReviewFile(cwd, file, request.action, roots)

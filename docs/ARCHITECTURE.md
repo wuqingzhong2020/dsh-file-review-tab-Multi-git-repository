@@ -1,8 +1,12 @@
 # 整体架构与开发接入指南
 
+当前新增目录能力见 [非 Git 目录架构与使用](NON_GIT_DIRECTORIES.md)。管理、发现与文件归属由共享插件提供，审查侧仅维护业务适配；以下既有链路继续沿用。
+
+多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.1**。`apply` 注入 `multiGitRepoManager`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。本仓库的 `repository-*.ts` 及客户端路径/事件文件只保留兼容再导出。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。详见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
+
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.0**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](MIGRATION_VERIFICATION.md)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.1**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](MIGRATION_VERIFICATION.md)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
 
@@ -10,12 +14,12 @@
 
 这是一个运行在 DeepSeek Harness 内的插件，包含 Node.js Host 服务和浏览器 React 界面。它把会话中的文件工具改动，以及多个 Git 仓库的真实差异，统一放进「文件审查」侧栏，并提供工程级仓库配置、行评论和会话改动撤销。
 
-四个用户入口均由 [src/client/index.tsx](../src/client/index.tsx) 注册：
+文件审查入口由 [src/client/index.tsx](../src/client/index.tsx) 注册，管理页签由独立管理插件注册：
 
 | 入口 | 组件 | 作用 |
 | --- | --- | --- |
 | 原生右侧栏「文件审查」Tab | [NativeReviewTab.tsx](../src/client/NativeReviewTab.tsx) → [FileReviewTab.tsx](../src/client/FileReviewTab.tsx) | 适配会话／可见性，选择范围、查看差异、确认轮次、撤销和提交意见 |
-| 会话顶部「多代码仓管理」页签 | [RepositorySettings.tsx](../src/client/RepositorySettings.tsx) | 编辑当前工程的仓库列表，保存工程配置文件 |
+| 原生右侧「多代码仓管理」Tab | [RepositorySettings.tsx](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/RepositorySettings.tsx) | 从开始页打开，编辑当前工程的仓库列表，保存工程配置文件 |
 | 对话轮次末尾的审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx) | 展示工具改动摘要，撤销或定位到侧栏的文件差异 |
 | 审查标题行的「操作指南」按钮 | [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) | 打开安装包内的双语手册，预览截图并点击放大 |
 
@@ -23,7 +27,7 @@
 
 - **会话改动**来自工具执行记录，能够归属到某一轮对话；是否可以撤销取决于原始差异和当前磁盘内容。
 - **Git 差异**来自实际工作区、暂存区和提交历史，也能看到终端、编辑器等产生的修改；这些范围在插件中只读。
-- **确认本轮**只是记录审查进度，不修改文件或 Git 状态。
+- **确认当前范围文件**只是记录审查进度，不修改文件或 Git 状态。
 - **提交修改意见**是把评论发送给当前会话的 Agent，不是 Git 提交，也不直接执行代码修改。
 - **工程配置**描述该工程维护哪些仓库；**会话本地状态**描述某个会话的评论、确认和临时仓库，二者独立。
 
@@ -35,7 +39,7 @@
 flowchart TB
   subgraph Desktop["DeepSeek Harness Desktop / Web 宿主"]
     subgraph Browser["浏览器界面"]
-      Slots["conversation.view / turnTail 插槽"]
+      Slots["sidebar.right.pane.tab / turnTail 插槽"]
       Sidebar["原生右侧栏"]
       UI["React 页面与差异渲染"]
       Snapshot["会话 Conversation snapshot"]
@@ -50,7 +54,7 @@ flowchart TB
     subgraph Host["Node.js Host"]
       Entry["src/index.ts：注册与嵌套工具监听"]
       Service["FileReviewService"]
-      Workspace["工程配置、路径与仓库解析"]
+      Workspace["multiGitRepoManager：共享工程配置、路径与仓库解析"]
       Git["git-review.ts"]
       Entry --> Service
       Service --> Workspace
@@ -67,7 +71,7 @@ flowchart TB
 
 ### 2.1 Host 入口
 
-[src/index.ts](../src/index.ts) 的 `apply` 创建 `RepositorySettings` 和 `FileReviewService`，注册文件引用的系统提示，并监听成功的嵌套 `tools/result`。
+[src/index.ts](../src/index.ts) 的 `apply` 注入共享 `multiGitRepoManager`，创建 `FileReviewService`，注册文件引用的系统提示，并监听成功的嵌套 `tools/result`。
 
 监听器按结果结构识别具有 `path / before / after` 的文件修改，只补录嵌套调用。普通工具调用已经有 Conversation 数据，不在这里重复记录。失败的工具结果不会进入记录。
 
@@ -77,7 +81,7 @@ flowchart TB
 
 1. 注册中英文文案。
 2. 挂载 `TYPERT_REMOTE`。
-3. 注册工程配置页、插件自己的 Conversation 数据定义和轮次尾部审查行。
+3. 注册插件自己的 Conversation 数据定义和轮次尾部审查行。工程配置页由管理插件注册。
 4. 委托 `native-sidebar.ts` 注册原生 `file-review` 类型、正文和标题插槽，键为插件 implementation id。
 5. 注册无引导卡片的旧 `file-review-guide` 兼容页；日常操作指南由插件弹窗打开。
 
@@ -119,8 +123,8 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 配置文件与 Profile | [repository-project-file.ts](../src/repository-project-file.ts)、[repository-settings.ts](../src/repository-settings.ts) | 项目 JSON 发现、校验、版本检查、原子写入和 Profile 索引 |
 | 仓库范围与路径 | [repository-workspace.ts](../src/repository-workspace.ts)、[repository-path-policy.ts](../src/repository-path-policy.ts)、[repository-directory.ts](../src/repository-directory.ts) | 配置规范化、候选仓库收集、真实路径与 Git 可用性检查、去重和目录选择 |
 | 旧仓库清单解析 | [repository-manifest.ts](../src/repository-manifest.ts) | 纯文本解析 JSON、INI 和 `.gitmodules`；`repository-workspace` 保留原解析函数导出 |
-| 多仓库管理界面 | [RepositorySettings.tsx](../src/client/RepositorySettings.tsx)、[repository-settings-components.tsx](../src/client/repository-settings-components.tsx) | 设置页组合、仓库行编辑、解析结果展示及删除确认 |
-| 多仓库管理流程 | [use-repository-settings.ts](../src/client/use-repository-settings.ts)、[repository-settings-model.ts](../src/client/repository-settings-model.ts) | 会话表单与请求生命周期、目录选择、临时仓库更新；草稿合并和保存数据转换 |
+| 多仓库管理界面 | [RepositorySettings.tsx](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/RepositorySettings.tsx)、[repository-settings-components.tsx](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/repository-settings-components.tsx) | 设置页组合、仓库行编辑、解析结果展示及删除确认 |
+| 多仓库管理流程 | [use-repository-settings.ts](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/use-repository-settings.ts)、[repository-settings-model.ts](../src/client/repository-settings-model.ts) | 会话表单与请求生命周期、目录选择、临时仓库更新；草稿合并和保存数据转换 |
 | 客户端目录选择 | [directory-picker.ts](../src/client/directory-picker.ts) | 选择 Desktop/Web 目录接口、检查起始目录能力、处理取消及错误 |
 | Git 查询 | [git-review.ts](../src/git-review.ts)、[git-review-command.ts](../src/git-review-command.ts)、[git-review-parser.ts](../src/git-review-parser.ts) | 比较与仓库编排、受限命令执行、NUL 分隔输出与 patch 解析；契约位于 `git-review-types/schemas` |
 | 审查范围定义 | [review-scopes.ts](../src/review-scopes.ts)、[review-scope-model.ts](../src/client/review-scope-model.ts) | 共享范围 ID、数据来源、标签与 Git 能力；客户端轮次筛选、分页规则及引用选择器 |
@@ -292,7 +296,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 ## 6. Host / Client 通信契约
 
-通信命名空间为 `fileReview`，以 Agent 为作用域。Host 从宿主查找 Agent，并使用 `agent.session.header.cwd` 作为权威会话目录，不能信任浏览器传入一个根目录就扩大文件操作范围。
+审查通信命名空间为 `fileReview`，管理通信命名空间为 `multiGitRepoManager`，均以 Agent 为作用域。Host 从宿主查找 Agent，并使用 `agent.session.header.cwd` 作为权威会话目录，不能信任浏览器传入一个根目录就扩大文件操作范围。
 
 契约分为三层：
 
@@ -302,11 +306,11 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 | 方法 | 用途 | 副作用 |
 | --- | --- | --- |
-| `project()` | 读取当前工程的管理页数据、配置存在状态与修订值 | 读取 |
-| `workspace()` | 获取当前会话有效仓库和允许的文件根目录 | 读取 |
-| `saveProject(request)` | 保存工程配置并返回管理页数据 | 写工程 JSON、更新 Profile 索引 |
-| `setTemporaryRepositories(entries)` | 设置当前会话的临时外部仓库 | 更新 Host 内存 |
-| `directoryStart(path)` | 解析目录选择器起始目录 | 读取 |
+| `multiGitRepoManager.project()` | 读取当前工程的管理页数据、配置存在状态与修订值 | 读取 |
+| `multiGitRepoManager.workspace()` | 获取当前会话有效仓库和允许的文件根目录 | 读取 |
+| `multiGitRepoManager.saveProject(request)` | 保存工程配置并返回管理页数据 | 写工程 JSON、更新 Profile 索引 |
+| `multiGitRepoManager.setTemporaryRepositories(entries)` | 设置当前会话的临时外部仓库 | 更新 Host 内存 |
+| `multiGitRepoManager.directoryStart(path)` | 解析目录选择器起始目录 | 读取 |
 | `userGuide(language)` | 按 `zh` / `en` 返回插件安装目录中的使用手册绝对路径 | 读取插件文件；不依赖会话工程目录 |
 | `userGuideDocument(language)` | 返回固定语言手册的 Markdown 与 12 张随包截图的 JPEG data URL | 只读取固定文档和图片白名单；不接受调用方文件路径 |
 | `gitReview(request)` | 查询仓库、比较引用及改动文件列表 | 读取 Git |
@@ -317,7 +321,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | `locateReference(request)` | 核对当前磁盘引用位置 | 读取，结果含原位置／移动／歧义／失配 |
 | `openEditor(request)` | 再次校验后向 VS Code 兼容程序传递文件与行号 | 启动外部编辑器，不写工程文件 |
 
-客户端先获取 `sessions.scope(sessionId)`，再用 `scope.get('remote.fileReview')` 获取动态服务。响应为 `RemoteResult`：先检查 `ok`，失败读取 `error.message`，成功读取 `value`。异步挂载未完成或插件服务缺失时必须提供可见错误，不能在组件渲染期间无条件访问会抛异常的动态服务 getter。
+客户端先获取 `sessions.scope(sessionId)`，审查功能用 `scope.get('remote.fileReview')`，管理与工作区功能用 `scope.get('remote.multiGitRepoManager')` 获取动态服务。响应为 `RemoteResult`：先检查 `ok`，失败读取 `error.message`，成功读取 `value`。异步挂载未完成或插件服务缺失时必须提供可见错误，不能在组件渲染期间无条件访问会抛异常的动态服务 getter。
 
 文件审查标题行的「操作指南」打开 [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) 中的宿主 Modal 弹窗。[UserGuideContent.tsx](../src/client/UserGuideContent.tsx) 通过 Agent 作用域 `userGuideDocument(language)` 读取手册和截图，保留宿主 Markdown 排版、图片放大、刷新、焦点返回及 Esc。语言变化重载正文，关闭或来源 Tab 隐藏时卸载文档与图片层，旧请求不写回。旧保存布局的 `file-review-guide` 兼容页只提供打开同一弹窗和关闭自身，不再出现在引导页；Host 的旧路径 RPC 保留兼容。
 
@@ -418,7 +422,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 
 确认记录使用整轮文件差异的修订标识。只能确认已完成且有改动的轮次；该轮后续补录或改变差异，修订标识变化后自动重新进入「待确认」。撤销、Git 状态与确认记录分别处理。
 
-`repository-events.ts` 是当前浏览器插件实例中的通知通道，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 按会话保存最新跳转目标，以 nonce 区分重复点击，完成滚动后消费；定位归档轮次时自动打开归档并加载所需页。`sidebar-navigation.ts` 检查顶层控制器的当前会话，审查正文则通过自己的 `tab.actions.openResource` 打开文件；统一导航 Provider 供文件头和选区菜单使用，避免异步操作误打开到其他会话。
+`repository-events.ts` 再导出管理插件的通知通道，在独立浏览器 bundle 间共享，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 按会话保存最新跳转目标，以 nonce 区分重复点击，完成滚动后消费；定位归档轮次时自动打开归档并加载所需页。`sidebar-navigation.ts` 检查顶层控制器的当前会话，审查正文则通过自己的 `tab.actions.openResource` 打开文件；统一导航 Provider 供文件头和选区菜单使用，避免异步操作误打开到其他会话。
 
 ## 9. 文件写入边界与性能约束
 
@@ -434,7 +438,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 4. 有行号时按预期位置匹配；无行号时要求文本唯一匹配，不做模糊猜测。
 5. 写入前重新读取核对内容，冲突时跳过；采用原子写入并保留权限和换行风格。
 
-仅有 `oldText: null` 的旧记录、终端删除标记、缺少足够差异或冲突文件不能直接恢复。v0.3.0 只有完整 Host 生命周期才支持新建删除／重建，且每次重新授权与核对身份。不扩大根目录或添加模糊匹配。写前核对是乐观保护，不能描述成覆盖所有外部编辑竞争的文件系统事务。
+仅有 `oldText: null` 的旧记录、终端删除标记、缺少足够差异或冲突文件不能直接恢复。v0.3.1 只有完整 Host 生命周期才支持新建删除／重建，且每次重新授权与核对身份。不扩大根目录或添加模糊匹配。写前核对是乐观保护，不能描述成覆盖所有外部编辑竞争的文件系统事务。
 
 ### 9.2 当前性能策略与限制
 
@@ -478,7 +482,7 @@ pnpm build
 
 接手时仍需确认以下环境条件：
 
-- **运行时与依赖**：建议统一使用 Node.js 24、pnpm 11，并通过 `pnpm install --frozen-lockfile` 安装锁定依赖。测试直接导入 `.ts`，旧 Node 版本可能无法执行；`directory-start`、`git-review` 和 `repository-workspace` 测试还导入 `lib/index.js`，功能变更后需先同步产物。
+- **运行时与依赖**：建议统一使用 Node.js 24、pnpm 11，并通过 `pnpm install --frozen-lockfile` 安装锁定依赖。测试直接导入 `.ts`，旧 Node 版本可能无法执行；`directory-start`、`git-review` 和 `repository-workspace` 测试在管理插件中导入 `lib/index.js`，功能变更后需先同步产物。
 - **Git**：`git-review.test.mjs` 会在临时目录调用 PATH 中的 `git`，创建仓库和本地提交，不需要 GitHub 账号。测试已指定提交身份并关闭提交签名，但尚未完全隔离系统/全局 Git 配置，例如全局忽略规则、属性、钩子和仓库模板可能影响结果。
 - **文件系统**：系统临时目录需要可写；`repository-workspace.test.mjs` 的越界验证会在 Windows 创建目录联接，在其他系统创建符号链接，环境需允许对应操作。
 
@@ -499,7 +503,7 @@ pnpm test
 pnpm pack --pack-destination dist
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.3.0.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
+默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.3.1.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 
@@ -540,7 +544,7 @@ pnpm pack --pack-destination dist
 排查时先确定问题属于会话记录、Git 查询、项目范围、显示状态还是文件写入，再沿对应链路处理。一个页面显示相同路径不代表两个范围使用相同版本的代码。
 
 
-## 12. v0.3.0 融合实现边界
+## 12. v0.3.1 融合实现边界
 
 ### 12.1 捕获、提交与重放
 

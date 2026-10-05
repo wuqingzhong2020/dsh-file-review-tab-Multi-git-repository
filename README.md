@@ -1,8 +1,14 @@
 # dsh-file-review-tab-multi-git-repository
 
+已支持 Git 仓库与非 Git 目录：类型选择、直接子目录发现、v1/v2 配置和 Host 文件归属共用管理服务。普通目录的会话审查与按文件确认见 [非 Git 目录说明](docs/NON_GIT_DIRECTORIES.md)。
+
+多仓库管理现已独立到 **[dsh-multi-git-repo-manager v0.1.2](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**。本插件固定依赖 `0.1.2`，并通过共享服务取得仓库范围；管理页面从右侧「开始」页打开为原生 Tab，原会话区管理页签已移除。安装时必须同时安装并启用两个插件；旧 `dsh-file-review-repositories.json` 无需改名。迁移说明见 [公共仓库管理依赖](docs/REPOSITORY_MANAGER.md)。
+
+本轮类型检查、构建、自动测试、双包联装及指定 Desktop 的实际验证见 [实施验证记录](docs/NON_GIT_VERIFICATION.md)。
+
 [简体中文](README.md) | [English](README.en.md)
 
-当前版本：**v0.3.0**。
+当前版本：**v0.3.2**。
 
 **dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并直接接入 DeepSeek Harness Desktop 0.2.0-rc.2 的原生右侧栏，无需安装第三方侧栏插件。**
 
@@ -26,14 +32,14 @@
 - **差异块导航**：工具条的上下箭头和块选择框可循环定位上一处／下一处修改，显示当前块及总数，并标示目标行。差异区域内支持 Ctrl/Cmd+↑ / ↓；切换统一／并排或中英文时保留搜索和定位。
 - **基础语法高亮**：按文件扩展名识别 C/C++、JavaScript、TypeScript、**Python 3**、JSON 和 Markdown，支持常见关键字、字符串、注释和数字；Python 支持三引号多行字符串。未知类型显示纯文本。高亮只为原始代码着色，Markdown 保留源码显示；超长行或超出高亮预算时保留原始文本和行级差异。
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
-- **侧边栏 Tab「文件审查」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
+- **侧边栏 Tab「文件审查（多git仓）」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
 - **仓库分组与内容展开**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。仓库标题旁的图标批量展开或收起该仓库内文件的差异内容；轮次标题旁的图标控制该轮全部仓库的文件内容，Git 范围的文件数标题旁图标控制当前显示的全部文件内容。收起内容后仍显示文件名，点击仓库名称或左侧箭头则隐藏、显示整个文件列表。部分文件已展开时，图标先展开剩余内容，再次点击全部收起；操作只影响当前作用范围。Git 差异按需加载并缓存，批量展开最多同时请求 4 个文件。
 - **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 N 行未修改代码（默认 20）；中间间隔将 N 行分配到两端，首尾间隔从改动处向外展开。蓝色条另有向上、向下双箭头图标，一次展开该方向相邻间隔内的全部未修改代码；首尾展开至记录的开头或结尾，中间展开至相邻修改块。展开后蓝色条保留「收起这段」图标，只收起该间隔的未修改代码；全部展开后仍可点击，其他间隔不受影响。点击「收起展开的上下文」恢复全部间隔的默认显示。
 - **选区引用**：点击行号选择一行，Shift+点击同一侧行号选择连续范围，也可拖选同一版本侧的代码。在选区内右键打开菜单，支持复制完整代码引用、复制路径与范围、添加范围评论、外部行定位和清除选区；也可按 Shift+F10。范围外右键选择该行。引用包含仓库、比较来源、版本侧、修订和起止行；不接受跨文件、混合新旧版本或跨缺失历史片段的选区，引用正文及相邻上下文各限 64 KiB。
 - **外部行定位**：选区可在配置的外部 IDE 中打开，推荐 VS Code，Windows 也支持手动配置 Antigravity IDE。Host 核对当前会话允许的真实仓库路径及磁盘内容，只有新版引用匹配成功才传递行号。位置移动时必须确认，重复匹配、旧版删除行、文件不存在或编辑器缺失时显示原因，并保留内置文件查看入口。
 - **审查设置**：顶部「设置」按钮提供每次展开行数 N（默认 20）、代码字体、字号、行高、Tab 宽度、跟随主题或蓝／橙配色及背景强度、外部 IDE 程序路径、文件内搜索／导航快捷键，以及讨论记录和大文件虚拟化开关。点击「保存」立即生效；布局、换行与 Dock／窄栏回退／消息折叠开关通过官方配置保存在当前 Profile，其余阅读设置和编辑器路径保存在本机；「取消」或 Esc 放弃本次编辑。适用于八种范围和两种布局，不注册全局快捷键。
 - **两种差异布局**：统一／并排与自动换行仍可手动选择。并排偏好在实际差异容器小于 480px 时临时回退统一，拉宽后恢复；隐藏时零宽度不改偏好，搜索、上下文、选区和评论草稿保留。
-- **会话「多代码仓管理」页签**：在「对话」「轨迹」旁边，直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换工程会自动显示对应配置；文件审查显示所属仓库及仓库内路径，可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
+- **右侧「多代码仓管理」Tab**：从右侧「开始」页打开，由管理插件提供。直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换 Tab 保留未保存表单，切换工程显示对应配置；文件审查可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
 - **删除文件可见**：dsh 没有删除文件的工具，删除发生在终端命令里——插件解析 `rm` 族命令（`rm` / `rmdir` / `unlink` / `Remove-Item` / `del` / `rd` 等）的字面路径参数，被删文件以「已删除」标记出现在两个入口（内容已不存在，故无行级 diff、不可撤销）。带通配符（`rm *.log`）或命令替换（`rm $(...)`）的删除不识别——受影响文件事后无法枚举。
 - **自动归档**：主列表只保留最近 5 轮（进行中的轮次永不归档），更早的已完成轮次沉入底部「已归档 N 轮」折叠区。折叠时归档内容零渲染，展开后每页加载 10 轮（「加载更多」续页），diff 行另有懒挂载——长会话不再一次性挂载几十个 diff 组。深链跳到已归档轮次会自动展开并定位；展开状态按会话记忆；角标只统计主列表。
 - **可信工具生命周期**：标准与 PTC 嵌套调用在官方执行／最终接受接口捕获 UTF-8 原始 before/after，携带 Host 记录身份。记录随官方工具结果和 PTC 日志保存，重载后可重建；支持空／非空新建文件安全撤销、重新创建以及创建后编辑序列。未记录、超限、外部改写或权限变化时明确拒绝，旧局部差异继续走原有检查路径。详见 [实现与验证记录](docs/MIGRATION_VERIFICATION.md)。
@@ -50,30 +56,30 @@
 
 ## 安装
 
-目标接口范围：**DSH 正式版 >=0.2.0**；另保留 **0.2.0-rc.2** 测试通道。已在 Windows 的实际 Desktop 0.2.0-rc.2 中安装并操作验证 v0.3.0，覆盖多仓库、八种范围、差异阅读、两种评论发送、答复关联、确认、撤销／重新应用和设置同步；详见 [验证矩阵](docs/MIGRATION_VERIFICATION.md)。正式版／较新稳定版及完整 Web 宿主仍未验证。文件审查直接使用原生右侧栏；dsh-better-sidebar 为可选共存插件。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
+目标接口范围：**DSH 正式版 >=0.2.0**；另保留 **0.2.0-rc.2** 测试通道。v0.3.0 已在 Windows 的实际 Desktop 0.2.0-rc.2 中验证多仓库、八种范围、差异阅读、两种评论发送、答复关联、确认、撤销／重新应用和设置同步；v0.3.2 的新增验证聚焦公共管理服务和右侧原生管理 Tab，详见 [验证矩阵](docs/MIGRATION_VERIFICATION.md)。正式版／较新稳定版及完整 Web 宿主仍未验证。文件审查直接使用原生右侧栏；dsh-better-sidebar 为可选共存插件。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
 
 文件由宿主选择内置查看器；原生预览可能只读，可选编辑器插件可为其接管的格式提供编辑能力。外部 IDE 定位仍可独立使用。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.0.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.2.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.0.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.2.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.2.tgz"
 ```
 
-维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；在会话顶部打开「多代码仓管理」，在原生右侧栏「+」引导页中打开「文件审查」。
+维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；从原生右侧栏「+」打开「开始」页，在其中选择「多代码仓管理」或「文件审查（多git仓）」。
 
-重新构建但版本号未变时，pnpm 可能复用同路径本地包。请先复制为包含构建校验摘要的新文件名，再安装该路径；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.0，并不能单独证明加载了最新构建。
+重新构建但版本号未变时，pnpm 可能复用同路径本地包。请先复制为包含构建校验摘要的新文件名，再安装该路径；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.2，并不能单独证明加载了最新构建。
 
 ### 独立 Web Profile
 
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.0/dsh-file-review-tab-multi-git-repository-0.3.0.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.2/dsh-file-review-tab-multi-git-repository-0.3.2.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -98,7 +104,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.0 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v030) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.2 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v031) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
@@ -107,7 +113,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 文件审查标题旁的下拉框默认显示 **上一轮**，可切换：
 
 - **上一轮 / 本会话**：最近一轮或整个会话的工具改动，保留原有撤销和重新应用。最近一轮没有修改文件时显示为空，不回退到更早的改动。
-- **待确认**：只显示当前会话尚未确认的工具改动，按轮次列出。例如修改了五轮，在各轮头部点击 **确认本轮** 确认前三轮后，此范围仅显示第四、第五轮。确认按整轮生效，包含该轮全部仓库；进行中的轮次结束后才能确认。在「本会话」或「上一轮」中可看到 **已确认** 标记，点击 **取消确认** 放回待确认列表。确认记录按会话保存在应用本地存储中，不改变文件或 Git 状态，也不会清空修改意见；同一轮后续补录新的改动时会重新变为待确认。此范围保留原有安全撤销和重新应用；未确认的较早轮次通过 **加载更多** 每次加载十轮，不放进折叠归档区。
+- **待确认**：只显示当前会话尚未确认的工具改动，按轮次列出。例如修改了五轮，在各轮头部点击 **确认当前范围 N 个文件** 确认前三轮后，此范围仅显示第四、第五轮。确认只作用于当前筛选范围内显示的文件；隐藏文件不会一并确认。进行中的轮次结束后才能确认。在「本会话」或「上一轮」中可看到 **已确认** 标记，点击 **取消确认** 放回待确认列表。确认记录按会话保存在应用本地存储中，不改变文件或 Git 状态，也不会清空修改意见；同一轮后续补录新的改动时会重新变为待确认。此范围保留原有安全撤销和重新应用；未确认的较早轮次通过 **加载更多** 每次加载十轮，不放进折叠归档区。
 - **未提交**：HEAD 到当前工作区的合并差异，包含未跟踪文件。
 - **未暂存**：暂存区到工作区的差异，包含未跟踪文件。
 - **已暂存**：HEAD 到暂存区的差异。

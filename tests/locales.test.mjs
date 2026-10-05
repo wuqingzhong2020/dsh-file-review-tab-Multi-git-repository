@@ -23,7 +23,7 @@ test('host General settings language overrides browser language and switches exi
   const unsubscribe = subscribeLocale(() => { seen.push(t('diffSettings')) })
   try {
     assert.equal(getLocaleSnapshot(), 'en')
-    assert.equal(t('tabTitle'), 'File Review')
+    assert.equal(t('tabTitle'), 'File Review (Multi-Git)')
     host.set('zh')
     assert.equal(t('diffSettings'), '设置')
     assert.equal(t('expandContext', { count: 7, remaining: 50 }), '展开 7 行未修改代码（剩余 50 行）')
@@ -104,7 +104,7 @@ test('existing diagnostics switch language at render and preserve paths and unkn
   } finally { detach() }
 })
 
-test('Host configuration descriptions provide both Chinese and English metadata', () => {
-  assert.deepEqual(Config.dict.enabled.meta.description, { zh: '是否启用多代码仓管理', en: 'Enable multi-repository management' })
-  assert.deepEqual(Config.dict.projects.inner.dict.enabled.meta.description, { zh: '是否启用该项目的多代码仓管理', en: 'Enable multi-repository management for this project' })
+test('review configuration retains a hidden legacy index without management controls', () => {
+  assert.equal(Config.dict.enabled, undefined)
+  assert.equal(Config.dict.projects.meta.hidden, true)
 })

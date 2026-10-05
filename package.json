@@ -1,7 +1,7 @@
 {
   "name": "dsh-file-review-tab-multi-git-repository",
   "description": "DeepSeek Harness file-review tab for tool-produced diffs and safe undo across multi-repository workspaces.",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",
@@ -70,12 +70,13 @@
   },
   "scripts": {
     "build:types": "tsc --emitDeclarationOnly --outDir lib/types",
-    "build": "tsc --emitDeclarationOnly --outDir lib/types && tsdown",
+    "build": "node scripts/clean-lib.mjs && tsc --emitDeclarationOnly --outDir lib/types && tsdown",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
     "test:docs": "node scripts/verify-docs.mjs",
-    "test:pack": "node scripts/verify-pack.mjs"
+    "test:pack": "node scripts/verify-pack.mjs",
+    "test:install": "node scripts/verify-manager-install.mjs"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
@@ -110,7 +111,8 @@
     "react": "^18.2.0",
     "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.2.0 || 0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-plugin-manager": ">=0.2.0 || 0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0 || 0.2.0-rc.2"
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0 || 0.2.0-rc.2",
+    "dsh-multi-git-repo-manager": "0.1.2"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
@@ -168,7 +170,8 @@
     "simple-icons": "16.31.0",
     "tsdown": "^0.22.14",
     "typescript": "^5.9.0",
-    "zustand": "4.4.7"
+    "zustand": "4.4.7",
+    "dsh-multi-git-repo-manager": "0.1.2"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-client-ui-input-trigger": {

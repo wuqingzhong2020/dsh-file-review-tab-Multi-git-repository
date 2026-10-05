@@ -14,6 +14,7 @@ interface DeepLinkOptions {
   readonly sessionId: string
   readonly turns: readonly TurnFileChanges[]
   readonly visible: boolean
+  readonly resolveFilter?: (paths: readonly string[]) => string
   readonly ready: boolean
   readonly meta: unknown
   readonly expanded: ReadonlySet<string>
@@ -33,6 +34,7 @@ export function useFileReviewDeepLink({
   turns,
   visible,
   ready,
+  resolveFilter,
   meta,
   expanded,
   flatKey,
@@ -44,6 +46,8 @@ export function useFileReviewDeepLink({
   setCollapsedRepositories,
   onMissing,
 }: DeepLinkOptions) {
+  const resolveFilterRef = useRef(resolveFilter)
+  resolveFilterRef.current = resolveFilter
   const turnsRef = useRef(turns)
   turnsRef.current = turns
   const archivedTurnsRef = useRef(splitArchivedTurns(turns).archived)
@@ -62,7 +66,7 @@ export function useFileReviewDeepLink({
     (paths: readonly string[], targetTurn: number | undefined, nonce?: number) => {
       if (paths.length === 0) return
       setReviewMode('session')
-      setRepositoryFilter('*')
+      setRepositoryFilter(resolveFilterRef.current?.(paths) ?? '*')
       // Open enough archive pages to mount the target before attempting to scroll.
       const ownerTurn =
         targetTurn !== undefined
