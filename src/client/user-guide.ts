@@ -1,3 +1,4 @@
+import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -8,7 +9,7 @@ import type { UserGuideDocument } from '../user-guide.ts'
 
 export async function loadUserGuide(ctx: Context, sessionId: string, language: ReviewLocale): Promise<UserGuideDocument> {
   const scope = (ctx as Context & { sessions: ISessions }).sessions.scope(sessionId as SessionId)
-  const remote = scope?.get('remote.fileReview') as { userGuideDocument?: (language: ReviewLocale) => Promise<RemoteResult<UserGuideDocument>> } | undefined
+  const remote = scope?.get(FILE_REVIEW_REMOTE_NAMESPACE) as { userGuideDocument?: (language: ReviewLocale) => Promise<RemoteResult<UserGuideDocument>> } | undefined
   if (!remote?.userGuideDocument) throw new Error(t('userGuideServiceUnavailable'))
   const result = await remote.userGuideDocument(language)
   if (!result.ok) throw new Error(result.error.message)

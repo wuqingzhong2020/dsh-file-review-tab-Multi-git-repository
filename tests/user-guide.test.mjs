@@ -37,7 +37,7 @@ test('guide requests use the selected language and originating session without a
   const ctx = { sessions: { scope(id) {
     assert.equal(id, 'review-session')
     return { get(namespace) {
-      assert.equal(namespace, 'remote.fileReview')
+      assert.equal(namespace, 'remote.multiGitFileReviewByWqz')
       return { async userGuideDocument(language) {
         requested.push(language)
         return { ok: true, value: { path: language, markdown: '# Guide', images: {} } }

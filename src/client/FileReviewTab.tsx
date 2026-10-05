@@ -1,3 +1,4 @@
+import { MULTI_GIT_REPO_MANAGER_REMOTE_NAMESPACE } from 'dsh-multi-git-repo-manager/service-names'
 /** Session/Git review page: scope controls, review state and composed turn groups. */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
@@ -123,7 +124,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   useEffect(() => {
     if (!visible) return
     let active = true
-    const remote = sessions.scope(sessionId as SessionId)?.get('remote.multiGitRepoManager') as
+    const remote = sessions.scope(sessionId as SessionId)?.get(MULTI_GIT_REPO_MANAGER_REMOTE_NAMESPACE) as
       | FileReviewRemote
       | undefined
     void remote

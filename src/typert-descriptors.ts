@@ -1,3 +1,4 @@
+import { FILE_REVIEW_SERVICE_NAME } from './service-names.ts'
 /** Strict Typert codecs shared by the Host and browser contribution artifacts. */
 
 import { z } from 'zod'
@@ -106,9 +107,9 @@ const recordedResultCodec = {
 
 function descriptor(method: 'status' | 'apply'): InvocationDescriptor {
   return {
-    id: `${PACKAGE_NAME}#fileReview/${method}`,
-    service: 'fileReview',
-    namespace: 'fileReview',
+    id: `${PACKAGE_NAME}#${FILE_REVIEW_SERVICE_NAME}/${method}`,
+    service: FILE_REVIEW_SERVICE_NAME,
+    namespace: FILE_REVIEW_SERVICE_NAME,
     method,
     invocation: { kind: 'direct' },
     scope: { context: 'agent', wire: 'agentId' },
@@ -123,9 +124,9 @@ function descriptor(method: 'status' | 'apply'): InvocationDescriptor {
 
 function recordedDescriptor(): InvocationDescriptor {
   return {
-    id: `${PACKAGE_NAME}#fileReview/recorded`,
-    service: 'fileReview',
-    namespace: 'fileReview',
+    id: `${PACKAGE_NAME}#${FILE_REVIEW_SERVICE_NAME}/recorded`,
+    service: FILE_REVIEW_SERVICE_NAME,
+    namespace: FILE_REVIEW_SERVICE_NAME,
     method: 'recorded',
     invocation: { kind: 'direct' },
     scope: { context: 'agent', wire: 'agentId' },
@@ -140,7 +141,7 @@ function recordedDescriptor(): InvocationDescriptor {
 
 export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
   ...(['locateReference', 'openEditor'] as const).map(method => ({
-    id: `${PACKAGE_NAME}#fileReview/${method}`, service: 'fileReview', namespace: 'fileReview', method,
+    id: `${PACKAGE_NAME}#${FILE_REVIEW_SERVICE_NAME}/${method}`, service: FILE_REVIEW_SERVICE_NAME, namespace: FILE_REVIEW_SERVICE_NAME, method,
     invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
     parameters: [
       { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
@@ -149,7 +150,7 @@ export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
     result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#ReviewLocationResult`, create: () => locationResultSchema },
   } satisfies InvocationDescriptor)),
   ...(['gitReview', 'gitReviewDiff'] as const).map(method => ({
-    id: `${PACKAGE_NAME}#fileReview/${method}`, service: 'fileReview', namespace: 'fileReview', method,
+    id: `${PACKAGE_NAME}#${FILE_REVIEW_SERVICE_NAME}/${method}`, service: FILE_REVIEW_SERVICE_NAME, namespace: FILE_REVIEW_SERVICE_NAME, method,
     invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
     parameters: [
       { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
@@ -158,7 +159,7 @@ export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
     result: { mode: 'strict', typeSymbol: `${PACKAGE_NAME}#${method === 'gitReview' ? 'GitReviewResult' : 'GitReviewDiff'}`, create: () => method === 'gitReview' ? gitReviewResultSchema : gitReviewDiffSchema },
   } satisfies InvocationDescriptor)),
   {
-    id: `${PACKAGE_NAME}#fileReview/userGuide`, service: 'fileReview', namespace: 'fileReview',
+    id: `${PACKAGE_NAME}#${FILE_REVIEW_SERVICE_NAME}/userGuide`, service: FILE_REVIEW_SERVICE_NAME, namespace: FILE_REVIEW_SERVICE_NAME,
     method: 'userGuide', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
     parameters: [
       { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },
@@ -168,7 +169,7 @@ export const FILE_REVIEW_INVOCATIONS: readonly InvocationDescriptor[] = [
   },
   descriptor('status'),
   {
-    id: `${PACKAGE_NAME}#fileReview/userGuideDocument`, service: 'fileReview', namespace: 'fileReview',
+    id: `${PACKAGE_NAME}#${FILE_REVIEW_SERVICE_NAME}/userGuideDocument`, service: FILE_REVIEW_SERVICE_NAME, namespace: FILE_REVIEW_SERVICE_NAME,
     method: 'userGuideDocument', invocation: { kind: 'direct' }, scope: { context: 'agent', wire: 'agentId' },
     parameters: [
       { name: 'agent', wire: 'agentId', source: 'lookup', lookup: 'agent', codec: agentCodec },

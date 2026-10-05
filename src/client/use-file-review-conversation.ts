@@ -1,3 +1,4 @@
+import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -66,7 +67,7 @@ export function useFileReviewConversation(
     let active = true
     const timer = window.setTimeout(() => {
       const scope = sessions.scope(sessionId as SessionId)
-      const remote = scope?.get('remote.fileReview') as FileReviewRemote | undefined
+      const remote = scope?.get(FILE_REVIEW_REMOTE_NAMESPACE) as FileReviewRemote | undefined
       if (scope === undefined || remote === undefined) {
         active = false
         return

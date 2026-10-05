@@ -88,7 +88,7 @@ const form = Object.assign(observable({ status: 'ready', writable: true, revisio
   },
 })
 const mirror = Object.assign(observable({ view: { namespaces: [{ ns: 'fixture-profile', value: { reviewSettingsOwner: packageName } }] } }), { ensure: async () => {} })
-const scope = { get: name => name === 'remote.fileReview' ? remote : name === 'remote.multiGitRepoManager' ? managerRemote : undefined, bail: (_ctx, _name, request) => {
+const scope = { get: name => name === 'remote.multiGitFileReviewByWqz' ? remote : name === 'remote.multiGitRepoManagerByWqz' ? managerRemote : undefined, bail: (_ctx, _name, request) => {
   inputState.set({ ...inputState.getSnapshot(), draftRev: inputState.getSnapshot().draftRev + 1, occurrences: [{ ...request.reference, offset: 0, length: request.reference.clipboardText.length }] })
   return true
 } }

@@ -100,10 +100,10 @@ test('a batch shares one durable replay for status and one for apply', () => fix
   const snapshotEvents = agent.session.snapshotEvents.bind(agent.session)
   let replays = 0
   agent.session.snapshotEvents = () => { replays++; return snapshotEvents() }
-  const status = await ctx.fileReview.status(agent, request)
+  const status = await ctx.multiGitFileReviewByWqz.status(agent, request)
   assert.deepEqual(status.files.map(file => file.state), ['applied', 'applied'])
   assert.equal(replays, 1)
-  const applied = await ctx.fileReview.apply(agent, request)
+  const applied = await ctx.multiGitFileReviewByWqz.apply(agent, request)
   assert.deepEqual(applied.files.map(file => file.state), ['undone', 'undone'])
   assert.equal(replays, 2)
 }))
@@ -160,7 +160,7 @@ test('failed, aborted and post-policy replaced tool results cannot authorize lif
   const off = ctx.on('tools/post-execute', async (exec, result, next) => exec.callId === 'REPLACED' ? { kind: 'accept', value: 'replacement' } : next())
   const replaced = await execute('REPLACED')
   assert.deepEqual(lifecycleFromContent(replaced.content), [])
-  assert.deepEqual(ctx.fileReview.lifecycleRecords(agent), [])
+  assert.deepEqual(ctx.multiGitFileReviewByWqz.lifecycleRecords(agent), [])
   off()
 }))
 
@@ -171,7 +171,7 @@ test('a failing PTC program retains previously accepted nested file records', ()
   const result = await ctx.tools.execute({ name: 'run_code', callId, arguments: arguments_, agent, signal: new AbortController().signal })
   assert.equal(result.isError, true)
   agent.session.append('tool/result', { turn: 1, step: 1, message: createToolResultMessage({ callId, content: result.content, isError: true }) }, { surfaceOp: 'append' })
-  assert.equal((await ctx.fileReview.recorded(agent, { rootCallIds: [callId] })).mutations[0].after, 'accepted')
+  assert.equal((await ctx.multiGitFileReviewByWqz.recorded(agent, { rootCallIds: [callId] })).mutations[0].after, 'accepted')
 }, { ptc: true, programFail: true }))
 
 test('only complete Host-owned identities authorize lifecycle writes, including after durable JSON replay', () => fixture(async ({ root, agent, mutate }) => {

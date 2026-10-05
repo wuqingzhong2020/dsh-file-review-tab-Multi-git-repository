@@ -1,3 +1,4 @@
+import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 /**
  * File-review-tab plugin, browser half: TWO coexisting surfaces over the same
  * produced-file vocabulary —
@@ -38,7 +39,7 @@ import { registerReviewEnhancements } from './review-enhancements.tsx'
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Turn-tail row copy (the chat-side surface). */
-    'file-review': DeliverablesKey
+    [CHAT_NS]: DeliverablesKey
   }
 }
 
@@ -136,9 +137,9 @@ export function apply(ctx: Context): void {
                 // `get()` is the Cordis escape hatch for an explicitly mounted
                 // dynamic service; tracing still binds the Remote call to this
                 // Session scope.
-                const fileReview = scope.get('remote.fileReview') as FileReviewRemote | undefined
-                if (fileReview === undefined) throw new Error('File review Remote is unavailable')
-                const result = await fileReview[method](request)
+                const multiGitFileReviewByWqz = scope.get(FILE_REVIEW_REMOTE_NAMESPACE) as FileReviewRemote | undefined
+                if (multiGitFileReviewByWqz === undefined) throw new Error('File review Remote is unavailable')
+                const result = await multiGitFileReviewByWqz[method](request)
                 if (!result.ok) throw new Error(result.error.message)
                 return result.value
               }

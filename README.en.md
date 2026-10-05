@@ -2,13 +2,15 @@
 
 Git repositories and ordinary directories now share managed targets, discovery and Host admission. See [non-Git directories](docs/NON_GIT_DIRECTORIES.en.md) for filtering and file-scoped confirmation.
 
-Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.2](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.2` and uses its shared service for repository scope. Install and enable both plugins; existing `dsh-file-review-repositories.json` files remain compatible. See [dependency and migration notes](docs/REPOSITORY_MANAGER.md).
+Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.3](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.3` and uses its shared service for repository scope. Install and enable both plugins; existing `dsh-file-review-repositories.json` files remain compatible. See [dependency and migration notes](docs/REPOSITORY_MANAGER.md).
 
 See the [validation record](docs/NON_GIT_VERIFICATION.md) for automated checks, isolated package installation and actual Windows Desktop checks, including their limits.
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.3.2**.
+Current version: **v0.3.4**.
+
+The Host service and Remote namespace are `multiGitFileReviewByWqz`, using `multiGitRepoManagerByWqz` for shared repository management. Chat dictionaries use `multiGitFileReviewByWqz.chat`, isolating both the original plugin's `fileReview` service and its `file-review` dictionaries. Install the matching package versions. See [namespace isolation](docs/NAMESPACE_ISOLATION.md).
 
 **dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 using its native right sidebar, without a third-party sidebar requirement.**
 
@@ -57,26 +59,26 @@ Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as 
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.3.2.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.4.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.2.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.2.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.3.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.4.tgz"
 ```
 
 Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open the native right sidebar's Start page using ＋, then select Multi-repository management or File Review (Multi-Git).
 
-For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.2 label alone does not establish that the latest build is loaded.
+For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.4 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.2/dsh-file-review-tab-multi-git-repository-0.3.2.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.4/dsh-file-review-tab-multi-git-repository-0.3.4.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -101,7 +103,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.2 package has not been published). The bilingual [Release notes](docs/releases/version.md#v031) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.4 package has not been published). The bilingual [Release notes](docs/releases/version.md#v034) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 

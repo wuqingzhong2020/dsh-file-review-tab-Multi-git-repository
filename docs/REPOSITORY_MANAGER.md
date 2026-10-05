@@ -1,12 +1,12 @@
 # 公共仓库管理依赖与迁移
 
-本插件精确依赖 `dsh-multi-git-repo-manager@0.1.2`。工程配置、Profile 索引、仓库清单解析、路径和仓库归属、临时仓库、目录选择、中英文管理界面及原生右侧管理 Tab 均归管理插件所有。审查插件保留 Git 差异、工具变更、撤销/重做、评论、确认与原生侧栏。
+本插件精确依赖 `dsh-multi-git-repo-manager@0.1.3`。工程配置、Profile 索引、仓库清单解析、路径和仓库归属、临时仓库、目录选择、中英文管理界面及原生右侧管理 Tab 均归管理插件所有。审查插件保留 Git 差异、工具变更、撤销/重做、评论、确认与原生侧栏。
 
 ## 安装
 
-在 Desktop 插件页安装并启用管理插件的 `dsh-multi-git-repo-manager-0.1.2.tgz`，再安装并启用本插件。管理插件是必需的 `peerDependencies`，版本固定为 `0.1.2`；它未发布到 npm registry 时，需同时提供两个本地包，供宿主共享同一个插件实例。DSH Profile 的 `dsh.profile.bundles` 中也需要选中两个包，因为普通 npm dependencies 不会自动启动插件。
+在 Desktop 插件页安装并启用管理插件的 `dsh-multi-git-repo-manager-0.1.3.tgz`，再安装并启用本插件。管理插件是必需的 `peerDependencies`，版本固定为 `0.1.3`；它未发布到 npm registry 时，需同时提供两个本地包，供宿主共享同一个插件实例。DSH Profile 的 `dsh.profile.bundles` 中也需要选中两个包，因为普通 npm dependencies 不会自动启动插件。
 
-`0.1.2` 是 package.json 中的版本号，Git 标签为 `v0.1.2`。本仓库的开发链接仅在未打包的 `pnpm-workspace.yaml` 中：`link:../dsh-multi-git-repo-manager`。发布包中的必需插件依赖仍是 `peerDependencies` 的 `0.1.2`。
+`0.1.3` 是 package.json 中的版本号，Git 标签为 `v0.1.3`。本仓库的开发链接仅在未打包的 `pnpm-workspace.yaml` 中：`link:../dsh-multi-git-repo-manager`。发布包中的必需插件依赖仍是 `peerDependencies` 的 `0.1.3`。
 
 ## 现有工程
 
@@ -18,7 +18,7 @@
 
 ## 后续插件接入
 
-宿主声明 `inject = ['multiGitRepoManager']` 并调用 `ctx.multiGitRepoManager.workspace(agent)`。浏览器使用当前会话的 `remote.multiGitRepoManager`，订阅 `/events` 的配置变化后刷新自己的界面。不要实例化第二个管理服务或再次注册管理页签。
+宿主声明 `inject = ['multiGitRepoManagerByWqz']` 并调用 `ctx.multiGitRepoManagerByWqz.workspace(agent)`。浏览器使用当前会话的 `remote.multiGitRepoManagerByWqz`，订阅 `/events` 的配置变化后刷新自己的界面。不要实例化第二个管理服务或再次注册管理页签。
 
 `repository-*.ts` 和部分客户端工具在本仓库只再导出管理包的公共接口，供既有源码调用和声明兼容；管理实现不再留在本仓库。新增管理能力应修改独立管理包，再更新消费者版本。
 

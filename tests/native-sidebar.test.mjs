@@ -10,6 +10,7 @@ import { openReviewTab, openReviewResource } from '../src/client/sidebar-navigat
 import { registrationLifetime } from '../src/client/registration-lifetime.ts'
 import { clearFileReviewSeeds, currentFileReviewSeed, discardFileReviewSeed, publishFileReviewSeed, subscribeFileReviewSeed } from '../src/client/deep-link.ts'
 import { t } from '../src/client/locales.ts'
+import { NS as CHAT_LOCALE_NS } from '../src/client/chat-locales.ts'
 
 test('chat navigation isolates sessions, reveals existing pages and rolls back failed targets', () => {
   clearFileReviewSeeds()
@@ -84,7 +85,7 @@ test('partial registration rolls back in reverse order despite a throwing dispos
 })
 
 /** Load the real distributable with host capabilities, rather than a duplicated test implementation. */
-async function clientHarness({ delayed = false, failTitle = false } = {}) {
+async function clientHarness({ delayed = false, failTitle = false, locale: registeredLocale } = {}) {
   let plugin
   const diagnostics = []
   runInNewContext(await readFile(new URL('../lib/client.js', import.meta.url), 'utf8'), {
@@ -101,7 +102,7 @@ async function clientHarness({ delayed = false, failTitle = false } = {}) {
   const snapshots = new Map()
   const sessions = { list: { getSnapshot: () => ({ byId: {} }), subscribe: () => () => {} }, binding: id => id,
     retainInfo: id => ({ getSnapshot: () => id, subscribe: () => () => {} }) }
-  const locale = { active: 'zh', getSnapshot() { return { active: this.active } },
+  const locale = registeredLocale ?? { active: 'zh', getSnapshot() { return { active: this.active } },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn) }, register: () => () => {},
     set(active) { this.active = active; for (const notify of [...listeners]) notify() } }
   const ctx = {
@@ -139,6 +140,44 @@ async function clientHarness({ delayed = false, failTitle = false } = {}) {
   return { plugin, ctx, types, seats, pending, locale, snapshots, diagnostics,
     release: () => { for (const dispose of effects.reverse()) dispose?.() },
   }
+}
+
+/** Use the shipped DSH registry so duplicate dictionary registration really throws. */
+async function localeRuntime() {
+  let runtime
+  runInNewContext(await readFile(new URL(import.meta.resolve('@deepseek-ai/dsh-client-locale/client')), 'utf8'), {
+    window: { __ModuleLoader__: { load: ({ factory }) => {
+      runtime = factory(name => {
+        if (name === 'react') return React
+        if (name === 'react/jsx-runtime') return jsx
+        if (name === '@deepseek-ai/dsh-client-ui-primitives' || name === '@deepseek-ai/dsh-client-store') return {}
+        assert.fail(`Unexpected locale runtime dependency: ${name}`)
+      })
+    } } }, console, Map, Set, navigator: { languages: ['en-US'], language: 'en-US' },
+  })
+  return new runtime.LocaleRuntime({ emit() {} })
+}
+
+for (const originalFirst of [true, false]) {
+  test(`packaged review and the original chat dictionaries coexist with original ${originalFirst ? 'first' : 'last'}`, async () => {
+    const locale = await localeRuntime()
+    const originalDictionaries = { zh: { 'produced.summary': '原版文件改动' }, en: { 'produced.summary': 'Original file changes' } }
+    let originalRelease, harness
+    try {
+      if (originalFirst) originalRelease = locale.register('file-review', originalDictionaries)
+      harness = await clientHarness({ locale })
+      if (!originalFirst) originalRelease = locale.register('file-review', originalDictionaries)
+      assert.notEqual(CHAT_LOCALE_NS, 'file-review')
+      assert.equal(locale.bind('file-review')('produced.summary'), 'Original file changes')
+      assert.equal(locale.bind(CHAT_LOCALE_NS)('produced.summary'), 'Edited files')
+      harness.release()
+      harness = undefined
+      assert.equal(locale.bind('file-review')('produced.summary'), 'Original file changes', 'unloading the fork retains the original dictionary')
+    } finally {
+      harness?.release()
+      originalRelease?.()
+    }
+  })
 }
 
 test('packaged client boots without a third-party sidebar and restores review plus hidden legacy-guide kinds', async () => {

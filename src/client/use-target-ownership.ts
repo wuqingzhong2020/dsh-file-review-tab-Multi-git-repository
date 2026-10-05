@@ -1,3 +1,4 @@
+import { MULTI_GIT_REPO_MANAGER_REMOTE_NAMESPACE } from 'dsh-multi-git-repo-manager/service-names'
 import { useEffect, useMemo, useState } from 'react'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -14,7 +15,7 @@ export function useTargetOwnership(sessions: ISessions, sessionId: string, cwd: 
   useEffect(() => {
     if (!visible || !workspace?.targets) return
     let active = true
-    const remote = sessions.scope(sessionId as SessionId)?.get('remote.multiGitRepoManager') as TargetRemote | undefined
+    const remote = sessions.scope(sessionId as SessionId)?.get(MULTI_GIT_REPO_MANAGER_REMOTE_NAMESPACE) as TargetRemote | undefined
     const paths = JSON.parse(pathsKey) as string[]
     if (!paths.length) { setResult({ key, owners: new Map() }); return }
     void (async () => {

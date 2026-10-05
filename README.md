@@ -2,13 +2,15 @@
 
 已支持 Git 仓库与非 Git 目录：类型选择、直接子目录发现、v1/v2 配置和 Host 文件归属共用管理服务。普通目录的会话审查与按文件确认见 [非 Git 目录说明](docs/NON_GIT_DIRECTORIES.md)。
 
-多仓库管理现已独立到 **[dsh-multi-git-repo-manager v0.1.2](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**。本插件固定依赖 `0.1.2`，并通过共享服务取得仓库范围；管理页面从右侧「开始」页打开为原生 Tab，原会话区管理页签已移除。安装时必须同时安装并启用两个插件；旧 `dsh-file-review-repositories.json` 无需改名。迁移说明见 [公共仓库管理依赖](docs/REPOSITORY_MANAGER.md)。
+多仓库管理现已独立到 **[dsh-multi-git-repo-manager v0.1.3](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**。本插件固定依赖 `0.1.3`，并通过共享服务取得仓库范围；管理页面从右侧「开始」页打开为原生 Tab，原会话区管理页签已移除。安装时必须同时安装并启用两个插件；旧 `dsh-file-review-repositories.json` 无需改名。迁移说明见 [公共仓库管理依赖](docs/REPOSITORY_MANAGER.md)。
 
 本轮类型检查、构建、自动测试、双包联装及指定 Desktop 的实际验证见 [实施验证记录](docs/NON_GIT_VERIFICATION.md)。
 
 [简体中文](README.md) | [English](README.en.md)
 
-当前版本：**v0.3.2**。
+当前版本：**v0.3.4**。
+
+本插件的 Host 服务与 Remote 命名空间为 `multiGitFileReviewByWqz`，使用管理服务 `multiGitRepoManagerByWqz`。聊天字典独立为 `multiGitFileReviewByWqz.chat`，与原版的 `fileReview` 服务和 `file-review` 字典分别隔离。使用配套版本安装包；迁移与验证见 [命名空间隔离](docs/NAMESPACE_ISOLATION.md)。
 
 **dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并直接接入 DeepSeek Harness Desktop 0.2.0-rc.2 的原生右侧栏，无需安装第三方侧栏插件。**
 
@@ -60,26 +62,26 @@
 
 文件由宿主选择内置查看器；原生预览可能只读，可选编辑器插件可为其接管的格式提供编辑能力。外部 IDE 定位仍可独立使用。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.2.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.4.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.2.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.2.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.3.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.4.tgz"
 ```
 
 维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；从原生右侧栏「+」打开「开始」页，在其中选择「多代码仓管理」或「文件审查（多git仓）」。
 
-重新构建但版本号未变时，pnpm 可能复用同路径本地包。请先复制为包含构建校验摘要的新文件名，再安装该路径；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.2，并不能单独证明加载了最新构建。
+重新构建但版本号未变时，pnpm 可能复用同路径本地包。请先复制为包含构建校验摘要的新文件名，再安装该路径；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.4，并不能单独证明加载了最新构建。
 
 ### 独立 Web Profile
 
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.2/dsh-file-review-tab-multi-git-repository-0.3.2.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.4/dsh-file-review-tab-multi-git-repository-0.3.4.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -104,7 +106,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.2 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v031) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.4 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v034) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 

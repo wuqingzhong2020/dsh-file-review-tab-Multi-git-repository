@@ -1,6 +1,5 @@
-/** `file-review` namespace dictionaries. */
 /** Dictionary namespace owned by this plugin. */
-export declare const NS = "file-review";
+export declare const NS: "multiGitFileReviewByWqz.chat";
 /** English dictionary (the key-set source of truth). */
 export declare const en: {
     'produced.summary': string;

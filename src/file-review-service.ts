@@ -1,3 +1,4 @@
+import { FILE_REVIEW_SERVICE_NAME } from './service-names.ts'
 /** Host-side, workspace-contained undo / redo service for produced text diffs. */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -32,7 +33,7 @@ function agentKey(agent: Agent): string {
   return String(agent.id)
 }
 
-/** Host service published as the `fileReview` Remote namespace. */
+/** Host service published as the `multiGitFileReviewByWqz` Remote namespace. */
 export class FileReviewService extends TypertRemoteService {
   /** Per-agent record of Code Mode (`run_code`) file mutations, dispatch order. */
   private readonly recordLog = new Map<string, RecordedMutation[]>()
@@ -43,7 +44,7 @@ export class FileReviewService extends TypertRemoteService {
     ctx: Context,
     private readonly repositoryManager: Pick<MultiGitRepoManager, 'workspace'> & Partial<Pick<MultiGitRepoManager, 'resolveTargetPaths'>>,
   ) {
-    super(ctx, 'fileReview')
+    super(ctx, FILE_REVIEW_SERVICE_NAME)
   }
 
   /** Every review operation uses the manager's authoritative session scope. */

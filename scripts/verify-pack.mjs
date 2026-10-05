@@ -20,7 +20,7 @@ for (const [entry, target] of Object.entries(pkg.exports)) {
 }
 assert.ok(![...files].some(path => path.includes('TEMP_REF_FEATURE') || path.startsWith('tests/') || path.startsWith('node_modules/')))
 assert.ok(!Object.keys(pkg.dependencies).some(name => /better-sidebar|file-review-tab|left0ver/.test(name)))
-assert.equal(pkg.peerDependencies['dsh-multi-git-repo-manager'], '0.1.2')
+assert.equal(pkg.peerDependencies['dsh-multi-git-repo-manager'], '0.1.3')
 assert.notEqual(pkg.peerDependenciesMeta?.['dsh-multi-git-repo-manager']?.optional, true)
 for (const name of ['@deepseek-ai/dsh-client-ui-input-trigger', '@deepseek-ai/dsh-client-ui-plugin-manager', '@deepseek-ai/dsh-client-ui-settings']) {
   assert.equal(pkg.peerDependenciesMeta[name].optional, true)

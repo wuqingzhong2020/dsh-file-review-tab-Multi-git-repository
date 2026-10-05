@@ -1,3 +1,4 @@
+import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import { useCallback, useEffect } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -55,7 +56,7 @@ export function useFileReviewActions({
     async (method: 'status' | 'apply', request: FileReviewRequest): Promise<FileReviewResult> => {
       const scope = sessions.scope(sessionId as SessionId)
       if (scope === undefined) throw new Error(t('sessionUnavailable'))
-      const remote = scope.get('remote.fileReview') as FileReviewRemote | undefined
+      const remote = scope.get(FILE_REVIEW_REMOTE_NAMESPACE) as FileReviewRemote | undefined
       if (remote === undefined) throw new Error(t('remoteUnavailable'))
       const result = await remote[method](request)
       if (!result.ok) throw new Error(result.error.message)

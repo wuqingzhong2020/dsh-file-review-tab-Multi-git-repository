@@ -1,3 +1,4 @@
+import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -41,7 +42,7 @@ export async function reviewLocation(
   method: LocationMethod = 'openEditor',
 ): Promise<ReviewLocationResult> {
   const scope = (ctx as Context & { sessions: ISessions }).sessions.scope(sessionId as SessionId)
-  const remote = scope?.get('remote.fileReview') as LocationRemote | undefined
+  const remote = scope?.get(FILE_REVIEW_REMOTE_NAMESPACE) as LocationRemote | undefined
   if (!remote?.[method]) return { state: 'error' }
   const result = await remote[method](request)
   return result.ok ? result.value : { state: 'error' }

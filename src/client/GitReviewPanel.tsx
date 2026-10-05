@@ -1,3 +1,4 @@
+import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import { useEffect, useRef, useState } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -55,7 +56,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
   useReviewLocale()
   const sessions = (ctx as Context & { sessions: ISessions }).sessions
   const remote = (): GitRemote => {
-    const value = sessions.scope(sessionId as SessionId)?.get('remote.fileReview') as
+    const value = sessions.scope(sessionId as SessionId)?.get(FILE_REVIEW_REMOTE_NAMESPACE) as
       | GitRemote
       | undefined
     if (!value) throw new Error(t('remoteUnavailable'))

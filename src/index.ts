@@ -1,3 +1,4 @@
+import { MULTI_GIT_REPO_MANAGER_SERVICE_NAME } from 'dsh-multi-git-repo-manager/service-names'
 /**
  * File-review-tab plugin, node half. Registers the response-format guidance
  * that lets the browser half recognize final-response file references. The
@@ -22,7 +23,7 @@ export { Config } from './repository-config.ts'
 export { FileReviewService, transformFile } from './file-review-service.ts'
 
 /** Services required for the model guidance paired with the browser renderer. */
-export const inject = ['systemPrompt', 'tools', 'multiGitRepoManager']
+export const inject = ['systemPrompt', 'tools', MULTI_GIT_REPO_MANAGER_SERVICE_NAME]
 
 /** Stable final-response guidance owned by the matching renderer. */
 const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, mention the primary outputs in your final response. '
@@ -37,14 +38,14 @@ const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, men
  * model-direct tool/call frames — so reviewing programmatic file edits needs a
  * second source: this listener snapshots the full `before`/`after` content of
  * every nested file mutation (`edit`/`write` — recognized by result shape, not
- * tool name) into the `fileReview` service, which the browser half later turns
+ * tool name) into the `multiGitFileReviewByWqz` service, which the browser half later turns
  * into line-level hunks and merges into the owning `run_code` turn.
  * @param ctx - host context carrying the system-prompt registry and tool runtime.
  */
 export function apply(ctx: Context, config: FileReviewConfig): void {
   const projects = Array.isArray(config?.projects) ? config.projects : config?.projects?.get() ?? []
-  ctx.multiGitRepoManager.adoptLegacyProjects(projects)
-  const service = new FileReviewService(ctx, ctx.multiGitRepoManager)
+  ctx.multiGitRepoManagerByWqz.adoptLegacyProjects(projects)
+  const service = new FileReviewService(ctx, ctx.multiGitRepoManagerByWqz)
   registerLifecycleCapture(ctx, service)
   ctx.systemPrompt.section({
     name: 'ui:file-review-tab-multi-git-repository:references',
@@ -72,3 +73,5 @@ export function apply(ctx: Context, config: FileReviewConfig): void {
     })
   }), 'file-review-tab: ptc recorder')
 }
+
+export * from './service-names.ts'

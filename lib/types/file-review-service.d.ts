@@ -10,7 +10,7 @@ import type { ReviewLocationRequest, ReviewLocationResult } from './review-locat
 import type { UserGuideDocument } from './user-guide.ts';
 import { type LifecycleRecord } from './lifecycle-record.ts';
 export { transformFile } from './file-review-files.ts';
-/** Host service published as the `fileReview` Remote namespace. */
+/** Host service published as the `multiGitFileReviewByWqz` Remote namespace. */
 export declare class FileReviewService extends TypertRemoteService {
     private readonly repositoryManager;
     /** Per-agent record of Code Mode (`run_code`) file mutations, dispatch order. */

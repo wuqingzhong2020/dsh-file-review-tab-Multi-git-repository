@@ -15,11 +15,11 @@
  * disposal (HMR / plugin disable) unregisters cleanly.
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { type DeliverablesKey } from './chat-locales.ts';
+import { NS as CHAT_NS, type DeliverablesKey } from './chat-locales.ts';
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
         /** Turn-tail row copy (the chat-side surface). */
-        'file-review': DeliverablesKey;
+        [CHAT_NS]: DeliverablesKey;
     }
 }
 /**

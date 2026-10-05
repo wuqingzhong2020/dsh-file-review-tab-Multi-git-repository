@@ -1,7 +1,8 @@
-/** `file-review` namespace dictionaries. */
+/** Chat dictionaries use a package-owned namespace, separate from the original plugin. */
+import { FILE_REVIEW_CHAT_LOCALE_NAMESPACE } from '../service-names.ts'
 
 /** Dictionary namespace owned by this plugin. */
-export const NS = 'file-review'
+export const NS = FILE_REVIEW_CHAT_LOCALE_NAMESPACE
 
 /** English dictionary (the key-set source of truth). */
 export const en = {

@@ -2,7 +2,7 @@
 
 当前新增目录能力见 [非 Git 目录架构与使用](NON_GIT_DIRECTORIES.md)。管理、发现与文件归属由共享插件提供，审查侧仅维护业务适配；以下既有链路继续沿用。
 
-多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.1**。`apply` 注入 `multiGitRepoManager`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。本仓库的 `repository-*.ts` 及客户端路径/事件文件只保留兼容再导出。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。详见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
+多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.3**。`apply` 注入 `multiGitRepoManagerByWqz`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。本仓库的 `repository-*.ts` 及客户端路径/事件文件只保留兼容再导出。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。详见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
@@ -44,7 +44,7 @@ flowchart TB
       UI["React 页面与差异渲染"]
       Snapshot["会话 Conversation snapshot"]
       Local["浏览器 localStorage"]
-      Remote["Typert 客户端 remote.fileReview"]
+      Remote["Typert 客户端 remote.multiGitFileReviewByWqz"]
       Slots --> UI
       Sidebar --> UI
       Snapshot --> UI
@@ -54,7 +54,7 @@ flowchart TB
     subgraph Host["Node.js Host"]
       Entry["src/index.ts：注册与嵌套工具监听"]
       Service["FileReviewService"]
-      Workspace["multiGitRepoManager：共享工程配置、路径与仓库解析"]
+      Workspace["multiGitRepoManagerByWqz：共享工程配置、路径与仓库解析"]
       Git["git-review.ts"]
       Entry --> Service
       Service --> Workspace
@@ -71,7 +71,7 @@ flowchart TB
 
 ### 2.1 Host 入口
 
-[src/index.ts](../src/index.ts) 的 `apply` 注入共享 `multiGitRepoManager`，创建 `FileReviewService`，注册文件引用的系统提示，并监听成功的嵌套 `tools/result`。
+[src/index.ts](../src/index.ts) 的 `apply` 注入共享 `multiGitRepoManagerByWqz`，创建 `FileReviewService`，注册文件引用的系统提示，并监听成功的嵌套 `tools/result`。
 
 监听器按结果结构识别具有 `path / before / after` 的文件修改，只补录嵌套调用。普通工具调用已经有 Conversation 数据，不在这里重复记录。失败的工具结果不会进入记录。
 
@@ -296,7 +296,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 ## 6. Host / Client 通信契约
 
-审查通信命名空间为 `fileReview`，管理通信命名空间为 `multiGitRepoManager`，均以 Agent 为作用域。Host 从宿主查找 Agent，并使用 `agent.session.header.cwd` 作为权威会话目录，不能信任浏览器传入一个根目录就扩大文件操作范围。
+审查通信命名空间为 `multiGitFileReviewByWqz`，管理通信命名空间为 `multiGitRepoManagerByWqz`，均以 Agent 为作用域。Host 从宿主查找 Agent，并使用 `agent.session.header.cwd` 作为权威会话目录，不能信任浏览器传入一个根目录就扩大文件操作范围。
 
 契约分为三层：
 
@@ -306,11 +306,11 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 | 方法 | 用途 | 副作用 |
 | --- | --- | --- |
-| `multiGitRepoManager.project()` | 读取当前工程的管理页数据、配置存在状态与修订值 | 读取 |
-| `multiGitRepoManager.workspace()` | 获取当前会话有效仓库和允许的文件根目录 | 读取 |
-| `multiGitRepoManager.saveProject(request)` | 保存工程配置并返回管理页数据 | 写工程 JSON、更新 Profile 索引 |
-| `multiGitRepoManager.setTemporaryRepositories(entries)` | 设置当前会话的临时外部仓库 | 更新 Host 内存 |
-| `multiGitRepoManager.directoryStart(path)` | 解析目录选择器起始目录 | 读取 |
+| `multiGitRepoManagerByWqz.project()` | 读取当前工程的管理页数据、配置存在状态与修订值 | 读取 |
+| `multiGitRepoManagerByWqz.workspace()` | 获取当前会话有效仓库和允许的文件根目录 | 读取 |
+| `multiGitRepoManagerByWqz.saveProject(request)` | 保存工程配置并返回管理页数据 | 写工程 JSON、更新 Profile 索引 |
+| `multiGitRepoManagerByWqz.setTemporaryRepositories(entries)` | 设置当前会话的临时外部仓库 | 更新 Host 内存 |
+| `multiGitRepoManagerByWqz.directoryStart(path)` | 解析目录选择器起始目录 | 读取 |
 | `userGuide(language)` | 按 `zh` / `en` 返回插件安装目录中的使用手册绝对路径 | 读取插件文件；不依赖会话工程目录 |
 | `userGuideDocument(language)` | 返回固定语言手册的 Markdown 与 12 张随包截图的 JPEG data URL | 只读取固定文档和图片白名单；不接受调用方文件路径 |
 | `gitReview(request)` | 查询仓库、比较引用及改动文件列表 | 读取 Git |
@@ -321,7 +321,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | `locateReference(request)` | 核对当前磁盘引用位置 | 读取，结果含原位置／移动／歧义／失配 |
 | `openEditor(request)` | 再次校验后向 VS Code 兼容程序传递文件与行号 | 启动外部编辑器，不写工程文件 |
 
-客户端先获取 `sessions.scope(sessionId)`，审查功能用 `scope.get('remote.fileReview')`，管理与工作区功能用 `scope.get('remote.multiGitRepoManager')` 获取动态服务。响应为 `RemoteResult`：先检查 `ok`，失败读取 `error.message`，成功读取 `value`。异步挂载未完成或插件服务缺失时必须提供可见错误，不能在组件渲染期间无条件访问会抛异常的动态服务 getter。
+客户端先获取 `sessions.scope(sessionId)`，审查功能用 `scope.get('remote.multiGitFileReviewByWqz')`，管理与工作区功能用 `scope.get('remote.multiGitRepoManagerByWqz')` 获取动态服务。响应为 `RemoteResult`：先检查 `ok`，失败读取 `error.message`，成功读取 `value`。异步挂载未完成或插件服务缺失时必须提供可见错误，不能在组件渲染期间无条件访问会抛异常的动态服务 getter。
 
 文件审查标题行的「操作指南」打开 [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) 中的宿主 Modal 弹窗。[UserGuideContent.tsx](../src/client/UserGuideContent.tsx) 通过 Agent 作用域 `userGuideDocument(language)` 读取手册和截图，保留宿主 Markdown 排版、图片放大、刷新、焦点返回及 Esc。语言变化重载正文，关闭或来源 Tab 隐藏时卸载文档与图片层，旧请求不写回。旧保存布局的 `file-review-guide` 兼容页只提供打开同一弹窗和关闭自身，不再出现在引导页；Host 的旧路径 RPC 保留兼容。
 
@@ -529,7 +529,7 @@ pnpm pack --pack-destination dist
 | 现象 | 优先排查 |
 | --- | --- |
 | 「文件审查」Tab 不出现 | 原生类型／插槽注册、`dsh.client` 加载、`client/index` 日志、安装包是否为本次产物 |
-| `remote.fileReview` 不可用 | `$mount` 错误、Host 插件与 Typert 模型加载、会话 scope 是否存在、两端版本是否一致 |
+| `remote.multiGitFileReviewByWqz` 不可用 | `$mount` 错误、Host 插件与 Typert 模型加载、会话 scope 是否存在、两端版本是否一致 |
 | 会话有旧修改但「上一轮」为空 | 最新轮次是否实际修改文件；按定义不会回退到更早轮次 |
 | Code Mode 改动缺失 | 嵌套调用是否成功、结果是否有 before/after、root/sub-call 归属、schema 与预算、官方持久化标记及截断提示 |
 | 多仓库没有生效 | 最近项目 JSON 是否存在/启用、相对根目录是否正确、仓库是否可用；旧 Profile 清单本身不启用功能 |

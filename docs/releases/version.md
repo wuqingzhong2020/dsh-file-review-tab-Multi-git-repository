@@ -6,6 +6,8 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
+- [v0.3.4](#v034)
+- [v0.3.3](#v033)
 - [v0.3.2](#v032) · [非 Git 目录验证](../NON_GIT_VERIFICATION.md)
 - [v0.3.1](#v031) · [验证矩阵](../MIGRATION_VERIFICATION.md)
 - [v0.3.0](#v030)
@@ -13,6 +15,22 @@ Release notes and validation records are maintained in this file, with the newes
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
+
+## v0.3.4
+
+- 将聊天文案字典独立为 `multiGitFileReviewByWqz.chat`，修复与原版 `dsh-file-review` 共用 `file-review` 导致的客户端启动失败。
+- 使用实际发布客户端和 DSH `LocaleRuntime` 检查两个加载顺序，并验证单独卸载不会删除原版字典；管理依赖仍为 `0.1.3`。
+- 服务、工程配置、原生 Tab 和审查偏好继续沿用。原因和实际验证见 [命名空间隔离](../NAMESPACE_ISOLATION.md)。
+
+Isolate chat dictionaries as `multiGitFileReviewByWqz.chat` to prevent client startup failure alongside the original plugin. Test both registration orders against DSH's real locale registry and preserve the original dictionary when unloading. The manager dependency remains `0.1.3`.
+
+## v0.3.3
+
+- 将 Host 服务、Typert 描述、Remote 类型与前端调用统一迁移至 `multiGitFileReviewByWqz`，与原版 `dsh-file-review` 的 `fileReview` 服务隔离。
+- 精确依赖管理插件 `0.1.3`，调用 `multiGitRepoManagerByWqz`；集中定义服务名称，新增实际 Cordis/Typert 同名服务共存回归。
+- 升级两个包即可沿用工程配置和审查偏好，不提供占用旧服务名的别名。验证记录见 [命名空间隔离](../NAMESPACE_ISOLATION.md)。
+
+Isolate the review service as `multiGitFileReviewByWqz` and pin manager `0.1.3` with its `multiGitRepoManagerByWqz` namespace. Centralized identities and coexistence coverage preserve the original plugin's separate service.
 
 ## v0.3.2
 
