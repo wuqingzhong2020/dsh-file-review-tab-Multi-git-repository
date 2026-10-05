@@ -34,6 +34,9 @@ import { FileContentsButton, ReviewRepositoryGroup } from './ReviewRepositoryGro
 import { addStats, isReversible, stateKey, type ReviewMode } from './file-review-model.ts'
 import type { FileReviewActions } from './use-file-review-actions.ts'
 import css from './FileReviewTab.module.css'
+import { AggregateCopyButton } from './AggregateCopyButton.tsx'
+import type { AggregateDiffFile } from './aggregate-diff.ts'
+import { localizeReviewMessage } from './message-locales.ts'
 
 interface FileReviewExpansion {
   readonly expanded: ReadonlySet<string>
@@ -201,6 +204,13 @@ export function FileReviewTurn({
     : confirmed
       ? t('unconfirmTurnHint')
       : t('confirmTurnHint', { count: fullTurn.files.length })
+  const copyFiles = (files: readonly SessionFileChange[]): AggregateDiffFile[] => files.map(file => ({
+    repository: ownerOf(file.path)?.path ?? cwd ?? '?',
+    path: file.path,
+    source: `Session ${sessionId}; turn ${turn.turn}; ${view.reviewMode}`,
+    diffs: file.diffs,
+    ...(file.note || file.deleted ? { note: file.note ?? 'Terminal deletion: no recoverable snapshot' } : {}),
+  }))
   return (
     <section
       key={turn.turn}
@@ -219,6 +229,7 @@ export function FileReviewTurn({
         </span>
         <FileReviewStats stats={turnStats} />
         <div className={css.turnActions}>
+          <AggregateCopyButton load={async () => copyFiles(turn.files)} />
           <FileContentsButton
             expanded={allExpanded}
             label={t(allExpanded ? 'collapseTurnRepositories' : 'expandTurnRepositories')}
@@ -276,6 +287,7 @@ export function FileReviewTurn({
             name={group.name}
             path={group.path}
             count={group.files.length}
+            actions={<AggregateCopyButton load={async () => copyFiles(group.files)} />}
             collapsed={collapsedRepositories.has(groupId)}
             onCollapsedChange={collapsed => {
               setCollapsedRepositories(current =>
@@ -370,6 +382,14 @@ function FileReviewFile({
       >
         <FileReviewChevron open={isOpen} />
         <span className={css.fileName}>{commentTarget.path}</span>
+        {file.deleted !== true && file.diffs.length > 0 && file.diffs.every(diff => diff.recordId) && (
+          <span
+            className={css.stateBadge}
+            aria-label={t(file.diffs[0]?.oldText === null ? 'reviewCreated' : 'reviewModified')}
+          >
+            {file.diffs[0]?.oldText === null ? 'A' : 'M'}
+          </span>
+        )}
         {file.deleted === true ? (
           <span className={css.deletedBadge}>{t('deleted')}</span>
         ) : (
@@ -413,6 +433,7 @@ function FileReviewFile({
       <ReviewFileCommentThread target={commentTarget} />
       {isOpen && (
         <div className={css.diffWrap}>
+          {file.note && <p role="status">{localizeReviewMessage(file.note)}</p>}
           <LazyDiff>
             <FileReviewDiff sessionId={sessionId} file={file} target={commentTarget} />
           </LazyDiff>

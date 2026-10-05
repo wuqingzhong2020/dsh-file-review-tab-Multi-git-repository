@@ -25,7 +25,9 @@ import {
   setRepositoryGroupsCollapsed,
 } from './review-repository-groups.ts'
 import { FileContentsButton, ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
-import { loadMissingReviewDiffs } from './git-review-diff-loader.ts'
+import { loadMissingReviewDiffs, ReviewDiffQueue } from './git-review-diff-loader.ts'
+import { AggregateCopyButton } from './AggregateCopyButton.tsx'
+import { gitReviewFileKey, loadGitReviewReport } from './git-review-report.ts'
 import { GitReviewFile } from './GitReviewFile.tsx'
 import { gitReferenceSelector } from './review-scope-model.ts'
 
@@ -70,7 +72,8 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
   const [diffs, setDiffs] = useState<Map<string, GitReviewDiff | string | null>>(new Map())
   const version = useRef(0)
   const requestedDiffs = useRef(new Set<string>())
-  const keyOf = (file: GitReviewFileChange) => `${file.repository}\0${file.path}`
+  const diffQueue = useRef(new ReviewDiffQueue<GitReviewDiff>())
+  const keyOf = gitReviewFileKey
   const request = (): GitReviewRequest => ({
     mode,
     ...(repository !== '*' ? { repository } : {}),
@@ -85,6 +88,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
     if (!visible) return
     const current = ++version.current
     requestedDiffs.current = new Set()
+    diffQueue.current = new ReviewDiffQueue<GitReviewDiff>()
     setLoading(true)
     setError('')
     setExpanded(new Set())
@@ -115,13 +119,13 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
       const key = keyOf(file)
       setDiffs(value => new Map(value).set(key, null))
       try {
-        const result = await unwrap(
+        const result = await diffQueue.current.load(key, () => unwrap(
           remote().gitReviewDiff({
             ...comparison,
             repository: file.repository,
             path: file.path,
           }),
-        )
+        ))
         if (version.current === current) setDiffs(value => new Map(value).set(key, result))
       } catch (cause) {
         if (version.current === current) {
@@ -135,6 +139,27 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
   const setContents = (files: readonly GitReviewFileChange[], open: boolean) => {
     setExpanded(current => setFileContentsExpanded(current, files.map(keyOf), open))
     if (open) loadDiffs(files)
+  }
+  const copyFiles = (files: readonly GitReviewFileChange[], signal: AbortSignal) => {
+    const current = version.current
+    const comparison = request()
+    const queue = diffQueue.current
+    const ensureActive = () => {
+      signal.throwIfAborted()
+      if (current !== version.current) throw new Error('Comparison changed; copy again')
+    }
+    return loadGitReviewReport(files, {
+      source: `${mode}; ${ref || data?.comparisons.join('; ') || 'current comparison'}`,
+      ensureActive,
+      load: file => queue.load(keyOf(file), () => {
+        ensureActive()
+        return unwrap(remote().gitReviewDiff({
+          ...comparison,
+          repository: file.repository,
+          path: file.path,
+        }))
+      }),
+    })
   }
   const toggleFile = (file: GitReviewFileChange) => {
     setContents([file], !expanded.has(keyOf(file)))
@@ -250,6 +275,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
                 {t('reviewFiles', { count: data.files.length })}
               </span>
               <span className={css.gitVisibility}>
+                <AggregateCopyButton key={version.current} load={signal => copyFiles(data.files, signal)} />
                 <FileContentsButton
                   expanded={allExpanded}
                   label={t(allExpanded ? 'collapseAllRepositories' : 'expandAllRepositories')}
@@ -266,6 +292,7 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick }: GitRevie
                   name={group.name}
                   path={group.path}
                   count={group.files.length}
+                  actions={<AggregateCopyButton key={version.current} load={signal => copyFiles(group.files, signal)} />}
                   collapsed={collapsedRepositories.has(groupId)}
                   onCollapsedChange={collapsed => {
                     setCollapsedRepositories(current =>

@@ -35,7 +35,7 @@ export class RepositorySettings {
   }
 
   private entry() {
-    const loader = (this.ctx as Context & { loader?: { entries(): Iterable<{ fiber?: unknown; options: { id?: string; name?: string } }> } }).loader
+    const loader = this.ctx.get('loader') as { entries(): Iterable<{ fiber?: unknown; options: { id?: string; name?: string } }> } | undefined
     return [...(loader?.entries() ?? [])].find(entry => entry.fiber === this.ctx.fiber && entry.options.name === PACKAGE_NAME)
   }
 }

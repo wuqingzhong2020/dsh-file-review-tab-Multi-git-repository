@@ -12,6 +12,8 @@ node_modules/
 # Generated test reports (keep tests/ source files)
 coverage/
 .nyc_output/
+/.browser-fixture/
+/test-results/
 
 # Logs, temporary files and local backups
 *.log

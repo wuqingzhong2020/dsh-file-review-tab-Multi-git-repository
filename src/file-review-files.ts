@@ -54,6 +54,7 @@ export async function resolveReviewFile(
   const linkStat = await lstat(candidate)
   if (linkStat.isSymbolicLink()) throw new Error('symbolic links are not supported')
   if (!linkStat.isFile()) throw new Error('path is not a regular file')
+  if (linkStat.size > 16 * 1024 * 1024) throw new Error('file exceeds the review operation budget')
   const filename = await realpath(candidate)
   if (!roots.some(root => inside(root, filename)))
     throw new Error('resolved path is outside the configured project repositories')

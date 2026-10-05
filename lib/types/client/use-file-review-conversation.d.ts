@@ -5,6 +5,7 @@ import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversati
 export declare function useFileReviewConversation(ctx: Context, sessions: ISessions, sessionId: string, visible: boolean, tick: number): {
     snapshot: ConversationSnapshot | null;
     turns: readonly import("./session-changes.ts").TurnFileChanges[];
+    recordedWarnings: readonly string[];
     ready: boolean;
 };
 //# sourceMappingURL=use-file-review-conversation.d.ts.map

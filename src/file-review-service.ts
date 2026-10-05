@@ -42,6 +42,9 @@ import type { UserGuideDocument } from './user-guide.ts'
 import { inspectReviewFile, applyReviewFile } from './file-review-files.ts'
 import { locateReferenceOnDisk, openReferenceInEditor } from './file-review-locations.ts'
 import { userGuidePath, readUserGuideDocument } from './file-review-user-guide.ts'
+import { MARKER_MAX_BYTES, type LifecycleImage, type LifecycleRecord } from './lifecycle-record.ts'
+import { LifecycleRecordCache, replayLifecycleHistory, lifecycleMutation } from './lifecycle-history.ts'
+import { applyLifecycle } from './file-lifecycle.ts'
 
 // Preserve the existing Host entry point for callers of the pure transform.
 export { transformFile } from './file-review-files.ts'
@@ -66,6 +69,8 @@ export class FileReviewService extends TypertRemoteService {
   /** Per-agent record of Code Mode (`run_code`) file mutations, dispatch order. */
   private readonly recordLog = new Map<string, RecordedMutation[]>()
   private readonly temporaryRepositories = new Map<string, NamedReviewRepository[]>()
+  private readonly lifecycleLog = new Map<string, LifecycleRecordCache>()
+  private readonly lifecycleIdentities = new Map<string, LifecycleImage>()
 
   constructor(
     ctx: Context,
@@ -275,6 +280,15 @@ export class FileReviewService extends TypertRemoteService {
 
   /** Append one nested (Code Mode) file mutation for the receiving agent. */
   recordMutation(agent: Agent, mutation: RecordedMutation): void {
+    if (Buffer.byteLength(JSON.stringify(mutation)) > MARKER_MAX_BYTES) {
+      mutation = {
+        ...mutation,
+        before: null,
+        after: '',
+        complete: false,
+        reason: 'legacy mutation exceeds the 256 KiB capture budget',
+      }
+    }
     const key = agentKey(agent)
     const list = this.recordLog.get(key)
     if (list === undefined) {
@@ -287,19 +301,60 @@ export class FileReviewService extends TypertRemoteService {
     }
   }
 
+  recordLifecycle(agent: Agent, record: LifecycleRecord): void {
+    const key = agentKey(agent)
+    let cache = this.lifecycleLog.get(key)
+    if (!cache) {
+      cache = new LifecycleRecordCache()
+      this.lifecycleLog.set(key, cache)
+    }
+    cache.add(record)
+  }
+
+  private lifecycleHistory(agent: Agent) {
+    return replayLifecycleHistory(
+      String(agent.session.header.id),
+      agent.session.snapshotEvents?.() ?? [],
+      this.lifecycleLog?.get(agentKey(agent))?.records(),
+    )
+  }
+
+  /** Replay only accepted official tool settlements, never client-supplied markers. */
+  lifecycleRecords(agent: Agent): LifecycleRecord[] {
+    return [...this.lifecycleHistory(agent).records]
+  }
+
   /** Return the recorded mutations for the requested `run_code` roots. */
   async recorded(agent: Agent, request: RecordedRequest): Promise<RecordedResult> {
-    const list = this.recordLog.get(agentKey(agent))
-    if (list === undefined || request.rootCallIds.length === 0) return { mutations: [] }
+    const history = this.lifecycleHistory(agent)
+    const lifecycle = history.records
+    const covered = new Set(lifecycle.map(record => `${record.rootCallId}\0${record.path}`))
+    const list: RecordedMutation[] = [
+      ...lifecycle.map(lifecycleMutation),
+      ...(this.recordLog.get(agentKey(agent)) ?? []).filter(record => !covered.has(`${record.rootCallId}\0${record.path}`)),
+    ]
     const wanted = new Set(request.rootCallIds)
-    return { mutations: list.filter(mutation => wanted.has(mutation.rootCallId)) }
+    return {
+      mutations: list.filter(mutation => wanted.has(mutation.rootCallId)),
+      ...(history.truncated ? {
+        warnings: ['Only the most recent 4000 lifecycle records are available; older nested changes may lack review images.'],
+      } : {}),
+    }
   }
 
   /** Inspect current disk state without changing files. */
   async status(agent: Agent, request: FileReviewRequest): Promise<FileReviewResult> {
     const cwd = sessionCwd(agent)
     const { roots } = await this.workspace(agent)
-    const files = await Promise.all(request.files.map(file => inspectReviewFile(cwd, file, roots)))
+    const history = request.files.some(file => file.diffs.some(diff => diff.recordId))
+      ? this.lifecycleHistory(agent)
+      : undefined
+    const files = await Promise.all(request.files.map(file => {
+      const records = history?.sequence(file) ?? null
+      return records === null
+        ? inspectReviewFile(cwd, file, roots)
+        : applyLifecycle(cwd, file.path, roots, records)
+    }))
     return { files }
   }
 
@@ -308,9 +363,16 @@ export class FileReviewService extends TypertRemoteService {
     return agent.runMaintenance(async () => {
       const cwd = sessionCwd(agent)
       const { roots } = await this.workspace(agent)
+      const history = request.files.some(file => file.diffs.some(diff => diff.recordId))
+        ? this.lifecycleHistory(agent)
+        : undefined
       const files: FileReviewFileResult[] = []
       for (const file of request.files) {
-        files.push(await applyReviewFile(cwd, file, request.action, roots))
+        const records = history?.sequence(file) ?? null
+        const result = records === null
+          ? await applyReviewFile(cwd, file, request.action, roots)
+          : await applyLifecycle(cwd, file.path, roots, records, request.action, this.lifecycleIdentities)
+        files.push(result)
       }
       return { files }
     })

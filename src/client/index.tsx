@@ -34,6 +34,7 @@ import { ProducedFiles } from './ProducedFiles.tsx'
 import { attachLocale, en, LOCALE_NS, t, zh } from './locales.ts'
 import { en as chatEn, NS as CHAT_NS, zh as chatZh, type DeliverablesKey } from './chat-locales.ts'
 import { deliverablesDefinition, selectProducedFiles } from './turn-deliverables.ts'
+import { registerReviewEnhancements } from './review-enhancements.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -199,4 +200,5 @@ export function apply(ctx: Context): void {
   )
 
   ctx.effect(() => registerNativeSidebar(ctx), 'file-review-tab: native sidebar')
+  registerReviewEnhancements(ctx)
 }

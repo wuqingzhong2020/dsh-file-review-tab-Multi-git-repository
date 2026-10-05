@@ -8,9 +8,11 @@ import {
 import { t } from './locales.ts'
 import { useReviewLocale } from './use-review-locale.ts'
 import css from './DiffViewControls.module.css'
+import { saveReviewPreferences } from './profile-review-preferences.ts'
+import { ReviewEnhancementControls } from './ReviewEnhancementControls.tsx'
 
 let store: DiffViewStore | undefined
-function viewStore(): DiffViewStore {
+export function viewStore(): DiffViewStore {
   if (!store) {
     let storage: Storage | undefined
     try {
@@ -35,23 +37,41 @@ export function DiffViewControls() {
   const hintId = useId()
   const [count, setCount] = useState(String(preferences.contextExpansionLines))
   const [draft, setDraft] = useState(preferences)
+  const openedPreferences = useRef(preferences)
   const [storageError, setStorageError] = useState(false)
   const patch = (value: Partial<DiffViewPreferences>) =>
     setDraft(current => ({ ...current, ...value }))
   const openSettings = () => {
     setCount(String(preferences.contextExpansionLines))
     setDraft(preferences)
+    openedPreferences.current = preferences
     setStorageError(false)
     dialog.current?.showModal()
   }
-  const saveSettings = (event: FormEvent<HTMLFormElement>) => {
+  const saveSettings = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const lines = Number(count)
     if (!Number.isSafeInteger(lines) || lines < 1) return
     const store = viewStore()
-    store.set({ ...draft, contextExpansionLines: lines })
-    if (store.storageError) setStorageError(true)
-    else dialog.current?.close()
+    // Save only user edits so a newer Profile update cannot be overwritten by an old dialog.
+    const edits = Object.fromEntries(
+      Object.entries({ ...draft, contextExpansionLines: lines }).filter(([key, value]) =>
+        value !== openedPreferences.current[key as keyof DiffViewPreferences],
+      ),
+    ) as Partial<DiffViewPreferences>
+    try {
+      if (!await saveReviewPreferences(store, edits)) setStorageError(true)
+      else dialog.current?.close()
+    } catch {
+      setStorageError(true)
+    }
+  }
+  const saveQuickPreference = async (patch: Partial<DiffViewPreferences>) => {
+    try {
+      setStorageError(!await saveReviewPreferences(viewStore(), patch))
+    } catch {
+      setStorageError(true)
+    }
   }
   const resetSettings = () => {
     setDraft(DEFAULT_DIFF_VIEW)
@@ -75,6 +95,12 @@ export function DiffViewControls() {
       <dialog ref={dialog} className={css.settingsDialog} aria-labelledby={titleId}>
         <form onSubmit={saveSettings}>
           <h2 id={titleId}>{t('diffSettings')}</h2>
+          <p>{t('reviewProfileHint')}</p>
+          <ReviewEnhancementControls
+            value={draft}
+            className={css.checkbox}
+            onChange={(key, checked) => patch({ [key]: checked })}
+          />
           <label htmlFor={inputId}>{t('diffContextExpansionLines')}</label>
           <input
             id={inputId}
@@ -258,7 +284,7 @@ export function DiffViewControls() {
         title={t('diffLayout')}
         value={preferences.layout}
         onChange={event => {
-          viewStore().set({ layout: event.target.value as DiffLayout })
+          void saveQuickPreference({ layout: event.target.value as DiffLayout })
         }}
       >
         <option value="split">{t('diffSplit')}</option>
@@ -269,7 +295,7 @@ export function DiffViewControls() {
         aria-pressed={preferences.wrap}
         title={t('diffWrap')}
         onClick={() => {
-          viewStore().set({ wrap: !preferences.wrap })
+          void saveQuickPreference({ wrap: !preferences.wrap })
         }}
       >
         <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -277,6 +303,7 @@ export function DiffViewControls() {
         </svg>
         {t('diffWrap')}
       </button>
+      {storageError && <small role="alert">{t('diffPreferencesStorageError')}</small>}
     </div>
   )
 }

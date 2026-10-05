@@ -50,6 +50,7 @@ import { rangeReference } from './review-reference.ts'
 import { useDiffSelection } from './use-diff-selection.ts'
 import { DiffReferenceMenu, DiffSearchControls, DiffToolbar } from './unified-diff-controls.tsx'
 import { DiffBlock } from './unified-diff-block.tsx'
+import { useEffectiveLayout } from './use-effective-layout.ts'
 
 export { summarizeDiffs, unifiedDiffText } from './unified-diff-model.ts'
 export type { UnifiedDiffStats } from './unified-diff-model.ts'
@@ -109,12 +110,13 @@ export function UnifiedDiff({
   useReviewLocale()
   const preferences = useDiffViewPreferences()
   const interactions = useReviewInteractions()
-  const isSplit = preferences.layout === 'split'
   const hunks = useMemo(() => buildUnifiedHunks(diffs, contextLines), [contextLines, diffs])
   const revision = useMemo(() => reviewDiffRevision(diffs), [diffs])
   const identity = `${sourceKey ?? (reviewTarget ? commentFileKey(reviewTarget) : '')}:${revision}`
   const index = useMemo(() => indexDiff(hunks, contextLines), [hunks, contextLines])
   const container = useRef<HTMLDivElement>(null)
+  const layout = useEffectiveLayout(container, preferences.layout, preferences.adaptive)
+  const isSplit = layout === 'split'
   const lineElements = useRef(new Map<string, HTMLDivElement>())
   const selection = useDiffSelection({
     diffs,
@@ -528,7 +530,7 @@ export function UnifiedDiff({
       className={`${css.unifiedBlock} ${showFileHeaders ? '' : css.unifiedEmbedded} ${reviewTarget ? css.commentEnabled : ''} ${preferences.wrap ? css.wrapLines : ''} ${className ?? ''}`}
       style={style}
       data-diff=""
-      data-diff-layout={preferences.layout}
+      data-diff-layout={layout}
       data-diff-wrap={preferences.wrap}
     >
       <DiffToolbar
@@ -635,7 +637,7 @@ export function UnifiedDiff({
                     hunkLines={hunk.lines}
                     identity={identity}
                     index={index}
-                    preferences={preferences}
+                    preferences={{ ...preferences, layout }}
                     labels={labels}
                     expandedLines={expandedLines}
                     focused={focused}

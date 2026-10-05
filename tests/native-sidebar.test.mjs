@@ -108,6 +108,7 @@ async function clientHarness({ delayed = false, failTitle = false } = {}) {
     get: name => name === 'sessions' ? sessions : undefined,
     locale, remote: { $mount: async () => async () => {} },
     effect(acquire) { const dispose = acquire(); effects.push(dispose); return dispose },
+    inject() { return () => {} }, // Optional enhancement services absent in this core-only host.
     uiConversation: { events: { register: () => () => {} }, binding: id => ({ snapshot: {
       getSnapshot: () => snapshots.get(id) ?? null, subscribe: () => () => {},
     } }) },
@@ -118,6 +119,7 @@ async function clientHarness({ delayed = false, failTitle = false } = {}) {
       return () => types.delete(definition.kind)
     } },
     slots: {
+      entriesOfSlot() { return [] },
       inject(name, factory) {
         let release
         const start = () => { release = factory() }

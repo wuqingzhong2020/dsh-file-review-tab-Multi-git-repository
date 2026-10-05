@@ -18,6 +18,7 @@ import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ProducedFileDiff, ProducedFileReview } from '../change-types.ts'
 import { appliedDiffs, callIntent } from './mutation-call.ts'
+import { lifecycleFromContent } from '../lifecycle-record.ts'
 
 export type { ProducedFileDiff, ProducedFileReview } from '../change-types.ts'
 
@@ -47,7 +48,7 @@ interface DeliverablesState extends DeliverablesTurnData {
 }
 
 /** Result payload structurally narrowed for the fields this Definition reads. */
-function toolResultFields(event: unknown): { readonly callId: string; readonly isError: boolean; readonly meta: unknown } | null {
+function toolResultFields(event: unknown): { readonly callId: string; readonly isError: boolean; readonly meta: unknown; readonly content: readonly unknown[] } | null {
   const data = (event as { data?: unknown }).data
   if (typeof data !== 'object' || data === null) return null
   const record = data as { message?: unknown; meta?: unknown }
@@ -63,7 +64,7 @@ function toolResultFields(event: unknown): { readonly callId: string; readonly i
     : undefined
   return typeof callId === 'string'
     ? { callId, isError: (message as { isError?: unknown }).isError === true
-      || first?.isError === true, meta: record.meta }
+      || first?.isError === true, meta: record.meta, content: (first as { content?: unknown[] })?.content ?? (Array.isArray(content) ? content : []) }
     : null
 }
 
@@ -191,6 +192,10 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
     const applied = appliedDiffs(result.meta)
     const seq = typeof record.seq === 'number' ? record.seq : Number.POSITIVE_INFINITY
     const additions: ProducedPath[] = []
+    const lifecycle = lifecycleFromContent(result.content).filter(record => record.rootCallId === result.callId && record.subCallId === result.callId)
+    if (lifecycle.length) return { ...context.state, produced: [...context.state.produced, ...lifecycle.map(record => ({
+      seq, path: record.path, diffs: [{ path: record.path, oldText: record.before?.text ?? null, newText: record.after?.text ?? '', oldStart: 1, newStart: 1, ...(record.complete ? { recordId: record.recordId } : {}) }],
+    }))] }
     if (intent.path !== null) {
       const own = applied === null
         ? intent.diffs

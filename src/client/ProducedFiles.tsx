@@ -14,6 +14,7 @@ import { useReviewLocale } from './use-review-locale.ts'
 import { localizeReviewMessage } from './message-locales.ts'
 import { t as reviewText } from './locales.ts'
 import { summarizeDiffs, type UnifiedDiffStats } from './UnifiedDiff.tsx'
+import { addStats, isReversible } from './file-review-model.ts'
 import { ProducedFilesSummary } from './produced-files-summary.tsx'
 import { ResultToast, type NoticeFile, type ToggleNotice } from './produced-files-toast.tsx'
 
@@ -41,10 +42,6 @@ const unavailableChanges = async (request: FileReviewRequest): Promise<FileRevie
     reason: 'Host file toggle is unavailable',
   })),
 })
-
-function addStats(left: UnifiedDiffStats, right: UnifiedDiffStats): UnifiedDiffStats {
-  return { added: left.added + right.added, removed: left.removed + right.removed }
-}
 
 function noticeDescription(notice: ToggleNotice, t: ProducedFilesProps['t']): string | undefined {
   if (notice.descriptionKey) return t(notice.descriptionKey)
@@ -99,23 +96,7 @@ export function ProducedFiles({
     [reviews],
   )
   const reversiblePaths = useMemo(
-    () =>
-      new Set(
-        reviews
-          .filter(
-            review =>
-              review.diffs.length > 0 &&
-              review.diffs.every(
-                diff =>
-                  diff.path === review.path &&
-                  diff.oldText !== null &&
-                  diff.oldText !== diff.newText &&
-                  (diff.oldText !== '' || diff.oldStart !== undefined) &&
-                  (diff.newText !== '' || diff.newStart !== undefined),
-              ),
-          )
-          .map(review => review.path),
-      ),
+    () => new Set(reviews.filter(isReversible).map(review => review.path)),
     [reviews],
   )
   const hasReversibleFiles = reversiblePaths.size > 0

@@ -29,6 +29,17 @@
 .modalContent > div:last-child { min-height: 0; padding: 0; margin-top: 0; overflow: hidden; }
 .modal .root { height: min(75vh, 850px); }
 .header span { color: var(--dsw-alias-label-secondary); }
+.chapterSelect {
+  min-width: 0;
+  max-width: min(400px, 100%);
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: inherit;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  font: inherit;
+}
+.chapterSelect:focus-visible { outline: 2px solid var(--dsw-alias-state-focus-primary, #006fee); outline-offset: 2px; }
 .header button {
   margin-left: auto;
   padding: 4px 8px;

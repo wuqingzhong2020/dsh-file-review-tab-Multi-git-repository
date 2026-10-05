@@ -140,7 +140,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     }
   }, [sessions, sessionId, visible, tick])
 
-  const { snapshot, turns, ready } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
+  const { snapshot, turns, ready, recordedWarnings } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
   const repositories = workspace?.repositories ?? []
   const scopeTurns = useMemo(
     () => scopeBehavior.select({ snapshot, turns, confirmed: confirmationSnapshot.confirmed }),
@@ -356,6 +356,11 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
         sessionId={sessionId}
         controls={<DiffViewControls />}
       >
+        {!isGitMode && recordedWarnings.map(message => (
+          <p className={`${css.notice} ${css.noticeError}`} role="status" key={message}>
+            {localizeReviewMessage(message)}
+          </p>
+        ))}
         {!isGitMode && workspace?.project !== null && workspace?.project !== undefined && (
           <div className={css.repositoryBar}>
             <span title={workspace.project.root}>

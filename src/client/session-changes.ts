@@ -20,6 +20,7 @@ import { diffsFromBeforeAfter } from './recorded-diffs.ts'
 
 /** One changed file inside one turn, hunks appended in settlement order. */
 export interface SessionFileChange {
+  readonly note?: string
   readonly path: string
   readonly diffs: readonly ProducedFileDiff[]
   /** Full recorded versions for display only; safe undo keeps the original hunks. */
@@ -38,6 +39,7 @@ export interface TurnFileChanges {
 
 /** Internal per-path accumulator: hunk list plus the last deletion state. */
 interface FileAccumulator {
+  note?: string
   diffs: ProducedFileDiff[]
   reviewDiffs?: ProducedFileDiff[]
   deleted?: true
@@ -88,7 +90,15 @@ function blockChanges(block: ToolCallBlock): readonly BlockChange[] {
         if (own.length > 0) diffs = own
       }
     }
-    if (diffs.length > 0) changes.push({ path: intent.path, diffs })
+    const sourceCallId = (block as ToolResultNode).callId
+    if (diffs.length > 0) {
+      changes.push({
+        path: intent.path,
+        diffs: typeof sourceCallId === 'string'
+          ? diffs.map(diff => ({ ...diff, sourceCallId }))
+          : diffs,
+      })
+    }
   }
   for (const path of intent.deletions) changes.push({ path, diffs: [], deleted: true })
   return changes
@@ -166,6 +176,7 @@ function derive(snapshot: ConversationSnapshot): TurnFileChanges[] {
       files: [...group.files.entries()].map(([path, own]) => ({
         path,
         diffs: own.diffs,
+        ...(own.note ? { note: own.note } : {}),
         ...(own.deleted === true ? { deleted: true as const } : {}),
       })),
     }))
@@ -209,19 +220,13 @@ export interface SessionRoot {
   readonly rootCallId: string
 }
 
-/** Every `run_code` tool-result node whose nested changes are not in the snapshot. */
+/** Settled roots include failed programs whose nested calls were accepted before failure. */
 export function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[] {
   const attribute = turnAttribution(snapshot)
   const roots: SessionRoot[] = []
   const view = normalizeSnapshot(snapshot)
   for (const node of (view?.nodes ?? []) as readonly ToolResultNode[]) {
-    if (node.kind !== 'tool-result' || node.isError) continue
-    if (node.subCalls.length === 0) continue
-    const nested: BlockChange[] = []
-    for (const child of node.subCalls) {
-      if ((child as ToolResultNode).kind === 'tool-result') collectChanges(child, nested)
-    }
-    if (nested.some(change => change.diffs.length > 0)) continue
+    if (node.kind !== 'tool-result') continue
     const { turn, live } = attribute(node.seq)
     roots.push({ turn, live, rootCallId: node.callId })
   }
@@ -263,12 +268,15 @@ export function mergeRecordedTurns(
     for (const file of turn.files) {
       files.set(file.path, {
         diffs: [...file.diffs],
+        ...(file.note ? { note: file.note } : {}),
         ...(file.reviewDiffs ? { reviewDiffs: [...file.reviewDiffs] } : {}),
         ...(file.deleted === true ? { deleted: true as const } : {}),
       })
     }
     groups.set(turn.turn, { live: turn.live, files })
   }
+  // Replace only fragments from the same accepted call. Uncaptured edits remain
+  // visible, and a mixed sequence is conservatively rejected by Host undo.
   for (const [rootCallId, mutations] of byRoot) {
     const owner = rootTurns.get(rootCallId)
     if (owner === undefined) continue
@@ -277,17 +285,7 @@ export function mergeRecordedTurns(
       group = { live: owner.live, files: new Map() }
       groups.set(owner.turn, group)
     }
-    for (const mutation of mutations) {
-      const diffs = diffsFromBeforeAfter(mutation.path, mutation.before, mutation.after)
-      if (diffs.length === 0) continue
-      const full = { path: mutation.path, oldText: mutation.before, newText: mutation.after, oldStart: 1, newStart: 1 }
-      const existing = group.files.get(mutation.path)
-      if (existing === undefined) group.files.set(mutation.path, { diffs: [...diffs], reviewDiffs: [full] })
-      else {
-        existing.reviewDiffs = [...(existing.reviewDiffs ?? existing.diffs), full]
-        existing.diffs.push(...diffs)
-      }
-    }
+    for (const mutation of mutations) mergeRecordedMutation(group.files, mutation)
   }
   return [...groups.entries()]
     .sort((a, b) => a[0] - b[0])
@@ -297,10 +295,47 @@ export function mergeRecordedTurns(
       files: [...group.files.entries()].map(([path, own]) => ({
         path,
         diffs: own.diffs,
+        ...(own.note ? { note: own.note } : {}),
         ...(own.reviewDiffs ? { reviewDiffs: own.reviewDiffs } : {}),
         ...(own.deleted === true ? { deleted: true as const } : {}),
       })),
     }))
+}
+
+/** Replace only the matching call's fragments, retaining uncaptured same-path changes. */
+function mergeRecordedMutation(files: Map<string, FileAccumulator>, mutation: RecordedMutation): void {
+  const full: ProducedFileDiff = {
+    path: mutation.path,
+    oldText: mutation.before,
+    newText: mutation.after,
+    oldStart: 1,
+    newStart: 1,
+  }
+  const callId = mutation.subCallId ?? mutation.rootCallId
+  const diffs = mutation.recordId
+    ? [{ ...full, sourceCallId: callId, ...(mutation.complete ? { recordId: mutation.recordId } : {}) }]
+    : diffsFromBeforeAfter(mutation.path, mutation.before, mutation.after)
+  if (diffs.length === 0) return
+
+  let file = files.get(mutation.path)
+  if (!file) {
+    file = { diffs: [...diffs], reviewDiffs: [full] }
+    files.set(mutation.path, file)
+  } else {
+    const replacementIndex = mutation.recordId
+      ? file.diffs.findIndex(diff => diff.sourceCallId === callId)
+      : -1
+    if (replacementIndex >= 0) {
+      const retained = file.diffs.filter(diff => diff.sourceCallId !== callId)
+      retained.splice(replacementIndex, 0, ...diffs)
+      file.diffs = retained
+      file.reviewDiffs = retained
+    } else {
+      file.reviewDiffs = [...(file.reviewDiffs ?? file.diffs), full]
+      file.diffs.push(...diffs)
+    }
+  }
+  if (mutation.reason) file.note = mutation.reason
 }
 
 /** Count distinct changed paths across every turn (the sidebar badge count). */

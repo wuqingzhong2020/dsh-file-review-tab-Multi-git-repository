@@ -14,6 +14,7 @@ import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversati
 import type { ProducedFileDiff, RecordedMutation } from '../change-types.ts';
 /** One changed file inside one turn, hunks appended in settlement order. */
 export interface SessionFileChange {
+    readonly note?: string;
     readonly path: string;
     readonly diffs: readonly ProducedFileDiff[];
     /** Full recorded versions for display only; safe undo keeps the original hunks. */
@@ -44,7 +45,7 @@ export interface SessionRoot {
     readonly live: boolean;
     readonly rootCallId: string;
 }
-/** Every `run_code` tool-result node whose nested changes are not in the snapshot. */
+/** Settled roots include failed programs whose nested calls were accepted before failure. */
 export declare function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[];
 /**
  * Merge Host-recorded Code Mode mutations into the snapshot-derived turns:

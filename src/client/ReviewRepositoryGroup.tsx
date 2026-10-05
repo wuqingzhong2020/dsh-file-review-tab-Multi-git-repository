@@ -12,10 +12,11 @@ export function FileContentsButton({ expanded, label, onClick, controls }: { exp
   </button>
 }
 
-export function ReviewRepositoryGroup({ name, path, count, children, collapsed, onCollapsedChange, contentsExpanded, onContentsExpandedChange }: {
+export function ReviewRepositoryGroup({ name, path, count, children, collapsed, onCollapsedChange, contentsExpanded, onContentsExpandedChange, actions }: {
   name: string; path: string; count: number; children: ReactNode
   collapsed: boolean; onCollapsedChange: (collapsed: boolean) => void
   contentsExpanded: boolean; onContentsExpandedChange: (expanded: boolean) => void
+  actions?: ReactNode
 }) {
   useReviewLocale()
   const bodyId = useId()
@@ -32,6 +33,7 @@ export function ReviewRepositoryGroup({ name, path, count, children, collapsed, 
       onContentsExpandedChange(!expanded)
     }} />
     <span className={css.turnCount}>{count === 1 ? t('filesOne') : t('files', { count })}</span>
+    {actions}
     </div>
     <div id={bodyId}>{!collapsed && children}</div>
   </section>

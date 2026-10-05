@@ -12,7 +12,7 @@ const CLIENT_EXTERNALS = [
 ] as const
 
 /** Compile CSS Modules into package-owned style elements understood by the Web plugin loader. */
-function cssModulesPlugin() {
+export function cssModulesPlugin() {
   return {
     name: 'dsh-file-review-tab-multi-git-repository-css-modules',
     resolveId(source: string, importer: string | undefined) {

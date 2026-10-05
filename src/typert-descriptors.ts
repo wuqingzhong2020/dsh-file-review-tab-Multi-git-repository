@@ -25,17 +25,25 @@ const locationResultSchema = z.object({
 })
 
 const diffSchema = z.object({
-  path: z.string(),
-  oldText: z.string().nullable(),
-  newText: z.string(),
+  path: z.string().min(1).max(4096),
+  oldText: z.string().max(1024 * 1024).nullable(),
+  newText: z.string().max(1024 * 1024),
   oldStart: z.number().int().min(1).optional(),
   newStart: z.number().int().min(1).optional(),
+  recordId: z.string().uuid().optional(),
+  sourceCallId: z.string().max(256).optional(),
 })
 
 const requestSchema = z.object({
   action: z.enum(['undo', 'redo']),
-  files: z.array(z.object({ path: z.string(), diffs: z.array(diffSchema) })),
-})
+  files: z.array(z.object({
+    path: z.string().min(1).max(4096),
+    diffs: z.array(diffSchema).max(4000),
+  })).max(256),
+}).refine(
+  value => new TextEncoder().encode(JSON.stringify(value)).length <= 16 * 1024 * 1024,
+  'Review request exceeds the 16 MiB budget',
+)
 
 const resultSchema = z.object({
   files: z.array(z.object({
@@ -66,18 +74,23 @@ const resultCodec = {
 
 const recordedMutationSchema = z.object({
   rootCallId: z.string(),
+  subCallId: z.string().optional(),
   name: z.string(),
   path: z.string(),
   before: z.string().nullable(),
   after: z.string(),
+  recordId: z.string().uuid().optional(),
+  complete: z.boolean().optional(),
+  reason: z.string().optional(),
 })
 
 const recordedRequestSchema = z.object({
-  rootCallIds: z.array(z.string()),
+  rootCallIds: z.array(z.string().max(256)).max(4000),
 })
 
 const recordedResultSchema = z.object({
   mutations: z.array(recordedMutationSchema),
+  warnings: z.array(z.string().max(1024)).max(8).optional(),
 })
 
 const recordedRequestCodec = {

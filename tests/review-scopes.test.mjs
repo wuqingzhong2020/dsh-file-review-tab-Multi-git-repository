@@ -80,7 +80,10 @@ test('session scope handlers preserve latest-turn and pending-confirmation seman
   assert.equal(sessionScopeBehavior('pending').pagination, 'pending')
   assert.equal(sessionScopeBehavior('pending').empty, 'pendingEmpty')
   assert.equal(sessionScopeBehavior('pending').filteredEmpty, 'pendingRepoEmpty')
-  for (const mode of ['session', 'last-turn', ...GIT_REVIEW_MODES]) {
+  assert.equal(sessionScopeBehavior('last-turn').pagination, 'archive')
+  assert.equal(sessionScopeBehavior('last-turn').empty, 'lastTurnEmpty')
+  assert.equal(sessionScopeBehavior('last-turn').filteredEmpty, 'lastTurnRepoEmpty')
+  for (const mode of ['session', ...GIT_REVIEW_MODES]) {
     assert.equal(sessionScopeBehavior(mode).pagination, 'archive')
     assert.equal(sessionScopeBehavior(mode).empty, 'empty')
     assert.equal(sessionScopeBehavior(mode).filteredEmpty, 'repoFilterEmpty')

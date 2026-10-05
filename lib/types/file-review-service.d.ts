@@ -8,6 +8,7 @@ import type { NamedReviewRepository, ReviewProject, ReviewProjectPage, ReviewWor
 import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts';
 import type { ReviewLocationRequest, ReviewLocationResult } from './review-location.ts';
 import type { UserGuideDocument } from './user-guide.ts';
+import { type LifecycleRecord } from './lifecycle-record.ts';
 export { transformFile } from './file-review-files.ts';
 /** Host service published as the `fileReview` Remote namespace. */
 export declare class FileReviewService extends TypertRemoteService {
@@ -15,6 +16,8 @@ export declare class FileReviewService extends TypertRemoteService {
     /** Per-agent record of Code Mode (`run_code`) file mutations, dispatch order. */
     private readonly recordLog;
     private readonly temporaryRepositories;
+    private readonly lifecycleLog;
+    private readonly lifecycleIdentities;
     constructor(ctx: Context, projectSettings?: RepositorySettings | undefined);
     /** Read only the project selected by this Agent's authoritative directory. */
     project(agent: Agent): Promise<ReviewProjectPage>;
@@ -37,6 +40,10 @@ export declare class FileReviewService extends TypertRemoteService {
     setTemporaryRepositories(agent: Agent, entries: NamedReviewRepository[]): Promise<ReviewWorkspace>;
     /** Append one nested (Code Mode) file mutation for the receiving agent. */
     recordMutation(agent: Agent, mutation: RecordedMutation): void;
+    recordLifecycle(agent: Agent, record: LifecycleRecord): void;
+    private lifecycleHistory;
+    /** Replay only accepted official tool settlements, never client-supplied markers. */
+    lifecycleRecords(agent: Agent): LifecycleRecord[];
     /** Return the recorded mutations for the requested `run_code` roots. */
     recorded(agent: Agent, request: RecordedRequest): Promise<RecordedResult>;
     /** Inspect current disk state without changing files. */

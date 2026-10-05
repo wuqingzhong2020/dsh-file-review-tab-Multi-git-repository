@@ -6,10 +6,23 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
+- [v0.3.0](#v030) · [验证矩阵](../MIGRATION_VERIFICATION.md)
 - [v0.2.0](#v020) · [验证记录 / Validation](#v020-验证记录)
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
+
+## v0.3.0
+
+**参考功能融合 / Reference feature integration — 本地交付，尚未发布 / local artifact, unpublished**
+
+- 可信标准／PTC 文件图像、官方日志重放、空／非空新建撤销与独占重建；外部改写、文件替换和不完整序列拒绝写入。
+- 输入评论 Dock／引用 Chip、共享提交锁和真实请求关联；不可变评论包折叠，普通消息委托原宿主组件。
+- 官方 Profile 显示设置及无损迁移；小于 480px 的并排临时回退；仓库／轮次聚合复制、预算、取消与共享四并发。
+- Windows Desktop 0.2.0-rc.2 实装验收；修复侧栏评论提交的 Cordis 注入报错，改进空轮次提示与评论摘要。
+- 双语指南及全部 18 张实际 Desktop 截图、199 项 Node／4 项浏览器回归及包检查；来源许可证和既有功能保留。
+
+Trusted native/PTC lifecycle records and official durable replay enable safe creation undo/reapply. A shared comment Dock/reference codec supports main-input submission and immutable packet folding with host delegation. Portable Profile settings, narrow-layout fallback and bounded group copying retain existing multi-repository scopes. Actual Windows Desktop testing exposed and fixed a Cordis injection error in sidebar submission; all 18 guide screenshots now show the running Desktop. See the [verification matrix](../MIGRATION_VERIFICATION.md) for actual evidence, restart limits and unverified platforms.
 
 ## v0.2.0
 

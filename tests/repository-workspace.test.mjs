@@ -164,7 +164,7 @@ test('undo crosses into an explicitly configured repo but refuses unrelated repo
   await writeFile(denied, 'after\r\n')
   const projects = [project(rootA, { repositories: [external] })]
   const agent = { session: { header: { cwd: rootA } }, runMaintenance: async task => task() }
-  const receiver = { workspace: async () => resolveReviewWorkspace(rootA, projects) }
+  const receiver = Object.assign(Object.create(FileReviewService.prototype), { workspace: async () => resolveReviewWorkspace(rootA, projects) })
   const change = path => ({ path, diffs: [{ path, oldText: 'before\n', newText: 'after\n', oldStart: 1, newStart: 1 }] })
   const result = await FileReviewService.prototype.apply.call(receiver, agent, { action: 'undo', files: [change(allowed), change(denied)] })
   assert.equal(result.files[0].state, 'undone')

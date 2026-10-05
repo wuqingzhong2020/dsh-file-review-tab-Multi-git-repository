@@ -8,6 +8,7 @@ import {
 } from './review-discussions.ts'
 import { commentPositionLabel, commentScopeLabel } from './review-comment-labels.ts'
 import { t } from './locales.ts'
+import { serializeReviewPacket, REVIEW_PACKET_PACKAGE } from './review-comment-packet.ts'
 
 const PARENT_RESPONSE_LIMIT = 20_000
 
@@ -59,7 +60,14 @@ export async function submitReviewCommentBatch({
   discussionStore,
   discussionEnabled,
 }: ReviewSubmissionOptions): Promise<void> {
-  const message = formatReviewSubmission(comments, discussions)
+  const message = serializeReviewPacket({
+    package: REVIEW_PACKET_PACKAGE,
+    version: 1,
+    sessionId,
+    batchId: globalThis.crypto.randomUUID(),
+    comments,
+    context: formatReviewSubmission(comments, discussions),
+  })
   let discussionId: string | undefined
   const prepare = discussionEnabled
     ? (requestId: string) => {

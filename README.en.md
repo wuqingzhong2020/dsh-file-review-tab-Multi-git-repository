@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.2.0**.
+Current version: **v0.3.0**.
 
 **dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 using its native right sidebar, without a third-party sidebar requirement.**
 
@@ -29,12 +29,12 @@ Release maintainers should also read the [Public release and plugin marketplace 
 - **GitHub-style diffs**: Old/new line-number columns, red/green change backgrounds, and blue hunk headers. By default, three context lines are kept around each change. The arrow on the left of a blue header reveals N more unchanged lines per click (20 by default). Middle intervals divide N lines between both ends; leading and trailing intervals expand outward from the change. Additional upward/downward double-arrow icons reveal all remaining unchanged lines in the adjacent interval, reaching the beginning or end of the recorded content, or the neighboring change block. An expanded interval keeps a local collapse icon, including after full expansion. Clicking it hides only that interval's expanded unchanged lines, leaving other intervals unchanged. Collapse expanded context restores the default display for all intervals.
 - **Selection references**: Click a line number, then Shift+click on the same side for a contiguous range, or drag-select code from one version side. Right-click inside the selection or press Shift+F10 to copy a complete reference, copy its path and range, add a range comment, navigate externally or clear the selection. Right-clicking outside the range selects that line. References include repository, comparison source, side, revision and start/end lines. Cross-file, mixed-version and missing-history ranges are rejected; quote and adjacent context are each limited to 64 KiB.
 - **External line navigation**: Open selections in the configured external IDE. VS Code is recommended; Antigravity IDE is also supported on Windows. The Host checks the session's permitted repository paths and current disk content before passing a new-version line number. Relocated references require confirmation. Ambiguous matches, old-version lines, deleted files and missing editors display explanations and retain the built-in file viewer.
-- **Review settings**: Configure expansion count N (20 by default), code font, size, line height, tab width, theme or blue/orange colors, background intensity, external IDE path, scoped search/navigation shortcuts, discussion storage and large-file virtualization. Save applies immediately and stores preferences locally; Cancel or Esc discards edits. Settings apply to all eight scopes and both layouts; shortcuts remain inside the diff.
-- **Two diff layouts**: Choose Unified or Split at the top. Unified lists removed and added lines vertically. Split shows the old version on the left and the new version on the right, aligning corresponding changes. Wrap lines can be turned off to inspect long lines with horizontal scrolling. Layout and wrapping choices are saved locally. Switching layouts preserves expanded context and comments. Both sides of the split view support comments on actual code lines, using their respective old/new line numbers.
+- **Review settings**: Configure expansion count N (20 by default), fonts, appearance, editor path, scoped shortcuts, discussions and virtualization. Layout, wrapping and enhancement switches share the official Profile form; machine-specific preferences remain local. Save applies edited fields; Cancel or Esc discards edits. All eight scopes share the controls.
+- **Two diff layouts**: Unified/split and wrapping remain selectable. A split preference temporarily uses unified below 480px of actual diff width, restores when widened, and ignores hidden zero-width observations. Search, context, selection and comment drafts remain intact.
 - **Multi-repository management session tab**: Next to the conversation and trace tabs, add, edit, or remove repositories maintained by the current project. Save them to `dsh-file-review-repositories.json` in the project root. Switching projects loads the corresponding configuration. File review shows each file's repository and repository-relative path, with filtering by repository. Supports the main repository, nested repositories, and external repositories used temporarily in the current session.
 - **Deleted files remain visible**: dsh has no file deletion tool, so deletions happen through terminal commands. The plugin parses literal path arguments in commands such as `rm`, `rmdir`, `unlink`, `Remove-Item`, `del`, and `rd`. Deleted files appear with a deleted marker in both review entry points. Their content is no longer available, so there is no line diff or undo. Deletions using wildcards (`rm *.log`) or command substitution (`rm $(...)`) are not recognized because the affected files cannot be enumerated afterward.
 - **Automatic archiving**: The main list keeps the latest five turns; turns in progress are never archived. Older completed turns move into a collapsed Archived turns section at the bottom. Archived contents are not rendered while collapsed. Expanding it loads ten turns per page, with Load more for subsequent pages. Diff rows also mount lazily, avoiding dozens of diff groups mounting at once in long sessions. Deep links to archived turns automatically expand and locate them. Expansion state is remembered per session; the tab badge counts only the main list.
-- **PTC / Code Mode support**: Nested `edit`/`write` calls inside `run_code` programs are captured. The Host snapshots the full before/after content, and the browser reconstructs line-numbered hunks and associates them with the correct turn. Diff viewing, status checks, undo, and reapply are supported. Standard mode behavior is unchanged; the end-of-turn review row still covers standard-mode turns only.
+- **Trusted tool lifecycle**: Capture exact UTF-8 before/after images through official execution and final acceptance seams for native and nested PTC calls. Host identities persist in official results/dispatch logs and replay after reload. Empty/nonempty creations and create-then-edit sequences support safe undo/recreation. Missing, oversized, externally changed or permission-mismatched images refuse writes; legacy hunks retain their existing checks. See the [implementation and verification record](docs/MIGRATION_VERIFICATION.md).
 - **Review scopes**: Choose Last turn, This session, Pending review, Uncommitted, Unstaged, Staged, Committed, or Branch. Session scopes retain undo support. Pending review lists unconfirmed turns and supports confirming a turn, undoing a turn, and undoing individual files. Confirmations are stored locally per session and survive restarts; they can be undone in This session. Git scopes support worktree, index, historical commit, and branch comparisons, aggregated using the project's repository configuration.
 - **Comments and discussions**: All eight scopes support single-line, range and whole-file comments; Git file operations remain read-only. Edit, delete and submit opinions in batches, queue while busy, and preserve the conversation draft. Failed submissions retain pending opinions. Discussions retain submitted batches and link text replies through request identity and actual turn admission, with unread/read, manual resolve/reopen and follow-up actions. One batch shares its reply; individual fixes are not inferred.
 - **Large-file virtualization**: Visible blocks over 400 rows render a window of rows with measured wrapping and comment heights. Split cells are measured together, and editing rows remain mounted. Search and change navigation still cover complete recorded content. Virtualization can be disabled in Settings.
@@ -43,30 +43,34 @@ Release maintainers should also read the [Public release and plugin marketplace 
 - **Narrow-container support**: In a half-width sidebar, turn headers wrap and secondary details such as line statistics and Open in built-in viewer yield space, keeping filenames and undo actions visible.
 - **Style isolation**: CSS Modules and the host's `--dsw-alias-*` theme tokens keep styles isolated from the conversation area and other plugins.
 
+The **input comment Dock and Send with input reference chip** share sidebar drafts, submission locks and request association while preserving prose, other references and attachments. Complete plugin packets fold in chat; immutable details and complete-source copy remain available, and ordinary messages delegate to the host renderer. Turn/repository headers offer **Copy differences** with repository/scope/baseline sections, a 256-file / 2 MiB budget, cancellation and a shared four-request Git queue.
+
 ## Installation
 
-Supported versions: **DeepSeek Harness Desktop 0.2.0-rc.2**. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
+Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as a tested channel. Plugin v0.3.0 is installed and tested in the actual Windows Desktop 0.2.0-rc.2, covering multiple repositories, all eight scopes, diff reading, both comment submission routes, linked replies, confirmation, undo/reapply and shared settings. See the [verification matrix](docs/MIGRATION_VERIFICATION.md). Stable/newer stable versions and a full Web host remain unverified. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.2.0.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.0.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.2.0.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.0.tgz"
 ```
 
 Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open Multi-repository management at the top of the session, and open File Review from the native right sidebar's ＋ guide.
+
+For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.0 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.2.0/dsh-file-review-tab-multi-git-repository-0.2.0.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.0/dsh-file-review-tab-multi-git-repository-0.3.0.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -91,7 +95,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the complete `v0.2.0` packaging, push, and Release workflow. The bilingual [Release notes](docs/releases/version.md#v020) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.0 package has not been published). The bilingual [Release notes](docs/releases/version.md#v030) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 

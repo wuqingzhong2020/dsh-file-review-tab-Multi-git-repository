@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { FileReviewService } from './file-review-service.ts'
 import type { FileReviewConfig } from './repository-config.ts'
 import { RepositorySettings } from './repository-settings.ts'
+import { registerLifecycleCapture } from './lifecycle-capture.ts'
 
 export type * from './change-types.ts'
 export type * from './repository-types.ts'
@@ -42,6 +43,7 @@ const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, men
  */
 export function apply(ctx: Context, config: FileReviewConfig): void {
   const service = new FileReviewService(ctx, new RepositorySettings(ctx, config?.projects ?? []))
+  registerLifecycleCapture(ctx, service)
   ctx.systemPrompt.section({
     name: 'ui:file-review-tab-multi-git-repository:references',
     order: 190,

@@ -26,3 +26,10 @@
 .discussionReplies { margin: 12px 0; }
 .discussionReplies summary { cursor: pointer; font-weight: 600; }
 .discussionReplies .commentText { max-height: 340px; overflow: auto; }
+
+.dock { border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); margin: 6px 0; }
+.dockPreview { flex: 1; min-width: 160px; }
+.dockPreview summary, .packet summary { cursor: pointer; padding: 6px; }
+.dockPreview[open] { width: 100%; }
+.packet { margin: 8px 0 8px auto; max-width: 90%; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; padding: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); }
+.packetText { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 400px; overflow: auto; }

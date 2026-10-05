@@ -74,6 +74,10 @@ export declare class ReviewCommentStore {
     private publish;
     save(anchor: ReviewCommentAnchor, text: string, id?: string, discussionId?: string): void;
     remove(id: string): void;
+    clear(): void;
+    /** Main-input serialization acquires the same lock as sidebar submission. */
+    acquire(): boolean;
+    release(): void;
     /** Explicitly accepted draft relocation; submitted/history records keep the original anchor. */
     relocate(id: string, anchor: ReviewCommentAnchor): void;
     acknowledge(batch: readonly ReviewComment[]): void;

@@ -1,4 +1,6 @@
 import { test } from 'node:test'
+import { Context } from '@deepseek-ai/cordis'
+import { parseReviewPacket } from '../src/client/review-comment-packet.ts'
 import assert from 'node:assert/strict'
 import { attachLocale, t } from '../src/client/locales.ts'
 import { ReviewCommentStore, fileCommentAnchor } from '../src/client/review-comments.ts'
@@ -31,7 +33,10 @@ function stores() {
   return { memory, drafts, discussions }
 }
 function sessionContext({ prompt, send = async () => {}, abandon = () => {} }) {
-  const scope = { conversation: { send } }
+  const scope = {
+    get: name => name === 'conversation' ? { send } : undefined,
+    get conversation() { throw new Error('cannot get property "conversation" without inject') },
+  }
   const session = prompt
     ? {
         beginSubmission: () => ({ requestId: 'rpc-reviewed-batch', abandon }),
@@ -98,7 +103,13 @@ test('identified submission persists batch identity before prompting and clears 
       assert.deepEqual(persisted.comments, batch)
       assert.equal(mode, 'queue')
       assert.equal(signal, undefined)
-      assert.deepEqual(content, [{ type: 'text', text: formatReviewSubmission(batch, []) }])
+      assert.equal(content.length, 1)
+      assert.equal(content[0].type, 'text')
+      const packet = parseReviewPacket(content[0].text)
+      assert.ok(packet)
+      assert.equal(packet.packet.context, formatReviewSubmission(batch, []))
+      assert.deepEqual(packet.packet.comments, batch)
+      assert.equal(packet.packet.sessionId, 'review-session')
       assert.equal(drafts.getSnapshot().busy, true)
       assert.equal(drafts.getSnapshot().comments.length, 1)
       return { ok: true, value: { accepted: true } }
@@ -127,6 +138,27 @@ test('legacy send retains an explicitly unlinked discussion without fabricating 
   assert.equal(await submit(drafts, discussions, ctx), true)
   assert.equal(sent, 1)
   assert.equal(discussions.getSnapshot().records[0].state, 'unlinked')
+})
+
+test('Cordis session scopes resolve conversation without property injection', async () => {
+  const ctx = new Context()
+  const { drafts, discussions } = stores()
+  let sent = 0
+  await ctx.plugin(provider => {
+    provider.provide('conversation', { send: async () => { sent++ } })
+  }).await()
+  // Official createScope uses a no-op fiber with no conversation injection.
+  const fiber = ctx.plugin(() => {})
+  await fiber.await()
+  const scope = fiber.ctx
+  try {
+    assert.throws(() => scope.conversation, /without inject/)
+    assert.equal(await submit(drafts, discussions, { sessions: { scope: () => scope } }), true)
+    assert.equal(sent, 1)
+    assert.equal(drafts.getSnapshot().comments.length, 0)
+  } finally {
+    await ctx.fiber.dispose()
+  }
 })
 
 test('disabling discussion history continues through the legacy send and creates no record', async () => {

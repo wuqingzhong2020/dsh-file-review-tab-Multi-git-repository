@@ -33,15 +33,15 @@ export function stateKey(turn: number, path: string): string {
   return `${turn}|${path}`
 }
 
-/** A change group is reversible only with complete contextual hunks. */
+/** UI eligibility only: contextual hunks or lifecycle identities still need Host validation. */
 export function isReversible(file: SessionFileChange): boolean {
   return (
     file.diffs.length > 0 &&
     file.diffs.every(
       diff =>
         diff.path === file.path &&
-        diff.oldText !== null &&
-        diff.oldText !== diff.newText &&
+        (diff.recordId !== undefined || diff.oldText !== null) &&
+        (diff.recordId !== undefined || diff.oldText !== diff.newText) &&
         (diff.oldText !== '' || diff.oldStart !== undefined) &&
         (diff.newText !== '' || diff.newStart !== undefined),
     )

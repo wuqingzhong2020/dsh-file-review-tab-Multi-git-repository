@@ -21,7 +21,7 @@ export interface FlatChange {
 }
 /** Keep the existing row identity: expansion, status and deep links share it. */
 export declare function stateKey(turn: number, path: string): string;
-/** A change group is reversible only with complete contextual hunks. */
+/** UI eligibility only: contextual hunks or lifecycle identities still need Host validation. */
 export declare function isReversible(file: SessionFileChange): boolean;
 export declare function addStats(left: UnifiedDiffStats, right: UnifiedDiffStats): UnifiedDiffStats;
 //# sourceMappingURL=file-review-model.d.ts.map

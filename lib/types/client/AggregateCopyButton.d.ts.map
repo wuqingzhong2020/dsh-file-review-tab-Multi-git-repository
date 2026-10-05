@@ -1,0 +1,1 @@
+{"version":3,"file":"AggregateCopyButton.d.ts","sourceRoot":"","sources":["../../../src/client/AggregateCopyButton.tsx"],"names":[],"mappings":"AACA,OAAO,EAAqB,KAAK,iBAAiB,EAAE,MAAM,qBAAqB,CAAA;AAI/E,UAAU,wBAAwB;IAChC,IAAI,EAAE,CAAC,MAAM,EAAE,WAAW,KAAK,OAAO,CAAC,SAAS,iBAAiB,EAAE,CAAC,CAAA;CACrE;AAED,wBAAgB,mBAAmB,CAAC,EAAE,IAAI,EAAE,EAAE,wBAAwB,+BAuCrE"}

@@ -14,6 +14,9 @@ export interface DiffViewPreferences {
     readonly virtualize: boolean;
     readonly searchShortcut: 'mod+f' | 'mod+shift+f' | 'mod+alt+f';
     readonly changeShortcut: 'mod+arrow' | 'alt+arrow';
+    readonly adaptive: boolean;
+    readonly dock: boolean;
+    readonly foldMessages: boolean;
 }
 export declare const DEFAULT_DIFF_VIEW: DiffViewPreferences;
 export declare const DIFF_VIEW_STORAGE_KEY = "dsh-file-review-tab-multi-git-repository:diff-view";

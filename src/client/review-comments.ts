@@ -339,6 +339,18 @@ export class ReviewCommentStore {
         true,
       )
   }
+  clear(): void {
+    if (!this.snapshot.busy) this.publish([], false, true)
+  }
+  /** Main-input serialization acquires the same lock as sidebar submission. */
+  acquire(): boolean {
+    if (this.snapshot.busy || !this.snapshot.comments.length) return false
+    this.publish(this.snapshot.comments, true)
+    return true
+  }
+  release(): void {
+    this.publish(this.snapshot.comments, false)
+  }
   /** Explicitly accepted draft relocation; submitted/history records keep the original anchor. */
   relocate(id: string, anchor: ReviewCommentAnchor): void {
     if (!this.snapshot.busy)
@@ -367,12 +379,8 @@ export class ReviewCommentStore {
     this.publish(batch, true)
     try {
       await send(batch)
-      const ids = new Set(batch.map(item => item.id))
-      this.publish(
-        this.snapshot.comments.filter(item => !ids.has(item.id)),
-        false,
-        true,
-      )
+      this.acknowledge(batch)
+      this.release()
       return true
     } catch (cause) {
       this.publish(this.snapshot.comments, false)

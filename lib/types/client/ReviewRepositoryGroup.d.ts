@@ -5,7 +5,7 @@ export declare function FileContentsButton({ expanded, label, onClick, controls 
     onClick: () => void;
     controls?: string;
 }): import("react").JSX.Element;
-export declare function ReviewRepositoryGroup({ name, path, count, children, collapsed, onCollapsedChange, contentsExpanded, onContentsExpandedChange }: {
+export declare function ReviewRepositoryGroup({ name, path, count, children, collapsed, onCollapsedChange, contentsExpanded, onContentsExpandedChange, actions }: {
     name: string;
     path: string;
     count: number;
@@ -14,5 +14,6 @@ export declare function ReviewRepositoryGroup({ name, path, count, children, col
     onCollapsedChange: (collapsed: boolean) => void;
     contentsExpanded: boolean;
     onContentsExpandedChange: (expanded: boolean) => void;
+    actions?: ReactNode;
 }): import("react").JSX.Element;
 //# sourceMappingURL=ReviewRepositoryGroup.d.ts.map

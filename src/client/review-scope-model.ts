@@ -30,8 +30,8 @@ const SESSION_SCOPE_BEHAVIORS = {
   'last-turn': {
     select: ({ snapshot, turns }) => lastTurnChanges(snapshot, turns),
     pagination: 'archive',
-    empty: 'empty',
-    filteredEmpty: 'repoFilterEmpty',
+    empty: 'lastTurnEmpty',
+    filteredEmpty: 'lastTurnRepoEmpty',
   },
   session: {
     select: ({ turns }) => turns,

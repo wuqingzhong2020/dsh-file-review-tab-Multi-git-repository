@@ -80,7 +80,10 @@ test('batch messages include exact repository/file/source/side/context and safel
 test('conversation submission resolves the intended session scope without overwriting its composer draft', async () => {
   const calls = []; let draft = 'existing composer text'; let composerWrites = 0
   const input = { for: () => ({ setDraft: text => { composerWrites++; draft = text } }) }
-  const ctx = { sessions: { scope: id => ({ conversation: { input, send: async text => { calls.push({ id, text }) } } }) } }
+  const ctx = { sessions: { scope: id => ({
+    get: name => name === 'conversation' ? { input, send: async text => { calls.push({ id, text }) } } : undefined,
+    get conversation() { throw new Error('cannot get property "conversation" without inject') },
+  }) } }
   await sendReviewComments(ctx, 'session-a', 'review batch')
   assert.deepEqual(calls, [{ id: 'session-a', text: 'review batch' }]); assert.equal(draft, 'existing composer text'); assert.equal(composerWrites, 0)
   await assert.rejects(sendReviewComments({ sessions: { scope: () => undefined } }, 'missing', 'feedback'), /unavailable/)

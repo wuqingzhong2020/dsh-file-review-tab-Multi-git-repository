@@ -14,6 +14,9 @@ export interface DiffViewPreferences {
   readonly virtualize: boolean
   readonly searchShortcut: 'mod+f' | 'mod+shift+f' | 'mod+alt+f'
   readonly changeShortcut: 'mod+arrow' | 'alt+arrow'
+  readonly adaptive: boolean
+  readonly dock: boolean
+  readonly foldMessages: boolean
 }
 export const DEFAULT_DIFF_VIEW: DiffViewPreferences = Object.freeze({
   layout: 'unified',
@@ -30,6 +33,9 @@ export const DEFAULT_DIFF_VIEW: DiffViewPreferences = Object.freeze({
   virtualize: true,
   searchShortcut: 'mod+f',
   changeShortcut: 'mod+arrow',
+  adaptive: true,
+  dock: true,
+  foldMessages: true,
 })
 export const DIFF_VIEW_STORAGE_KEY = 'dsh-file-review-tab-multi-git-repository:diff-view'
 
@@ -80,6 +86,9 @@ export function parseDiffViewPreferences(raw: string | null): DiffViewPreference
         ...DEFAULT_DIFF_VIEW,
         layout: value.layout as DiffLayout,
         wrap: value.wrap,
+        adaptive: typeof record.adaptive === 'boolean' ? record.adaptive : true,
+        dock: typeof record.dock === 'boolean' ? record.dock : true,
+        foldMessages: typeof record.foldMessages === 'boolean' ? record.foldMessages : true,
         contextExpansionLines:
           typeof count === 'number' && Number.isSafeInteger(count) && count > 0
             ? count

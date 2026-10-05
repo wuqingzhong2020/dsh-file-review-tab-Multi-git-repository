@@ -6,6 +6,7 @@ import { FileReviewService } from '../lib/index.js'
 import { FILE_REVIEW_INVOCATIONS } from '../src/typert-descriptors.ts'
 import { loadUserGuide, guideImageResolver } from '../src/client/user-guide.ts'
 import { attachLocale, t } from '../src/client/locales.ts'
+import { USER_GUIDE_IMAGES } from '../src/user-guide.ts'
 
 test('Host opens shipped manuals outside the active project and never accepts a caller file path', async () => {
   const agent = { session: { header: { cwd: 'Z:/an-unrelated-project' } } }
@@ -68,7 +69,7 @@ test('both shipped guides include their original Markdown and exactly the packag
   for (const language of ['zh', 'en']) {
     const document = await service.userGuideDocument({}, language)
     assert.equal(document.markdown, await readFile(document.path, 'utf8'))
-    assert.equal(Object.keys(document.images).length, 12)
+    assert.equal(Object.keys(document.images).length, USER_GUIDE_IMAGES.length)
     assert.equal(codec.safeParse(document).success, true)
     for (const [destination, data] of Object.entries(document.images)) {
       const original = await readFile(new URL(`../docs/${destination}`, import.meta.url))

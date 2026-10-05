@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { RecordedMutation } from '../change-types.ts'
+import type { RecordedResult } from '../change-types.ts'
 import { deriveSessionChanges, deriveSessionRoots, mergeRecordedTurns } from './session-changes.ts'
 import type { FileReviewRemote } from './file-review-model.ts'
 
@@ -56,8 +56,11 @@ export function useFileReviewConversation(
   // fetch re-arms on the root set (a new run_code turn) or a manual refresh.
   const roots = useMemo(() => (snapshot === null ? [] : deriveSessionRoots(snapshot)), [snapshot])
   const rootsKey = useMemo(() => roots.map(root => root.rootCallId).join('|'), [roots])
-  const [recorded, setRecorded] = useState<readonly RecordedMutation[]>(() => [])
-  const [recordedKey, setRecordedKey] = useState<string | null>(null)
+  const [recorded, setRecorded] = useState<{
+    sessionId: string
+    rootsKey: string
+    result: RecordedResult
+  } | null>(null)
   useEffect(() => {
     if (!visible || roots.length === 0) return
     let active = true
@@ -72,8 +75,7 @@ export function useFileReviewConversation(
         .recorded({ rootCallIds: roots.map(root => root.rootCallId) })
         .then(result => {
           if (!result.ok || !active) return
-          setRecorded(result.value.mutations)
-          setRecordedKey(rootsKey)
+          setRecorded({ sessionId, rootsKey, result: result.value })
         })
         .catch(() => {
           // Transient fetch failure: keep the previous record; the next
@@ -85,12 +87,18 @@ export function useFileReviewConversation(
       window.clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, rootsKey, tick, sessions, sessionId])
+  }, [visible, rootsKey, tick, sessions, sessionId, snapshot])
 
+  const currentRecords = recorded?.sessionId === sessionId ? recorded : null
   const turns = useMemo(
-    () => mergeRecordedTurns(deriveSessionChanges(snapshot), roots, recorded),
-    [snapshot, roots, recorded],
+    () => mergeRecordedTurns(deriveSessionChanges(snapshot), roots, currentRecords?.result.mutations ?? []),
+    [snapshot, roots, currentRecords],
   )
-
-  return { snapshot, turns, ready: snapshot !== null && (roots.length === 0 || recordedKey === rootsKey) }
+  const ready = snapshot !== null && (roots.length === 0 || currentRecords?.rootsKey === rootsKey)
+  return {
+    snapshot,
+    turns,
+    recordedWarnings: currentRecords?.result.warnings ?? [],
+    ready,
+  }
 }

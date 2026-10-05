@@ -2,7 +2,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.2.0**，DeepSeek Harness Desktop **0.2.0-rc.2**；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.0**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](MIGRATION_VERIFICATION.md)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
 
@@ -311,7 +311,7 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 | `userGuideDocument(language)` | 返回固定语言手册的 Markdown 与 12 张随包截图的 JPEG data URL | 只读取固定文档和图片白名单；不接受调用方文件路径 |
 | `gitReview(request)` | 查询仓库、比较引用及改动文件列表 | 读取 Git |
 | `gitReviewDiff(request)` | 查询一个文件的具体差异 | 读取 Git/工作区 |
-| `recorded(request)` | 按根调用 ID 获取嵌套工具修改记录 | 读取 Host 内存 |
+| `recorded(request)` | 获取可信标准／PTC 记录、兼容补录及截断提示 | 重放官方会话日志与有界缓存 |
 | `status(request)` | 检查原始差异与当前文件的关系 | 读取文件 |
 | `apply(request)` | 安全撤销或重新应用差异 | 写文件 |
 | `locateReference(request)` | 核对当前磁盘引用位置 | 读取，结果含原位置／移动／歧义／失配 |
@@ -321,7 +321,9 @@ Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客�
 
 文件审查标题行的「操作指南」打开 [UserGuideTab.tsx](../src/client/UserGuideTab.tsx) 中的宿主 Modal 弹窗。[UserGuideContent.tsx](../src/client/UserGuideContent.tsx) 通过 Agent 作用域 `userGuideDocument(language)` 读取手册和截图，保留宿主 Markdown 排版、图片放大、刷新、焦点返回及 Esc。语言变化重载正文，关闭或来源 Tab 隐藏时卸载文档与图片层，旧请求不写回。旧保存布局的 `file-review-guide` 兼容页只提供打开同一弹窗和关闭自身，不再出现在引导页；Host 的旧路径 RPC 保留兼容。
 
-Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_GUIDE.en.md`，只接受两种语言值和 12 张固定命名的 JPEG 截图；不会把当前工程里的同名文件当作插件手册。截图转换为 data URL，经 `pathImages` / `fileImages` 的显式图片解析器交给宿主渲染，避免 Desktop 的 `dsh-app://` 地址被普通 Markdown 图片协议白名单拒绝。RPC 对内容长度、图片键和媒体类型作校验，不接受调用方的任意本地路径；图片数据只保留在弹窗内存中，不写入布局持久化元数据。未新增 Markdown 渲染运行时依赖；差异视图保持原有代码展示方式。
+Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_GUIDE.en.md`，只接受两种语言值和 18 张固定命名的 JPEG 截图；不会把当前工程里的同名文件当作插件手册。截图转换为 data URL，经 `pathImages` / `fileImages` 的显式图片解析器交给宿主渲染，避免 Desktop 的 `dsh-app://` 地址被普通 Markdown 图片协议白名单拒绝。RPC 对内容长度、图片键和媒体类型作校验，不接受调用方的任意本地路径；图片数据只保留在弹窗内存中，不写入布局持久化元数据。未新增 Markdown 渲染运行时依赖；差异视图保持原有代码展示方式。
+
+官方 Markdown 不支持片段导航。指南头部的章节选择框从实际渲染的编号 h2 标题提取选项，按标题定位且只滚动当前文档容器；不解析示例代码或替换宿主 Markdown／图片组件。
 
 新增远程方法时，应同时修改领域类型、Zod schema、描述符、Host 方法、`remote.ts` 类型扩展和调用页面。仅给 service 增加一个方法不会自动使它成为可调用 RPC。
 
@@ -398,13 +400,15 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 | --- | --- | --- |
 | 工程仓库配置 | 工程根目录 JSON | 可随 Git 维护；不同工程独立；不写外部临时仓库 |
 | 工程索引、旧配置引用 | 宿主 Profile 设置 | 用于项目匹配及迁移，不替代项目 JSON 的存在/启用判断 |
-| PTC 嵌套修改全文 | `FileReviewService` 的 `recordLog` | 按 Agent 隔离，最多保留 4000 条；Host 重启/重载后丢失 |
+| 可信标准／PTC 文件图像 | 官方 tool/result 与 tool/ptc-dispatch | 会话/root/sub-call 校验；最近 4000 条、16 MiB，超限说明 |
+| 旧 PTC 兼容补录 | Host recordLog | 最多 4000 条；重载后丢失，不授权新建文件删除 |
 | 临时外部仓库 | Host `temporaryRepositories` | 当前 Agent/会话内有效，Host 重启后丢失 |
 | 评论草稿 | localStorage 的 `…:comments:<sessionId>` | 按会话持久化 |
 | 已提交意见／讨论 | localStorage 的 `…:discussions:<sessionId>` | 按会话保存请求／轮次、答复、已读／解决状态 |
 | 轮次确认 | localStorage 的 `…:confirmations:<sessionId>` | 按会话持久化 |
 | 归档展开状态 | localStorage 的 `…:archive:<sessionId>` | 按会话持久化，兼容旧前缀迁移 |
-| 差异布局、换行、每次展开行数、外观、编辑器路径、快捷键和讨论／虚拟化开关 | localStorage 的 `…:diff-view` | 同一浏览器环境下共享的显示偏好 |
+| 布局、换行、Dock／adaptive／foldMessages | 本插件 Profile reviewSettings | 官方权威值；无损迁移缺少的便携字段，本地降级 |
+| 上下文、外观、编辑器路径、快捷键与讨论／虚拟化 | localStorage 的 `…:diff-view` | 本机偏好，不上传到 Profile |
 | 文件内容、仓库列表、上下文展开 | React/组件内存 | 页面状态，不写工程 JSON |
 | 搜索条件、匹配位置、修改块选择 | `UnifiedDiff` 内存 | 来源／修订隔离，不持久化；布局与语言切换保留 |
 | Git 文件差异缓存 | `GitReviewPanel` 内存 | 模式/引用/刷新等变化时失效 |
@@ -430,7 +434,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 4. 有行号时按预期位置匹配；无行号时要求文本唯一匹配，不做模糊猜测。
 5. 写入前重新读取核对内容，冲突时跳过；采用原子写入并保留权限和换行风格。
 
-新建文件的 `oldText: null`、终端删除标记、缺少足够差异或匹配冲突的文件不能直接恢复。不要为了让按钮可用而自动删除新文件、扩大根目录或添加模糊匹配。写前核对是乐观保护，不能描述成覆盖所有外部编辑竞争的文件系统事务。
+仅有 `oldText: null` 的旧记录、终端删除标记、缺少足够差异或冲突文件不能直接恢复。v0.3.0 只有完整 Host 生命周期才支持新建删除／重建，且每次重新授权与核对身份。不扩大根目录或添加模糊匹配。写前核对是乐观保护，不能描述成覆盖所有外部编辑竞争的文件系统事务。
 
 ### 9.2 当前性能策略与限制
 
@@ -495,7 +499,7 @@ pnpm test
 pnpm pack --pack-destination dist
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.2.0.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
+默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.3.0.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 
@@ -523,7 +527,7 @@ pnpm pack --pack-destination dist
 | 「文件审查」Tab 不出现 | 原生类型／插槽注册、`dsh.client` 加载、`client/index` 日志、安装包是否为本次产物 |
 | `remote.fileReview` 不可用 | `$mount` 错误、Host 插件与 Typert 模型加载、会话 scope 是否存在、两端版本是否一致 |
 | 会话有旧修改但「上一轮」为空 | 最新轮次是否实际修改文件；按定义不会回退到更早轮次 |
-| Code Mode 改动缺失 | 嵌套调用是否成功、结果是否有 before/after、rootCallId 归属、Host 记录是否因重启或上限丢失 |
+| Code Mode 改动缺失 | 嵌套调用是否成功、结果是否有 before/after、root/sub-call 归属、schema 与预算、官方持久化标记及截断提示 |
 | 多仓库没有生效 | 最近项目 JSON 是否存在/启用、相对根目录是否正确、仓库是否可用；旧 Profile 清单本身不启用功能 |
 | 保存配置提示已变动 | 文件修订值不匹配；重新加载后再编辑，避免覆盖他人的变动 |
 | 「打开」不能定位已有路径 | `directoryStart` 结果、Desktop 桥的 `supportsDefaultPath`、宿主构建是否匹配兼容脚本 |
@@ -534,3 +538,60 @@ pnpm pack --pack-destination dist
 | 仓库名称重复或展开影响其他组 | 是否用显示名称作唯一键；应使用仓库根目录和会话/轮次作用域 |
 
 排查时先确定问题属于会话记录、Git 查询、项目范围、显示状态还是文件写入，再沿对应链路处理。一个页面显示相同路径不代表两个范围使用相同版本的代码。
+
+
+## 12. v0.3.0 融合实现边界
+
+### 12.1 捕获、提交与重放
+
+标准与 PTC 根调用都请求 Host 生命周期记录。共享 codec 在 [lifecycle-record.ts](../src/lifecycle-record.ts)，观察适配在 [lifecycle-capture.ts](../src/lifecycle-capture.ts)，路径、字节图像与文件转换在 [file-lifecycle.ts](../src/file-lifecycle.ts)。执行前后只观察允许仓库内的普通 UTF-8 文件；捕获失败不会改变正常工具结果。
+
+官方 tools/execute → tools/post-execute → tools/result 决定最终接受；未接受、失败、取消、替换执行值不能产生可信图像。标记位于空 text 块的 dshFileReviewMultiRepository 元数据，模型正文不增加文件快照。标准结果随 tool/result 保存；子调用通过 tools/ptc-dispatch-log 进入官方 tool/ptc-dispatch。重放校验版本、session/root/sub-call，并按 UUID 去重；不写入未知的必需会话事件。
+
+单文件捕获 1 MiB、单标记 256 KiB、最近 4000 条／16 MiB 图像；超限保留原因或截断警告。请求另限 256 文件／16 MiB。客户端 recordId、路径、旧／新文本必须逐项匹配 Host 记录；sourceCallId 仅用于同次调用去重，不能授权。未捕获的同路径差异仍展示，混合或不连续序列保守拒绝整段撤销。
+
+创建是 before=null 与真实不存在路径的组合，空文件不等于不存在；独占 wx 重建、原始换行和 mode 均保留。实际操作重新检查当前 roots、真实父目录、常规文件、精确内容、权限及 dev/ino，批量返回逐文件结果。现有文件采用官方 atomic-write。旧局部 hunk 逻辑仍用于无身份历史，oldText=null 本身不能授权删除。
+
+自行还原后的新 dev/ino 只在本进程维护。RC Session.append 未提供写入 ignorable 扩展事件的公开参数，所以没有引入可能阻止卸载后恢复会话的必需事件；重启后继续多次切换可能保守冲突。原始记录经真正新 Node 进程可撤销与重建。此限制明确记录，不降低文件替换检查。
+
+### 12.2 评论增强与可选服务
+
+ReviewCommentsDock、侧栏 Provider 共用同一会话草稿／讨论 Store。review-input 使用官方 inputTriggers codec 和带 draftRev 的 input-insert-reference／insertText，保留文本与其他引用／附件，不 setDraft。附加时冻结包；序列化时占用共享锁；用官方 pendingSubmissions 和 eventSource 找真实 requestId／入队入轮证据。无讨论模式使用临时 reconciliation Store，不保存批次。全局 tracking 在 Dock 隐藏后仍运行，解绑、abort、卸载均释放。
+
+review-comment-packet 只认完整的 leading、本包名、版本 1 envelope，限制 512 KiB，并转义 JSON 中尖括号。ReviewPacketMessage 捕获实际原 user／steering 组件并组合：普通、损坏、旧消息完整委托；插件包仅投影首个 text，其他 content 和原 props 保留。遇到不可委托的 inject／children／store 契约时不接管。详情取消息快照，完整复制含原 envelope。宿主编辑／重发等在真实 Desktop 的行为仍待验证。
+
+inputTriggers、configForms 与插件设置卡片都通过可选能力注入／插槽生命周期接入，未增加社区插件或核心必需注入。唯一注册、effect disposer、参考包清理、ResizeObserver 与任务 AbortController 均随卸载释放。输入 Chip 重载后不可凭 localStorage 重新授权：保留草稿，用户移除并重附。
+
+### 12.3 设置与阅读
+
+repository-config 的 reviewSettingsOwner 标记用于发现本插件真实 Profile namespace；reviewSettings 只包含 layout/wrap/dock/adaptive/foldMessages。profile-review-preferences 负责 form 订阅、revision 写入、成功后迁移、已有 user/base 优先与只读／失败回退。顶部、弹窗及官方卡片共享权威 Store；弹窗按打开时基准只写用户改动字段。字体、editorPath 等留在本机。
+
+use-effective-layout 用实际容器 ResizeObserver 分离偏好与有效布局，小于 480px 回退统一、拉宽恢复、零宽保持上次决定；虚拟行获得有效布局以重算高度。搜索、引用、上下文和评论身份不随宽度重建。
+
+aggregate-diff 输出跨仓库、来源／基线明确的操作片段报告，数量 256／编码 2 MiB，不能冒充可应用净补丁。Git 复制与展开共用 ReviewDiffQueue（4 并发、去重、失败可重试）；取消／比较 epoch 阻止后续复制，逐文件失败／二进制／缺失文本有说明，加载中逐步核对内存预算。
+
+### 12.4 回归与安装包
+
+pnpm run typecheck / build / test / test:e2e / test:docs / test:pack 是复现入口。浏览器夹具加载真实 lib/client.js 与官方 UI primitives，模拟 Session/Remote/输入／配置服务，不是正在运行的 Desktop。test:docs 验证双语新增章节、白名单、JPEG 与 Host wire；test:pack 生成 tgz、校验导出／声明／资源／社区依赖边界及临时方案排除，附 SHA256。测试用纯 UI 依赖均为开发依赖。
+
+Windows Desktop 的独立双仓库操作验收见 [验证记录](MIGRATION_VERIFICATION.md)。`create-desktop-review-workspace.mjs` 只建立系统临时样例，真实截图经 `crop-desktop-guide-images.py` 裁剪后交付；浏览器调试截图写入 `test-results`，不覆盖指南资源。安装同版本新构建需使用内容摘要不同的归档路径，并核对安装产物字节，以免复用包缓存。
+
+侧栏发送的 Session scope 属于宿主 fiber，不能直接访问未在本插件声明注入的 `scope.conversation`。优先使用 Session 的请求身份与提交接口；降级时通过 Cordis `scope.get('conversation')` 解析动态服务。真实 Cordis fiber 与拒绝属性访问的夹具共同覆盖这一约束。
+
+### 12.5 模块职责与扩展约束
+
+融合代码按下表分工，避免在组件、Remote 服务中混合事件解析、持久化和副作用：
+
+| 模块 | 职责 | 扩展时保留的约束 |
+| --- | --- | --- |
+| [lifecycle-history.ts](../src/lifecycle-history.ts) | 接受事件回放、UUID 索引、顺序校验、缓存预算 | 一次批量 status/apply 共用一个回放快照；旧 hunk、可信记录、无效混合序列分别处理 |
+| [lifecycle-capture.ts](../src/lifecycle-capture.ts) | 从工具呈现发现路径，捕获前后图像，对接接受事件 | 观察失败不影响工具结果，工具自带元数据不能授权写入 |
+| [file-lifecycle.ts](../src/file-lifecycle.ts) | 路径授权、图像与身份复核、实际文件转换 | 内容相同与 inode 相同分别判断；新增写入方式必须保留操作前复核 |
+| [review-input-batches.ts](../src/client/review-input-batches.ts) | 冻结意见包、共享锁、提交身份、确认与释放 | 取消清理当前提交状态，重试重新绑定真实 requestId；只清除已确认的冻结意见 |
+| [review-input.ts](../src/client/review-input.ts) | 官方输入引用操作与会话订阅 | 使用 draftRev 防止覆盖更新后的输入；批次跟踪独立于 Dock 生命周期 |
+| [profile-review-preferences.ts](../src/client/profile-review-preferences.ts) | Profile 发现、单表单订阅、迁移与保存 | 每次表单绑定拥有独立异步状态，解绑后的完成回调不能恢复订阅或更新本地值 |
+| [ReviewEnhancementControls.tsx](../src/client/ReviewEnhancementControls.tsx) | 弹窗与官方卡片共享的增强选项 | 选项、标签只定义一次，保存策略由调用方提供 |
+| [git-review-report.ts](../src/client/git-review-report.ts) | 按显示顺序装配复制报告，保留逐文件失败 | 共享加载队列，校验比较版本和取消状态，超限或失败后停止继续调度 |
+| [review-enhancements.tsx](../src/client/review-enhancements.tsx) | 注册可选输入、消息和设置能力 | effect/inject 生命周期集中管理，不扩大核心必需注入 |
+
+会话补录的 mutations、warnings、sessionId、rootsKey 作为一个状态快照更新，避免关联字段分散维护。轮次摘要和侧栏共用 isReversible；此判断只决定 UI 可用性，最终写入仍由 Host 校验。新增逻辑测试放在 `lifecycle-history.test.mjs`、`lifecycle-migration.test.mjs` 和 `migration-client.test.mjs`，不要用复制实现的测试替代实际调用链验证。

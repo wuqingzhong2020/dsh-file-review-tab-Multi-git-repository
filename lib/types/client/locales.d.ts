@@ -18,6 +18,7 @@ export declare const zh: {
     readonly userGuideServiceUnavailable: "使用手册服务不可用；安装或更新插件后，请完整退出并重启 Desktop，再重试。";
     readonly userGuideClose: "关闭操作指南";
     readonly userGuideCloseLegacy: "关闭此旧标签";
+    readonly userGuideChapter: "跳转章节";
     readonly userGuideLegacyHint: "操作指南已改为插件弹窗；此标签仅兼容之前保存的布局。";
     readonly sidebarGuideDescription: "按轮次及 Git 范围审查多仓库文件改动";
     readonly sidebarUnavailable: "原生文件查看器尚未就绪，请重新打开文件审查。";
@@ -92,6 +93,8 @@ export declare const zh: {
     readonly reviewBinaryHint: "二进制文件、符号链接或超出大小限制，无法显示文本差异。";
     readonly reviewMetadataOnly: "仅有重命名或文件模式变化，没有文本差异。";
     readonly empty: "本会话暂无文件改动";
+    readonly lastTurnEmpty: "上一轮没有文件改动；可切换到“本会话”查看较早轮次。";
+    readonly lastTurnRepoEmpty: "此仓库在上一轮没有文件改动。";
     readonly sessionUnavailable: "会话不可用";
     readonly remoteUnavailable: "文件审查服务不可用";
     readonly turn: "第 {n} 轮";
@@ -290,6 +293,20 @@ export declare const zh: {
     readonly referenceRelocateApply: string;
     readonly referenceExact: string;
     readonly referenceHistorical: string;
+    readonly reviewPacketCount: "审查意见 {count} 条";
+    readonly reviewAttach: "随输入发送";
+    readonly reviewClear: "清空待提交意见";
+    readonly reviewAttachUnavailable: "输入引用不可用或已有引用，请使用侧栏提交；已携带的意见是添加时的快照。";
+    readonly reviewRawCopy: "复制完整审查信息";
+    readonly reviewProfileHint: "布局、换行及增强开关保存在当前 Profile；字体和编辑器路径仅保存在本机。";
+    readonly reviewAdaptive: "窄栏自动使用统一布局";
+    readonly reviewCreated: "工具新建文件";
+    readonly reviewModified: "工具修改文件";
+    readonly reviewDock: "显示输入框评论摘要";
+    readonly reviewFoldMessages: "折叠聊天中的审查意见包";
+    readonly reviewCopyGroup: "复制差异";
+    readonly reviewCopyFailed: "复制失败";
+    readonly reviewCancelCopy: "取消复制";
 };
 /** Union of this namespace's dictionary keys. */
 export type CopyKey = keyof typeof zh;

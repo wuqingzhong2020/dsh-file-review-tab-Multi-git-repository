@@ -12,7 +12,7 @@ export async function sendReviewComments(
 ): Promise<void> {
   const sessions = (ctx as Context & { sessions: ISessions }).sessions
   const scope = sessions.scope(sessionId as SessionId)
-  if (!scope?.conversation) throw new Error('Review conversation is unavailable')
+  if (!scope) throw new Error('Review conversation is unavailable')
   const session = typeof sessions.sessionOf === 'function' ? sessions.sessionOf(scope) : undefined
   if (onPrepared && session?.beginSubmission) {
     const handle = session.beginSubmission({ mode: 'queue', text, attachments: [] })
@@ -31,8 +31,12 @@ export async function sendReviewComments(
     }
     return
   }
+  // Session scopes belong to the Host, not this plugin's injection fiber.
+  // Resolve the dynamic service through get(), as the official UI does.
+  const conversation = scope.get('conversation') as Context['conversation'] | undefined
+  if (!conversation) throw new Error('Review conversation is unavailable')
   onPrepared?.('')
-  await scope.conversation.send(text)
+  await conversation.send(text)
 }
 export class ReviewSendFailure extends Error {
   readonly code: string

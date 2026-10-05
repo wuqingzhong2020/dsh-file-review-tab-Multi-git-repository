@@ -7,6 +7,10 @@ export interface ProducedFileDiff {
   readonly newText: string
   readonly oldStart?: number | undefined
   readonly newStart?: number | undefined
+  /** Host-owned lifecycle identity; client contents never authorize file removal. */
+  readonly recordId?: string | undefined
+  /** Client display provenance, used only to deduplicate a matching tool call. */
+  readonly sourceCallId?: string | undefined
 }
 
 /** One produced file and the applied hunks available for review. */
@@ -63,6 +67,7 @@ export interface FileReviewResult {
 export interface RecordedMutation {
   /** The `run_code` call that owns this dispatch (its `callId`). */
   readonly rootCallId: string
+  readonly subCallId?: string | undefined
   /** The dispatched tool name (`edit`, `write`, …). */
   readonly name: string
   /** Display path the tool reported; resolved against the session cwd. */
@@ -71,6 +76,9 @@ export interface RecordedMutation {
   readonly before: string | null
   /** Full file content after the mutation. */
   readonly after: string
+  readonly recordId?: string | undefined
+  readonly complete?: boolean | undefined
+  readonly reason?: string | undefined
 }
 
 /** Host request for the recorded Code Mode mutations of one session. */
@@ -82,5 +90,6 @@ export interface RecordedRequest {
 /** Host response: every requested root's mutations, in dispatch order. */
 export interface RecordedResult {
   readonly mutations: readonly RecordedMutation[]
+  readonly warnings?: readonly string[]
 }
 
