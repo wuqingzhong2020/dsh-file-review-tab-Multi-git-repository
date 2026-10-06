@@ -1,14 +1,14 @@
 # 整体架构与开发接入指南
 
-当前新增目录能力见 [非 Git 目录架构与使用](NON_GIT_DIRECTORIES.md)。管理、发现与文件归属由共享插件提供，审查侧仅维护业务适配；以下既有链路继续沿用。
+当前新增目录能力见 [非 Git 目录架构与使用](REPOSITORY_MANAGER.md#配置与界面)。管理、发现与文件归属由共享插件提供，审查侧仅维护业务适配；以下既有链路继续沿用。
 
-多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.3**。`apply` 注入 `multiGitRepoManagerByWqz`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。本仓库的 `repository-*.ts` 及客户端路径/事件文件只保留兼容再导出。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。详见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
+多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.4**。`apply` 注入 `multiGitRepoManagerByWqz`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。审查宿主仅依赖 `ManagedWorkspaceReader` 的两个必需读取方法，源码直接导入管理包正式入口，管理转发文件已移除。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。详见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.1**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](MIGRATION_VERIFICATION.md)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.5**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](releases/version.md#v031)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
-阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-多仓库工程模型与配置生命周期)。
+阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-管理契约与业务边界)。
 
 ## 1. 五分钟理解工程
 
@@ -116,16 +116,9 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 
 | 模块 | 主要文件 | 职责 |
 | --- | --- | --- |
-| Host 调度 | [file-review-service.ts](../src/file-review-service.ts) | 远程方法编排、会话工作区、嵌套改动及临时仓库存储 |
+| Host 调度 | [file-review-service.ts](../src/file-review-service.ts) | 远程方法编排、只读管理服务委托与审查证据缓存 |
 | Host 文件能力 | [file-review-files.ts](../src/file-review-files.ts)、[file-review-locations.ts](../src/file-review-locations.ts)、[file-review-user-guide.ts](../src/file-review-user-guide.ts) | 路径验证与安全撤销/重做、磁盘引用与编辑器、安装目录手册装载 |
 | 通信契约 | [change-types.ts](../src/change-types.ts)、[typert-descriptors.ts](../src/typert-descriptors.ts)、[typert.host.ts](../src/typert.host.ts)、[remote.ts](../src/remote.ts) | 请求结果类型、运行时校验、Host 模型和客户端类型注册 |
-| 工程数据模型 | [repository-types.ts](../src/repository-types.ts)、[repository-schemas.ts](../src/repository-schemas.ts)、[repository-config.ts](../src/repository-config.ts) | 工程、仓库、工作区及 Profile 配置类型 |
-| 配置文件与 Profile | [repository-project-file.ts](../src/repository-project-file.ts)、[repository-settings.ts](../src/repository-settings.ts) | 项目 JSON 发现、校验、版本检查、原子写入和 Profile 索引 |
-| 仓库范围与路径 | [repository-workspace.ts](../src/repository-workspace.ts)、[repository-path-policy.ts](../src/repository-path-policy.ts)、[repository-directory.ts](../src/repository-directory.ts) | 配置规范化、候选仓库收集、真实路径与 Git 可用性检查、去重和目录选择 |
-| 旧仓库清单解析 | [repository-manifest.ts](../src/repository-manifest.ts) | 纯文本解析 JSON、INI 和 `.gitmodules`；`repository-workspace` 保留原解析函数导出 |
-| 多仓库管理界面 | [RepositorySettings.tsx](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/RepositorySettings.tsx)、[repository-settings-components.tsx](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/repository-settings-components.tsx) | 设置页组合、仓库行编辑、解析结果展示及删除确认 |
-| 多仓库管理流程 | [use-repository-settings.ts](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager/blob/main/src/client/use-repository-settings.ts)、[repository-settings-model.ts](../src/client/repository-settings-model.ts) | 会话表单与请求生命周期、目录选择、临时仓库更新；草稿合并和保存数据转换 |
-| 客户端目录选择 | [directory-picker.ts](../src/client/directory-picker.ts) | 选择 Desktop/Web 目录接口、检查起始目录能力、处理取消及错误 |
 | Git 查询 | [git-review.ts](../src/git-review.ts)、[git-review-command.ts](../src/git-review-command.ts)、[git-review-parser.ts](../src/git-review-parser.ts) | 比较与仓库编排、受限命令执行、NUL 分隔输出与 patch 解析；契约位于 `git-review-types/schemas` |
 | 审查范围定义 | [review-scopes.ts](../src/review-scopes.ts)、[review-scope-model.ts](../src/client/review-scope-model.ts) | 共享范围 ID、数据来源、标签与 Git 能力；客户端轮次筛选、分页规则及引用选择器 |
 | 会话审查页面 | [FileReviewTab.tsx](../src/client/FileReviewTab.tsx)、[file-review-turn.tsx](../src/client/file-review-turn.tsx)、[file-review-model.ts](../src/client/file-review-model.ts) | 范围选择与页面组合、轮次/文件展示、共享身份及操作条件 |
@@ -134,7 +127,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 宿主快照适配 | [snapshot-compat.ts](../src/client/snapshot-compat.ts)、[turn-deliverables.ts](../src/client/turn-deliverables.ts)、[deleted-paths.ts](../src/client/deleted-paths.ts) | 快照形状适配、审查行数据、字面删除路径识别 |
 | 对话审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx)、[produced-files-summary.tsx](../src/client/produced-files-summary.tsx)、[produced-files-toast.tsx](../src/client/produced-files-toast.tsx) | 巡检与撤销流程、文件摘要与深链操作、带自动关闭的结果提示 |
 | Git 页面与加载 | [GitReviewPanel.tsx](../src/client/GitReviewPanel.tsx)、[GitReviewFile.tsx](../src/client/GitReviewFile.tsx)、[git-review-diff-loader.ts](../src/client/git-review-diff-loader.ts) | 范围、仓库筛选与请求生命周期，文件行与差异展示，并发加载队列 |
-| 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、[repository-paths.ts](../src/client/repository-paths.ts) | 文件所属仓库、组标题、列表折叠和批量内容展开 |
+| 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、[repository-paths.ts](REPOSITORY_MANAGER.md#只读契约) | 文件所属仓库、组标题、列表折叠和批量内容展开 |
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
 | 差异交互与展示 | [use-diff-selection.ts](../src/client/use-diff-selection.ts)、[unified-diff-controls.tsx](../src/client/unified-diff-controls.tsx)、[unified-diff-block.tsx](../src/client/unified-diff-block.tsx) | 选区/菜单生命周期与异步反馈、搜索导航控件、上下文与行窗口展示 |
 | 差异阅读 | [diff-search.ts](../src/client/diff-search.ts)、[diff-navigation.ts](../src/client/diff-navigation.ts)、[diff-highlight.ts](../src/client/diff-highlight.ts)、[DiffCode.tsx](../src/client/DiffCode.tsx) | 原始行搜索、修改块索引、有限语言词法着色与匹配标记 |
@@ -143,7 +136,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 范围引用与外部定位 | [review-reference.ts](../src/client/review-reference.ts)、[review-file-opener.ts](../src/client/review-file-opener.ts)、[review-location.ts](../src/review-location.ts)、[editor-launch.ts](../src/editor-launch.ts) | 完整行范围、来源、磁盘唯一匹配、受限编辑器启动 |
 | 讨论与大文件窗口 | [review-discussions.ts](../src/client/review-discussions.ts)、[VirtualDiffRows.tsx](../src/client/VirtualDiffRows.tsx)、[virtual-diff-model.ts](../src/client/virtual-diff-model.ts) | 持久化请求／轮次关联、已读／解决状态、可变高度渲染 |
 | 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
-| 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](../src/client/repository-events.ts) | 深链定位和配置变化通知 |
+| 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](REPOSITORY_MANAGER.md#通知边界) | 深链定位和配置变化通知 |
 | 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts)、[use-review-locale.ts](../src/client/use-review-locale.ts)、[message-locales.ts](../src/client/message-locales.ts) | 中英文词典、宿主语言订阅、界面实时刷新及已识别的错误说明翻译 |
 | Desktop 兼容适配 | [patch-desktop-directory-picker.mjs](../scripts/patch-desktop-directory-picker.mjs) | 为特定 Desktop 构建的目录选择桥增加起始目录参数 |
 
@@ -234,65 +227,15 @@ Host 的 `git-review.ts` 使用 `execFile('git', args)` 参数数组调用 Git�
 
 全部仓库查看「已提交」时，各仓库默认比较自己的 HEAD；选定单个仓库后可选最近 50 次提交。「分支」比较已提交内容，不包含工作区修改。
 
-## 5. 多仓库工程模型与配置生命周期
+## 5. 管理契约与业务边界
 
-### 5.1 配置归属
+管理插件统一维护 v2 `dsh-file-review-repositories.json`、Profile 根目录索引、`ManagedProject`、`ManagedWorkspace` 及文件归属；本仓库不解析或保存管理配置。完整接入与通知边界见 [公共管理依赖](REPOSITORY_MANAGER.md)。
 
-工程根目录下的 `dsh-file-review-repositories.json` 是可随 Git 维护的配置来源。项目名称和根目录由当前会话及配置发现结果确定，管理页面只读展示；文件内不保存某台机器的工程绝对根目录。
+`FileReviewService` 依赖管理包 `/types` 的 `ManagedWorkspaceReader`，必需方法为 `workspace(agent)` 与 `resolveTargetPaths(agent, paths)`。`targets`、`boundaries`、`workspaceRevision` 都是必需字段，缺少归属结果不能以 `roots` 兜底。
 
-~~~json
-{
-  "version": 1,
-  "enabled": true,
-  "includeProjectRoot": true,
-  "repositories": [
-    { "name": "core", "path": "packages/core" },
-    { "name": "editor", "path": "plugins/editor" }
-  ]
-}
-~~~
+审查业务定义自己的八种范围、目标筛选与操作条件。Git 批量读取可以复用同次管理快照的纯归属算法；捕获、撤销/重做、文件定位通过当前 Agent 服务重新核对归属。managed 只表示纳管，可信证据、当前内容、权限和维护锁继续属于审查安全条件。
 
-`version` 当前为 1，`enabled` 缺省时视为启用，`includeProjectRoot` 决定是否同时纳入工程根目录范围。所有保存的仓库路径均相对工程根目录，适用于任意工程，不绑定 ProjectManager 或 `submodules.ini`。
-
-配置发现从会话 `cwd` 的真实目录向父目录查找，最近的配置文件优先。Profile 中的项目索引可辅助匹配已登记工程，但最终仍检查工程文件是否存在、是否启用。没有配置文件时保持原有会话目录范围，不会仅凭旧 Profile 记录启用多代码仓。
-
-[src/repository-workspace.ts](../src/repository-workspace.ts) 收集候选仓库并检查目录/Git 可用性，旧清单文本委托给 [repository-manifest.ts](../src/repository-manifest.ts) 解析；实际 Git 审查使用可用仓库。嵌套仓库的文件归属按最具体的匹配根目录判定，避免统一归到父仓库；去重使用路径身份，不依赖仓库显示名称。
-
-### 5.2 保存、重新加载与旧配置迁移
-
-管理页通过 `project` 读取配置状态和 `fileRevision`：
-
-1. 无配置时禁用「重新加载已保存配置」，主按钮显示「生成新配置文件」。
-2. 编辑仓库行后，`saveProject` 校验工程身份与路径。
-3. `writeProjectFile` 对当前文件计算 SHA-256 修订值，与加载时的修订值比较；外部修改导致不一致时拒绝覆盖，要求先重新加载。
-4. 原子写入工程 JSON；随后尽力更新 Profile 项目索引。Profile 设置服务不可用时，已经保存的工程文件仍是可使用的配置。
-5. 浏览器通过 `repository-events` 通知已挂载页面重新读取工作区。
-
-这里的修订检查是乐观并发检查，工程文件写入与 Profile 索引更新不是一个跨存储事务。
-
-旧 Profile 可引用 INI、`.gitmodules` 或 JSON 仓库清单，用于在管理页列出可迁移的行。主动保存后，新项目 JSON 接管配置；新工程不需要准备这些旧清单。Host 内部仍有 `preview` 方法供保存验证使用，当前没有独立的预览按钮或 `preview` RPC。
-
-### 5.3 工程内路径与临时外部仓库
-
-Host 通过 `realpath` 判断实际位置：
-
-| 路径实际位置 | 界面表示 | 是否写入工程 JSON |
-| --- | --- | --- |
-| 工程根目录或内部目录 | `.` 或相对路径 | 是 |
-| 工程外的父目录、兄弟目录、其他盘目录 | 绝对路径，标记临时 | 否 |
-| 看似在工程内、实际经目录联接指向外部 | 按外部目录处理 | 否 |
-
-不能只用 `path.relative` 的结果判断可保存性；同盘工程外路径即使能写成 `../other`，仍是临时仓库。浏览器路径转换用于交互，Host 真实路径校验才是最终依据。
-
-临时仓库通过 `setTemporaryRepositories` 按 Agent/会话保存在 Host 内存中，依附已启用的项目配置，重新启动 Host 后丢失。它们不进入可提交的工程文件，也不改变其他会话的范围。删除仓库行需要确认，实际只移除列表项，不删除磁盘目录。
-
-### 5.4 「打开」目录选择
-
-管理页先调用 `directoryStart`：有有效路径就按相对工程路径或绝对路径解析，空值、错误路径或非目录则退回工程目录。之后由浏览器调用宿主目录选择接口，选中工程内目录转为相对路径，外部目录保留绝对路径。
-
-Desktop 0.2.0-rc.2 原生接口需要单独适配才能接收起始路径。客户端的 `directory-picker.ts` 检查桥上的 `supportsDefaultPath`，避免把「可选择目录」误当成「能按指定目录打开」；Host 的 `repository-directory.ts` 负责验证起始目录。独立 Web 的目录选择服务不具备同样的起始路径能力。
-
-[scripts/patch-desktop-directory-picker.mjs](../scripts/patch-desktop-directory-picker.mjs) 修改的是特定宿主 `app.asar`，不属于普通 React 功能实现。脚本保留窗口/来源验证，备份原文件，对不匹配构建停止操作。详细使用步骤见 README；宿主更新后需重新核对兼容性。
+普通目录只承载已经捕获的会话改动，没有 Git 比较能力或自动手工差异基线。管理目标改名、类型转换及移除不能改写审查记录、评论和确认身份。工程外目标仅由管理服务按 Agent + 工程身份保存，使用 `setTemporaryTargets`；重启、释放或工程切换后按生命周期清理。
 
 ## 6. Host / Client 通信契约
 
@@ -403,7 +346,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 | 数据 | 存储位置 | 隔离与生命周期 |
 | --- | --- | --- |
 | 工程仓库配置 | 工程根目录 JSON | 可随 Git 维护；不同工程独立；不写外部临时仓库 |
-| 工程索引、旧配置引用 | 宿主 Profile 设置 | 用于项目匹配及迁移，不替代项目 JSON 的存在/启用判断 |
+| 工程根目录索引 | 管理插件 Profile 设置 | 仅定位 v2 项目文件，不替代项目 JSON 的存在/启用判断 |
 | 可信标准／PTC 文件图像 | 官方 tool/result 与 tool/ptc-dispatch | 会话/root/sub-call 校验；最近 4000 条、16 MiB，超限说明 |
 | 旧 PTC 兼容补录 | Host recordLog | 最多 4000 条；重载后丢失，不授权新建文件删除 |
 | 临时外部仓库 | Host `temporaryRepositories` | 当前 Agent/会话内有效，Host 重启后丢失 |
@@ -422,7 +365,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 
 确认记录使用整轮文件差异的修订标识。只能确认已完成且有改动的轮次；该轮后续补录或改变差异，修订标识变化后自动重新进入「待确认」。撤销、Git 状态与确认记录分别处理。
 
-`repository-events.ts` 再导出管理插件的通知通道，在独立浏览器 bundle 间共享，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 按会话保存最新跳转目标，以 nonce 区分重复点击，完成滚动后消费；定位归档轮次时自动打开归档并加载所需页。`sidebar-navigation.ts` 检查顶层控制器的当前会话，审查正文则通过自己的 `tab.actions.openResource` 打开文件；统一导航 Provider 供文件头和选区菜单使用，避免异步操作误打开到其他会话。
+客户端直接订阅管理包 `/events` 通知通道，在独立浏览器 bundle 间共享，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 按会话保存最新跳转目标，以 nonce 区分重复点击，完成滚动后消费；定位归档轮次时自动打开归档并加载所需页。`sidebar-navigation.ts` 检查顶层控制器的当前会话，审查正文则通过自己的 `tab.actions.openResource` 打开文件；统一导航 Provider 供文件头和选区菜单使用，避免异步操作误打开到其他会话。
 
 ## 9. 文件写入边界与性能约束
 
@@ -578,7 +521,7 @@ aggregate-diff 输出跨仓库、来源／基线明确的操作片段报告，�
 
 pnpm run typecheck / build / test / test:e2e / test:docs / test:pack 是复现入口。浏览器夹具加载真实 lib/client.js 与官方 UI primitives，模拟 Session/Remote/输入／配置服务，不是正在运行的 Desktop。test:docs 验证双语新增章节、白名单、JPEG 与 Host wire；test:pack 生成 tgz、校验导出／声明／资源／社区依赖边界及临时方案排除，附 SHA256。测试用纯 UI 依赖均为开发依赖。
 
-Windows Desktop 的独立双仓库操作验收见 [验证记录](MIGRATION_VERIFICATION.md)。`create-desktop-review-workspace.mjs` 只建立系统临时样例，真实截图经 `crop-desktop-guide-images.py` 裁剪后交付；浏览器调试截图写入 `test-results`，不覆盖指南资源。安装同版本新构建需使用内容摘要不同的归档路径，并核对安装产物字节，以免复用包缓存。
+Windows Desktop 的独立双仓库操作验收见 [验证记录](releases/version.md#v031)。`create-desktop-review-workspace.mjs` 只建立系统临时样例，真实截图经 `crop-desktop-guide-images.py` 裁剪后交付；浏览器调试截图写入 `test-results`，不覆盖指南资源。安装同版本新构建需使用内容摘要不同的归档路径，并核对安装产物字节，以免复用包缓存。
 
 侧栏发送的 Session scope 属于宿主 fiber，不能直接访问未在本插件声明注入的 `scope.conversation`。优先使用 Session 的请求身份与提交接口；降级时通过 Cordis `scope.get('conversation')` 解析动态服务。真实 Cordis fiber 与拒绝属性访问的夹具共同覆盖这一约束。
 

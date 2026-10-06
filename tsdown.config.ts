@@ -76,7 +76,7 @@ const config: UserConfig[] = [{
   deps: {
     neverBundle: [...CLIENT_EXTERNALS],
     alwaysBundle: ['diff', 'zod', '@deepseek-ai/dsh-util-workspace-path', 'dsh-multi-git-repo-manager/paths', 'dsh-multi-git-repo-manager/events', 'dsh-multi-git-repo-manager/service-names'],
-    onlyBundle: ['diff', 'zod', '@deepseek-ai/dsh-util-workspace-path', 'dsh-multi-git-repo-manager'],
+    onlyBundle: ['diff', 'zod', '@deepseek-ai/dsh-util-workspace-path'],
   },
   plugins: [cssModulesPlugin()],
   outputOptions: {

@@ -1,16 +1,16 @@
 # dsh-file-review-tab-multi-git-repository
 
-已支持 Git 仓库与非 Git 目录：类型选择、直接子目录发现、v1/v2 配置和 Host 文件归属共用管理服务。普通目录的会话审查与按文件确认见 [非 Git 目录说明](docs/NON_GIT_DIRECTORIES.md)。
+已支持 Git 仓库与非 Git 目录：类型选择、直接子目录发现、v2 配置和 Host 文件归属共用管理服务。普通目录的会话审查与按文件确认见 [非 Git 目录说明](docs/REPOSITORY_MANAGER.md#配置与界面)。
 
-多仓库管理现已独立到 **[dsh-multi-git-repo-manager v0.1.3](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**。本插件固定依赖 `0.1.3`，并通过共享服务取得仓库范围；管理页面从右侧「开始」页打开为原生 Tab，原会话区管理页签已移除。安装时必须同时安装并启用两个插件；旧 `dsh-file-review-repositories.json` 无需改名。迁移说明见 [公共仓库管理依赖](docs/REPOSITORY_MANAGER.md)。
+多仓库管理现已独立到 **[dsh-multi-git-repo-manager v0.1.4](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**。本插件固定依赖 `0.1.4`，并通过共享服务取得仓库范围；管理页面从右侧「开始」页打开为原生 Tab，原会话区管理页签已移除。安装时必须同时安装并启用两个插件；旧 `dsh-file-review-repositories.json` 无需改名。接入说明见 [公共仓库管理依赖](docs/REPOSITORY_MANAGER.md)。
 
-本轮类型检查、构建、自动测试、双包联装及指定 Desktop 的实际验证见 [实施验证记录](docs/NON_GIT_VERIFICATION.md)。
+本轮类型检查、构建、自动测试、双包联装及指定 Desktop 的实际验证见 [实施验证记录](docs/releases/version.md#v035)。
 
 [简体中文](README.md) | [English](README.en.md)
 
-当前版本：**v0.3.4**。
+当前版本：**v0.3.5**。
 
-本插件的 Host 服务与 Remote 命名空间为 `multiGitFileReviewByWqz`，使用管理服务 `multiGitRepoManagerByWqz`。聊天字典独立为 `multiGitFileReviewByWqz.chat`，与原版的 `fileReview` 服务和 `file-review` 字典分别隔离。使用配套版本安装包；迁移与验证见 [命名空间隔离](docs/NAMESPACE_ISOLATION.md)。
+本插件的 Host 服务与 Remote 命名空间为 `multiGitFileReviewByWqz`，使用管理服务 `multiGitRepoManagerByWqz`。聊天字典独立为 `multiGitFileReviewByWqz.chat`，与原版的 `fileReview` 服务和 `file-review` 字典分别隔离。使用配套版本安装包；迁移与验证见 [命名空间隔离](docs/releases/version.md#v034)。
 
 **dsh-file-review-tab-multi-git-repository 插件是基于 [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab) 插件魔改的，目的是支持多 Git 代码仓管理，并直接接入 DeepSeek Harness Desktop 0.2.0-rc.2 的原生右侧栏，无需安装第三方侧栏插件。**
 
@@ -44,7 +44,7 @@
 - **右侧「多代码仓管理」Tab**：从右侧「开始」页打开，由管理插件提供。直接添加、编辑、删除当前工程维护的仓库，保存成工程根目录中的 `dsh-file-review-repositories.json`。切换 Tab 保留未保存表单，切换工程显示对应配置；文件审查可筛选单个仓库。支持主仓库、嵌套仓库及当前会话临时使用的外部仓库。
 - **删除文件可见**：dsh 没有删除文件的工具，删除发生在终端命令里——插件解析 `rm` 族命令（`rm` / `rmdir` / `unlink` / `Remove-Item` / `del` / `rd` 等）的字面路径参数，被删文件以「已删除」标记出现在两个入口（内容已不存在，故无行级 diff、不可撤销）。带通配符（`rm *.log`）或命令替换（`rm $(...)`）的删除不识别——受影响文件事后无法枚举。
 - **自动归档**：主列表只保留最近 5 轮（进行中的轮次永不归档），更早的已完成轮次沉入底部「已归档 N 轮」折叠区。折叠时归档内容零渲染，展开后每页加载 10 轮（「加载更多」续页），diff 行另有懒挂载——长会话不再一次性挂载几十个 diff 组。深链跳到已归档轮次会自动展开并定位；展开状态按会话记忆；角标只统计主列表。
-- **可信工具生命周期**：标准与 PTC 嵌套调用在官方执行／最终接受接口捕获 UTF-8 原始 before/after，携带 Host 记录身份。记录随官方工具结果和 PTC 日志保存，重载后可重建；支持空／非空新建文件安全撤销、重新创建以及创建后编辑序列。未记录、超限、外部改写或权限变化时明确拒绝，旧局部差异继续走原有检查路径。详见 [实现与验证记录](docs/MIGRATION_VERIFICATION.md)。
+- **可信工具生命周期**：标准与 PTC 嵌套调用在官方执行／最终接受接口捕获 UTF-8 原始 before/after，携带 Host 记录身份。记录随官方工具结果和 PTC 日志保存，重载后可重建；支持空／非空新建文件安全撤销、重新创建以及创建后编辑序列。未记录、超限、外部改写或权限变化时明确拒绝，旧局部差异继续走原有检查路径。详见 [实现与验证记录](docs/releases/version.md#v031)。
 - **审查范围**：顶部可选择「上一轮」「本会话」「待确认」「未提交」「未暂存」「已暂存」「已提交」「分支」。会话范围保留原有撤销；「待确认」只列出尚未确认的轮次，支持确认本轮、撤销本轮及单文件撤销。确认状态按会话保存在本地，重启后保留；可在「本会话」中取消确认。Git 范围支持工作区、暂存区、历史提交和分支比较，并按工程的多仓库配置聚合。
 - **修改意见与讨论**：八种范围均可添加单行、范围和整文件评论，Git 范围的文件操作继续只读。评论支持编辑、删除及批量提交，忙碌时排队，保留对话输入草稿；失败保留待提交意见。「讨论记录」保留已提交批次，按请求身份及其实际入轮记录关联文字答复，支持新回复、已读、手动解决／重新打开和追加意见。一批意见共享该批次答复，不推断每条意见已被修复。
 - **大文件虚拟化**：超过 400 行的可见差异块按窗口渲染，测量换行与评论卡片的实际高度；并排两侧一起测量，正在编辑的行保留挂载。搜索和修改块导航仍覆盖完整已记录行，设置可关闭虚拟化。
@@ -58,30 +58,30 @@
 
 ## 安装
 
-目标接口范围：**DSH 正式版 >=0.2.0**；另保留 **0.2.0-rc.2** 测试通道。v0.3.0 已在 Windows 的实际 Desktop 0.2.0-rc.2 中验证多仓库、八种范围、差异阅读、两种评论发送、答复关联、确认、撤销／重新应用和设置同步；v0.3.2 的新增验证聚焦公共管理服务和右侧原生管理 Tab，详见 [验证矩阵](docs/MIGRATION_VERIFICATION.md)。正式版／较新稳定版及完整 Web 宿主仍未验证。文件审查直接使用原生右侧栏；dsh-better-sidebar 为可选共存插件。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
+目标接口范围：**DSH 正式版 >=0.2.0**；另保留 **0.2.0-rc.2** 测试通道。v0.3.0 已在 Windows 的实际 Desktop 0.2.0-rc.2 中验证多仓库、八种范围、差异阅读、两种评论发送、答复关联、确认、撤销／重新应用和设置同步；v0.3.2 的新增验证聚焦公共管理服务和右侧原生管理 Tab，详见 [验证矩阵](docs/releases/version.md#v031)。正式版／较新稳定版及完整 Web 宿主仍未验证。文件审查直接使用原生右侧栏；dsh-better-sidebar 为可选共存插件。安装方式采用 GitHub Release 预构建 `.tgz` 或公开 GitHub 仓库；不要求先发布 npm。
 
 文件由宿主选择内置查看器；原生预览可能只读，可选编辑器插件可为其接管的格式提供编辑能力。外部 IDE 定位仍可独立使用。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.4.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.5.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.3.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.4.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.5.tgz"
 ```
 
 维护者也可以使用工程中 `dist/` 下的同名安装包。桌面应用管理 `desktop` Profile，使用上述本地包安装方式。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；从原生右侧栏「+」打开「开始」页，在其中选择「多代码仓管理」或「文件审查（多git仓）」。
 
-重新构建但版本号未变时，pnpm 可能复用同路径本地包。请先复制为包含构建校验摘要的新文件名，再安装该路径；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.4，并不能单独证明加载了最新构建。
+重新构建但版本号未变时，pnpm 可能复用同路径本地包。请先复制为包含构建校验摘要的新文件名，再安装该路径；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.5，并不能单独证明加载了最新构建。
 
 ### 独立 Web Profile
 
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.4/dsh-file-review-tab-multi-git-repository-0.3.4.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.5/dsh-file-review-tab-multi-git-repository-0.3.5.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -106,7 +106,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.4 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v034) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.5 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v035) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
@@ -154,7 +154,7 @@ Git 范围的上下文来自所选比较的真实版本，查看历史提交时�
 
 ## 配置多仓库项目
 
-进入目标工程的会话，点击顶部 **对话 / 轨迹 / 多代码仓管理** 中的「多代码仓管理」。当前工程目录和项目名称由会话确定，不能在这里修改。不同工程各自维护自己的配置文件。
+进入目标工程的会话，从右侧「开始」页打开 **多代码仓管理**。当前工程目录和项目名称由会话确定，不能在这里修改。不同工程各自维护自己的配置文件。
 
 1. 如果工程还没有配置文件，**重新加载已保存配置** 不可点击，保存按钮显示为 **生成新配置文件**。点击 **添加仓库**，填写仓库名称与路径；每行的 **打开** 从该行已有的有效目录开始选择，支持相对工程路径和绝对路径，路径为空、不存在或不是目录时从当前工程目录开始。选中工程内的目录自动换算为相对路径，工程外的目录显示为绝对路径。**删除** 会先询问确认，确认后只从列表移除，不删除磁盘目录。勾选项决定是否启用多仓库及同时审查工程根目录。
 2. 点击 **生成新配置文件**。插件在当前工程根目录创建 `dsh-file-review-repositories.json`，并在下方显示各仓库的 Git 状态。文件生成后，保存按钮恢复为 **保存配置**，重新加载按钮可用。根目录显示为 `.`，子仓库显示为 `project/PluginManager` 等相对路径。
@@ -164,18 +164,21 @@ Git 范围的上下文来自所选比较的真实版本，查看历史提交时�
 
 ```json
 {
-  "version": 1,
+  "version": 2,
+  "enabled": true,
   "includeProjectRoot": true,
   "repositories": [
     { "name": "PluginManager", "path": "project/PluginManager" },
     { "name": "ThirdPartyManager", "path": "project/ThirdPartyManager" }
-  ]
+  ],
+  "directories": [],
+  "discovery": { "containers": [] }
 }
 ```
 
 仓库路径相对**当前工程根目录**解析。只有工程目录内的仓库保存为相对路径；工程目录外的仓库，包括同盘的父目录、兄弟目录及跨盘目录，一律显示为绝对路径并标记为临时仓库，仅在当前会话使用，**不会写入配置文件**。「临时」标签位于路径框内右侧，悬停可查看完整说明，不增加行高，输入框与操作按钮保持对齐。手动填写 `../` 指向工程外的路径也会转换为绝对路径，指向工程外的目录联接也不会保存。插件不会 clone、pull 或修改仓库。直接修改配置文件后，点击 **重新加载已保存配置** 即可读取新内容。
 
-若旧 Profile 中已有 `submodules.ini`、`.gitmodules` 或其他仓库清单，启用页面会把识别到的仓库列成可编辑行，供主动迁移。旧 Profile 记录本身不会启用多代码仓范围。首次保存后，新文件接管配置，旧清单不再是依赖；例如 ProjectManager 的 `submodules.ini` 仅用于一次迁移。新工程无需准备仓库清单。
+工程配置统一采用 v2，目标声明和 Profile 根目录索引只由管理插件维护；审查插件没有配置导入或保存接口。
 
 默认同时审查项目根目录内的文件。如果只需维护指定子仓库，可取消对应选项。会话位于项目根目录或其子目录时，自动选用最近的工程配置文件。临时外部仓库只属于添加它的会话，不会改变其他工程或会话的配置。未配置的会话仍使用原有的会话目录范围。
 

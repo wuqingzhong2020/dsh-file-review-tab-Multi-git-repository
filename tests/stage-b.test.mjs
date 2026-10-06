@@ -16,6 +16,8 @@ import { sendReviewComments, ReviewSendFailure } from '../src/client/review-comm
 import { rowOffsets, virtualRange } from '../src/client/virtual-diff-model.ts'
 import { DEFAULT_DIFF_VIEW, DiffViewStore, parseDiffViewPreferences } from '../src/client/diff-view-preferences.ts'
 import { FileReviewService } from '../lib/index.js'
+import { MultiGitRepoManager } from 'dsh-multi-git-repo-manager'
+import { Context } from '@deepseek-ai/cordis'
 import { FILE_REVIEW_INVOCATIONS } from '../src/typert-descriptors.ts'
 
 const target = { scope: 'unstaged', repository: 'D:/core', repositoryName: 'core', path: 'file.py', absolutePath: 'D:/core/file.py' }
@@ -107,7 +109,9 @@ test('configured Antigravity IDE is accepted as a VS Code-compatible file; direc
   await mkdir(directory)
   assert.equal(await findVSCode(directory), null)
 })
-const service = Object.create(FileReviewService.prototype); service.workspace = async () => ({ roots: [root] })
+const managerContext = new Context(); after(() => managerContext.fiber.dispose())
+const manager = new MultiGitRepoManager(managerContext)
+const service = Object.assign(Object.create(FileReviewService.prototype), { repositoryManager: manager })
 const agent = { session: { header: { cwd: root } } }
 const hostRequest = { ...request, repository: root, path: file }
 test('Host line validation handles real files, repository boundaries, missing paths and old-side launch rejection', async () => {

@@ -5,9 +5,7 @@
  * package.json dsh.client declaration.
  */
 import type { Context } from '@deepseek-ai/cordis';
-import type { FileReviewConfig } from './repository-config.ts';
 export type * from './change-types.ts';
-export type * from './repository-types.ts';
 export type * from './git-review-types.ts';
 export type * from './review-location.ts';
 export type * from './user-guide.ts';
@@ -28,6 +26,6 @@ export declare const inject: string[];
  * into line-level hunks and merges into the owning `run_code` turn.
  * @param ctx - host context carrying the system-prompt registry and tool runtime.
  */
-export declare function apply(ctx: Context, config: FileReviewConfig): void;
+export declare function apply(ctx: Context): void;
 export * from './service-names.ts';
 //# sourceMappingURL=index.d.ts.map

@@ -12,7 +12,7 @@ const npm = process.env.npm_execpath
 const command = npm && /npm-cli\.js$/.test(npm) ? npm : execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', ['npm'], { encoding: 'utf8' }).trim().split(/\r?\n/)[0].replace(/npm(?:\.cmd)?$/, 'node_modules/npm/bin/npm-cli.js')
 const result = JSON.parse(execFileSync(process.execPath, [command, 'pack', '--json', '--pack-destination', 'dist'], { encoding: 'utf8' }))[0]
 const files = new Set(result.files.map(file => file.path))
-for (const path of ['LICENSE', 'README.md', 'README.en.md', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js', 'lib/remote.js', 'lib/typert.host.js', 'docs/MIGRATION_VERIFICATION.md', 'docs/USER_GUIDE.md', 'docs/USER_GUIDE.en.md']) assert.ok(files.has(path), `Missing package entry: ${path}`)
+for (const path of ['LICENSE', 'README.md', 'README.en.md', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js', 'lib/remote.js', 'lib/typert.host.js', 'docs/ARCHITECTURE.md', 'docs/REPOSITORY_MANAGER.md', 'docs/RELEASING.md', 'docs/USER_GUIDE.md', 'docs/USER_GUIDE.en.md', 'docs/releases/version.md']) assert.ok(files.has(path), `Missing package entry: ${path}`)
 for (const image of USER_GUIDE_IMAGES) assert.ok(files.has(`docs/image/${image}`), `Missing package image: ${image}`)
 for (const [entry, target] of Object.entries(pkg.exports)) {
   if (typeof target === 'string') assert.ok(files.has(target.replace(/^\.\//, '')), entry)
@@ -20,7 +20,8 @@ for (const [entry, target] of Object.entries(pkg.exports)) {
 }
 assert.ok(![...files].some(path => path.includes('TEMP_REF_FEATURE') || path.startsWith('tests/') || path.startsWith('node_modules/')))
 assert.ok(!Object.keys(pkg.dependencies).some(name => /better-sidebar|file-review-tab|left0ver/.test(name)))
-assert.equal(pkg.peerDependencies['dsh-multi-git-repo-manager'], '0.1.3')
+assert.equal(pkg.peerDependencies['dsh-multi-git-repo-manager'], '0.1.4')
+assert.equal(pkg.version, '0.3.5')
 assert.notEqual(pkg.peerDependenciesMeta?.['dsh-multi-git-repo-manager']?.optional, true)
 for (const name of ['@deepseek-ai/dsh-client-ui-input-trigger', '@deepseek-ai/dsh-client-ui-plugin-manager', '@deepseek-ai/dsh-client-ui-settings']) {
   assert.equal(pkg.peerDependenciesMeta[name].optional, true)

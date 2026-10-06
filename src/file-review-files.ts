@@ -8,7 +8,7 @@ import type {
   FileReviewFileResult,
   ProducedFileDiff,
 } from './change-types.ts'
-import { inside } from './repository-workspace.ts'
+import { inside } from 'dsh-multi-git-repo-manager/workspace'
 
 type InspectState = Exclude<FileReviewFileResult['state'], 'error'>
 

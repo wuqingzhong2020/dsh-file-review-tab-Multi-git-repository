@@ -25,7 +25,7 @@ for (const lang of ['zh', 'en']) {
     expect(await surface.evaluate(node => node.firstElementChild.scrollWidth <= node.clientWidth)).toBe(true)
     await surface.getByRole('button', { name: lang === 'zh' ? '保存配置' : 'Save configuration', exact: true }).click()
     await expect(surface.getByRole('status')).toContainText(lang === 'zh' ? '项目配置已保存' : 'Project configuration saved')
-    expect(await page.evaluate(() => window.fixture.projectPage().project.namedRepositories.at(-1))).toEqual({ name: 'extra', path: 'libs/extra' })
+    expect(await page.evaluate(() => window.fixture.projectPage().project.repositories.at(-1))).toEqual({ name: 'extra', path: 'libs/extra' })
     if (process.env.UPDATE_BROWSER_FIXTURE_SCREENSHOTS) await page.screenshot({ path: test.info().outputPath(`manager-${lang}.jpg`), type: 'jpeg', quality: 85, fullPage: true })
     await page.getByRole('button', { name: 'Review', exact: true }).click()
     await expect(page.locator('#review-surface').getByRole('option', { name: 'extra', exact: true })).toHaveCount(1)

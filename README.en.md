@@ -1,16 +1,16 @@
 # dsh-file-review-tab-multi-git-repository
 
-Git repositories and ordinary directories now share managed targets, discovery and Host admission. See [non-Git directories](docs/NON_GIT_DIRECTORIES.en.md) for filtering and file-scoped confirmation.
+Git repositories and ordinary directories now share managed targets, discovery and Host admission. See [non-Git directories](docs/REPOSITORY_MANAGER.md#配置与界面) for filtering and file-scoped confirmation.
 
-Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.3](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.3` and uses its shared service for repository scope. Install and enable both plugins; existing `dsh-file-review-repositories.json` files remain compatible. See [dependency and migration notes](docs/REPOSITORY_MANAGER.md).
+Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.4](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.4` and uses its shared service for repository scope. Install and enable both plugins; the filename remains `dsh-file-review-repositories.json`, with v2-only configuration. See [dependency and ownership notes](docs/REPOSITORY_MANAGER.md).
 
-See the [validation record](docs/NON_GIT_VERIFICATION.md) for automated checks, isolated package installation and actual Windows Desktop checks, including their limits.
+See the [validation record](docs/releases/version.md#v035) for automated checks, isolated package installation and actual Windows Desktop checks, including their limits.
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.3.4**.
+Current version: **v0.3.5**.
 
-The Host service and Remote namespace are `multiGitFileReviewByWqz`, using `multiGitRepoManagerByWqz` for shared repository management. Chat dictionaries use `multiGitFileReviewByWqz.chat`, isolating both the original plugin's `fileReview` service and its `file-review` dictionaries. Install the matching package versions. See [namespace isolation](docs/NAMESPACE_ISOLATION.md).
+The Host service and Remote namespace are `multiGitFileReviewByWqz`, using `multiGitRepoManagerByWqz` for shared repository management. Chat dictionaries use `multiGitFileReviewByWqz.chat`, isolating both the original plugin's `fileReview` service and its `file-review` dictionaries. Install the matching package versions. See [namespace isolation](docs/releases/version.md#v034).
 
 **dsh-file-review-tab-multi-git-repository is a modified version of [dsh-file-review-tab](https://github.com/Lzh3070/dsh-file-review-tab), extended to manage multiple Git repositories and adapted for DeepSeek Harness Desktop 0.2.0-rc.2 using its native right sidebar, without a third-party sidebar requirement.**
 
@@ -42,7 +42,7 @@ Release maintainers should also read the [Public release and plugin marketplace 
 - **Multi-repository management sidebar tab**: Open it from the native right sidebar's Start page, provided by the manager plugin. Add, edit, or remove repositories maintained by the current project and save them to `dsh-file-review-repositories.json` in the project root. Switching tabs preserves unsaved drafts; switching projects loads the corresponding configuration. File review supports repository filtering, nested repositories, and external repositories used temporarily in the current session.
 - **Deleted files remain visible**: dsh has no file deletion tool, so deletions happen through terminal commands. The plugin parses literal path arguments in commands such as `rm`, `rmdir`, `unlink`, `Remove-Item`, `del`, and `rd`. Deleted files appear with a deleted marker in both review entry points. Their content is no longer available, so there is no line diff or undo. Deletions using wildcards (`rm *.log`) or command substitution (`rm $(...)`) are not recognized because the affected files cannot be enumerated afterward.
 - **Automatic archiving**: The main list keeps the latest five turns; turns in progress are never archived. Older completed turns move into a collapsed Archived turns section at the bottom. Archived contents are not rendered while collapsed. Expanding it loads ten turns per page, with Load more for subsequent pages. Diff rows also mount lazily, avoiding dozens of diff groups mounting at once in long sessions. Deep links to archived turns automatically expand and locate them. Expansion state is remembered per session; the tab badge counts only the main list.
-- **Trusted tool lifecycle**: Capture exact UTF-8 before/after images through official execution and final acceptance seams for native and nested PTC calls. Host identities persist in official results/dispatch logs and replay after reload. Empty/nonempty creations and create-then-edit sequences support safe undo/recreation. Missing, oversized, externally changed or permission-mismatched images refuse writes; legacy hunks retain their existing checks. See the [implementation and verification record](docs/MIGRATION_VERIFICATION.md).
+- **Trusted tool lifecycle**: Capture exact UTF-8 before/after images through official execution and final acceptance seams for native and nested PTC calls. Host identities persist in official results/dispatch logs and replay after reload. Empty/nonempty creations and create-then-edit sequences support safe undo/recreation. Missing, oversized, externally changed or permission-mismatched images refuse writes; legacy hunks retain their existing checks. See the [implementation and verification record](docs/releases/version.md#v031).
 - **Review scopes**: Choose Last turn, This session, Pending review, Uncommitted, Unstaged, Staged, Committed, or Branch. Session scopes retain undo support. Pending review lists unconfirmed turns and supports confirming a turn, undoing a turn, and undoing individual files. Confirmations are stored locally per session and survive restarts; they can be undone in This session. Git scopes support worktree, index, historical commit, and branch comparisons, aggregated using the project's repository configuration.
 - **Comments and discussions**: All eight scopes support single-line, range and whole-file comments; Git file operations remain read-only. Edit, delete and submit opinions in batches, queue while busy, and preserve the conversation draft. Failed submissions retain pending opinions. Discussions retain submitted batches and link text replies through request identity and actual turn admission, with unread/read, manual resolve/reopen and follow-up actions. One batch shares its reply; individual fixes are not inferred.
 - **Large-file virtualization**: Visible blocks over 400 rows render a window of rows with measured wrapping and comment heights. Split cells are measured together, and editing rows remain mounted. Search and change navigation still cover complete recorded content. Virtualization can be disabled in Settings.
@@ -55,30 +55,30 @@ The **input comment Dock and Send with input reference chip** share sidebar draf
 
 ## Installation
 
-Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as a tested channel. Plugin v0.3.0 was tested in the actual Windows Desktop 0.2.0-rc.2, covering multiple repositories, all eight scopes, diff reading, both comment submission routes, linked replies, confirmation, undo/reapply and shared settings. Additional v0.3.2 validation focuses on the shared manager service and its native sidebar tab. See the [verification matrix](docs/MIGRATION_VERIFICATION.md). Stable/newer stable versions and a full Web host remain unverified. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
+Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as a tested channel. Plugin v0.3.0 was tested in the actual Windows Desktop 0.2.0-rc.2, covering multiple repositories, all eight scopes, diff reading, both comment submission routes, linked replies, confirmation, undo/reapply and shared settings. Additional v0.3.2 validation focuses on the shared manager service and its native sidebar tab. See the [verification matrix](docs/releases/version.md#v031). Stable/newer stable versions and a full Web host remain unverified. File Review uses the native right sidebar; dsh-better-sidebar is optional. Install from a prebuilt GitHub Release `.tgz` or the public GitHub repository. Publishing to npm is not required.
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.3.4.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.5.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.3.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.4.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.5.tgz"
 ```
 
 Maintainers can also use the package with the same name in the project's `dist/` directory. Desktop manages the `desktop` Profile; use the local package installation method above. Restart Desktop after installation so that the Host and browser plugin load the new build. Open the native right sidebar's Start page using ＋, then select Multi-repository management or File Review (Multi-Git).
 
-For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.4 label alone does not establish that the latest build is loaded.
+For a rebuilt package with the same version, pnpm may reuse a local archive at the same path. Copy it to a new filename containing its build checksum, install that path, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.5 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.4/dsh-file-review-tab-multi-git-repository-0.3.4.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.5/dsh-file-review-tab-multi-git-repository-0.3.5.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -103,7 +103,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.4 package has not been published). The bilingual [Release notes](docs/releases/version.md#v034) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.5 package has not been published). The bilingual [Release notes](docs/releases/version.md#v035) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 
@@ -151,7 +151,7 @@ Outdated pending drafts from the new side of Uncommitted/Unstaged can **Check cu
 
 ## Configuring a multi-repository project
 
-Open a session for the target project and select **Multi-repository management** beside the conversation and trace tabs. The session determines the current project directory and name; they cannot be edited here. Each project maintains its own configuration file.
+Open a session for the target project and open **Multi-repository management** from the right-sidebar Start page. The session determines the current project directory and name; they cannot be edited here. Each project maintains its own configuration file.
 
 1. If the project has no configuration file, **Reload saved configuration** is disabled and the save action reads **Generate new configuration file**. Click **Add repository** and enter its name and path. Each row's **Open** action starts from that row's existing valid directory, accepting both project-relative and absolute paths. Empty, nonexistent, or non-directory paths fall back to the current project directory. Selected directories inside the project become relative paths; directories outside it remain absolute. **Remove** asks for confirmation and removes only the list entry, leaving the directory on disk intact. Checkboxes control whether multi-repository management is enabled and whether files in the project root are reviewed as well.
 2. Click **Generate new configuration file**. The plugin creates `dsh-file-review-repositories.json` in the current project root and shows the Git status of each repository below. The action then changes to **Save configuration**, and reloading becomes available. The root is shown as `.`, and child repositories use relative paths such as `project/PluginManager`.
@@ -161,18 +161,21 @@ Example configuration:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
+  "enabled": true,
   "includeProjectRoot": true,
   "repositories": [
     { "name": "PluginManager", "path": "project/PluginManager" },
     { "name": "ThirdPartyManager", "path": "project/ThirdPartyManager" }
-  ]
+  ],
+  "directories": [],
+  "discovery": { "containers": [] }
 }
 ```
 
 Repository paths are resolved relative to the **current project root**. Only repositories inside the project are saved as relative paths. Repositories outside it, including parent or sibling directories on the same drive and directories on other drives, are shown as absolute paths and marked temporary. They are used only in the current session and **are not written to the configuration file**. The temporary badge appears on the right side of the path input; hovering over it shows the full explanation. It does not increase row height, keeping inputs and action buttons aligned. Manually entered `../` paths that point outside the project are also converted to absolute paths. Junctions pointing outside the project are not saved either. The plugin does not clone, pull, or modify repositories. After editing the configuration file directly, click **Reload saved configuration** to load the new content.
 
-If an older Profile contains `submodules.ini`, `.gitmodules`, or another repository manifest, opening the management page imports recognized repositories as editable rows for explicit migration. The old Profile entry alone does not enable multi-repository scope. After the first save, the new configuration file takes over and the old manifest is no longer a dependency. For example, ProjectManager's `submodules.ini` is used only for a one-time migration. New projects need no repository manifest.
+Project configuration is v2 only. The manager owns target declarations and the root-only Profile index; review does not import or save project configuration.
 
 Files inside the project root are reviewed by default. Disable the corresponding option if you only want to maintain the listed child repositories. Sessions in the project root or its subdirectories automatically use the nearest project configuration file. Temporary external repositories belong only to the session that added them and do not affect other projects or sessions. Unconfigured sessions retain the original session-directory scope.
 

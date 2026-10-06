@@ -1,8 +1,8 @@
-# 发布 v0.3.4 Release 并上传同名 tgz 资产后，将此文件复制到社区目录的 data/plugins/ 再提交 PR。
+# 发布 v0.3.5 Release 并上传同名 tgz 资产后，将此文件复制到社区目录的 data/plugins/ 再提交 PR。
 url: https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
 name: wuqingzhong2020/dsh-file-review-tab-Multi-git-repository
 category: git
 description:
   en: Review managed Git repositories and ordinary directories in the native DeepSeek Harness Desktop sidebar, with shared project configuration, Git diffs, review comments, and file revision confirmation.
   zh: 直接接入 DeepSeek Harness Desktop 原生侧栏，共用 Git 仓库与非 Git 目录管理，提供工程配置、差异审查、修改意见和按文件修订确认。
-tarball: https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.4/dsh-file-review-tab-multi-git-repository-0.3.4.tgz
+tarball: https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.5/dsh-file-review-tab-multi-git-repository-0.3.5.tgz

@@ -2,7 +2,7 @@
 import { lstat, open, readFile, realpath, unlink } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
-import { inside } from './repository-workspace.ts'
+import { inside } from 'dsh-multi-git-repo-manager/workspace'
 import { CAPTURE_MAX_BYTES, type LifecycleImage, type LifecycleRecord } from './lifecycle-record.ts'
 import type { FileReviewAction, FileReviewFileResult } from './change-types.ts'
 

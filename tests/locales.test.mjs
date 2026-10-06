@@ -104,7 +104,8 @@ test('existing diagnostics switch language at render and preserve paths and unkn
   } finally { detach() }
 })
 
-test('review configuration retains a hidden legacy index without management controls', () => {
+test('review configuration contains preferences without project management fields', () => {
   assert.equal(Config.dict.enabled, undefined)
-  assert.equal(Config.dict.projects.meta.hidden, true)
+  assert.equal(Config.dict.projects, undefined)
+  assert.ok(Config.dict.reviewSettings)
 })

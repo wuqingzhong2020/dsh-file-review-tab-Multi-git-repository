@@ -24,6 +24,6 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-typert-registry@0.2.0-rc.2'
   - 'dsh-better-sidebar@0.24.1'
 
-# Local development only; published dependencies stay pinned to 0.1.2.
+# Local development only; published dependencies stay pinned to 0.1.4.
 overrides:
   dsh-multi-git-repo-manager: link:../dsh-multi-git-repo-manager

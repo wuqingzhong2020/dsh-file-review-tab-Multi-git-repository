@@ -2,9 +2,9 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import { type MultiGitRepoManager, type TargetPathResolution } from 'dsh-multi-git-repo-manager';
+import type { ManagedWorkspaceReader, TargetPathResolution } from 'dsh-multi-git-repo-manager/types';
 import type { FileReviewRequest, FileReviewResult, RecordedMutation, RecordedRequest, RecordedResult } from './change-types.ts';
-import type { ReviewWorkspace } from './repository-types.ts';
+import type { ManagedWorkspace } from 'dsh-multi-git-repo-manager/types';
 import type { GitReviewDiff, GitReviewFileRequest, GitReviewRequest, GitReviewResult } from './git-review-types.ts';
 import type { ReviewLocationRequest, ReviewLocationResult } from './review-location.ts';
 import type { UserGuideDocument } from './user-guide.ts';
@@ -17,9 +17,9 @@ export declare class FileReviewService extends TypertRemoteService {
     private readonly recordLog;
     private readonly lifecycleLog;
     private readonly lifecycleIdentities;
-    constructor(ctx: Context, repositoryManager: Pick<MultiGitRepoManager, 'workspace'> & Partial<Pick<MultiGitRepoManager, 'resolveTargetPaths'>>);
+    constructor(ctx: Context, repositoryManager: ManagedWorkspaceReader);
     /** Every review operation uses the manager's authoritative session scope. */
-    workspace(agent: Agent): Promise<ReviewWorkspace>;
+    workspace(agent: Agent): Promise<ManagedWorkspace>;
     resolvePaths(agent: Agent, paths: string[]): Promise<TargetPathResolution[]>;
     /** Every read/capture/write gets the concrete owner's root, never a parent fallback. */
     approvedRoots(agent: Agent, path: string): Promise<string[]>;

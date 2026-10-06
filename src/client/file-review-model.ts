@@ -6,14 +6,14 @@ import type {
   RecordedRequest,
   RecordedResult,
 } from '../change-types.ts'
-import type { ReviewWorkspace } from '../repository-types.ts'
+import type { ManagedWorkspace } from 'dsh-multi-git-repo-manager/types'
 import type { SessionFileChange } from './session-changes.ts'
 import type { UnifiedDiffStats } from './UnifiedDiff.tsx'
 
 export type { ReviewMode } from '../review-scopes.ts'
 
 export interface FileReviewRemote {
-  workspace(): Promise<RemoteResult<ReviewWorkspace>>
+  workspace(): Promise<RemoteResult<ManagedWorkspace>>
   status(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   apply(request: FileReviewRequest): Promise<RemoteResult<FileReviewResult>>
   recorded(request: RecordedRequest): Promise<RemoteResult<RecordedResult>>

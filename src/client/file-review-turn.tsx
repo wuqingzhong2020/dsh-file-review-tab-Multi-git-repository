@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react'
 import type { FileReviewAction, FileReviewFileState } from '../change-types.ts'
-import type { TargetPathResolution } from 'dsh-multi-git-repo-manager/types'
-import type { ReviewWorkspace } from '../repository-types.ts'
+import type { TargetPathResolution, ManagedWorkspace } from 'dsh-multi-git-repo-manager/types'
 import { isSessionReviewMode } from '../review-scopes.ts'
 import {
   basename,
@@ -13,10 +12,9 @@ import {
 import { summarizeDiffs, UnifiedDiff, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import { t } from './locales.ts'
 import {
-  fileRepository,
   repositoryRelativePath,
   relativeProjectDirectory,
-} from './repository-paths.ts'
+} from 'dsh-multi-git-repo-manager/paths'
 import { ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
 import {
@@ -50,7 +48,7 @@ interface FileReviewExpansion {
 export interface FileReviewTurnView {
   readonly sessionId: string
   readonly cwd: string | undefined
-  readonly workspace: ReviewWorkspace | null
+  readonly workspace: ManagedWorkspace | null
   readonly ownership: ReadonlyMap<string, TargetPathResolution>
   readonly reviewMode: ReviewMode
   readonly expansion: FileReviewExpansion
@@ -152,14 +150,11 @@ function LazyDiff({ children }: { children: ReactNode }) {
 }
 
 function ownerOfReviewFile(view: FileReviewTurnView, path: string) {
-  if (view.workspace?.targets) {
-    const owner = view.ownership.get(path)
-    return owner?.state === 'managed' ? owner.target : undefined
-  }
-  return fileRepository(resolveSessionPath(view.cwd, path), view.workspace?.repositories ?? [])
+  const owner = view.ownership.get(path)
+  return owner?.state === 'managed' ? owner.target : undefined
 }
 function canOperateFile(view: FileReviewTurnView, path: string): boolean {
-  return !view.workspace?.targets || view.ownership.get(path)?.state === 'managed'
+  return view.ownership.get(path)?.state === 'managed'
 }
 
 /** A filtered turn retains its complete original turn for confirmation identity. */

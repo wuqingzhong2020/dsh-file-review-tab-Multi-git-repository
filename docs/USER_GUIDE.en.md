@@ -57,7 +57,7 @@ Git scopes provide viewing and commenting without staging files, committing, or 
 ### 2.1 Opening the plugin
 
 1. Install and enable this plugin. This guide targets DeepSeek Harness Desktop **0.2.0-rc.2** and its native right sidebar; dsh-better-sidebar is optional.
-2. After installation or an update, fully quit Desktop, including its tray process, and start it again. The plugin manager should show review **v0.3.1** and manager **v0.1.1**. See the [validation record](MIGRATION_VERIFICATION.md) for tested environments.
+2. After installation or an update, fully quit Desktop, including its tray process, and start it again. The plugin manager should show review **v0.3.1** and manager **v0.1.1**. See the [validation record](releases/version.md#v031) for tested environments.
 3. Open a session in the target project. Click **＋** at the top of the native right sidebar and choose **File Review (Multi-Git)** from the guide.
 4. After the Agent finishes a turn that changes files, you can also click **Review** in the end-of-turn “Edited N files” row. Clicking an individual file name opens that file's changes.
 
@@ -88,7 +88,7 @@ Figure 1: Review scope and reading controls appear above changes grouped by turn
 
 ## 3. Choosing a review scope
 
-The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed. See [non-Git directory support](NON_GIT_DIRECTORIES.en.md).
+The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed. See [non-Git directory support](REPOSITORY_MANAGER.md#配置与界面).
 
 Use the dropdown beside the File Review title to choose the changes you want to inspect.
 

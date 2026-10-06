@@ -1,7 +1,7 @@
 /** Read-only Git review. Every repository is derived from the receiving session. */
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { basename, isAbsolute, resolve } from 'node:path'
-import type { ReviewWorkspace } from './repository-types.ts'
+import type { ManagedWorkspace } from 'dsh-multi-git-repo-manager/types'
 import type {
   GitReviewDiff,
   GitReviewFile,
@@ -10,7 +10,7 @@ import type {
   GitReviewRequest,
   GitReviewResult,
 } from './git-review-types.ts'
-import { inside, pathKey } from './repository-workspace.ts'
+import { inside, pathKey } from 'dsh-multi-git-repo-manager/workspace'
 import { resolveTargetPaths } from 'dsh-multi-git-repo-manager'
 import { REVIEW_SCOPES, usesWorkingTree } from './review-scopes.ts'
 import {
@@ -34,9 +34,8 @@ const MAX_FILES = 1000
 const REPOSITORY_BATCH_SIZE = 4
 type AdmitGitPaths = (paths: string[]) => Promise<string[]>
 
-function gitPathAdmission(workspace: ReviewWorkspace, cwd: string, root: string): AdmitGitPaths {
+function gitPathAdmission(workspace: ManagedWorkspace, cwd: string, root: string): AdmitGitPaths {
   return async paths => {
-    if (workspace.targets === undefined) return paths
     const owners = await resolveTargetPaths(workspace, cwd, paths.map(path => resolve(root, path)))
     return paths.filter((_, index) => {
       const owner = owners[index]
@@ -46,15 +45,9 @@ function gitPathAdmission(workspace: ReviewWorkspace, cwd: string, root: string)
 }
 
 async function resolveApprovedRepositories(
-  workspace: ReviewWorkspace,
-  cwd: string,
+  workspace: ManagedWorkspace,
 ): Promise<GitReviewRepository[]> {
-  const candidates =
-    workspace.targets !== undefined
-      ? workspace.targets.filter(target => target.state === 'ready' && target.capabilities.git)
-      : workspace.project === null
-      ? [{ name: basename(cwd), path: cwd, state: 'ready' }]
-      : workspace.repositories.filter(repo => repo.state === 'ready')
+  const candidates = workspace.targets.filter(target => target.state === 'ready' && target.capabilities.git)
   const repositories: GitReviewRepository[] = []
   const seen = new Set<string>()
   for (const candidate of candidates) {
@@ -63,7 +56,7 @@ async function resolveApprovedRepositories(
         (await runReviewGit(candidate.path, ['rev-parse', '--show-toplevel'])).trim(),
       )
       // Configured roots must be real repository roots; don't silently select a parent.
-      if (workspace.project !== null && pathKey(root) !== pathKey(candidate.path)) continue
+      if (pathKey(root) !== pathKey(candidate.path)) continue
       if (seen.has(pathKey(root))) continue
       seen.add(pathKey(root))
       repositories.push({
@@ -235,11 +228,11 @@ async function loadRepositoryMetadata(
 }
 
 export async function gitReview(
-  workspace: ReviewWorkspace,
+  workspace: ManagedWorkspace,
   cwd: string,
   request: GitReviewRequest,
 ): Promise<GitReviewResult> {
-  const repositories = await resolveApprovedRepositories(workspace, cwd)
+  const repositories = await resolveApprovedRepositories(workspace)
   if (
     request.repository &&
     !repositories.some(repo => pathKey(repo.path) === pathKey(request.repository!))
@@ -272,27 +265,23 @@ export async function gitReview(
   result.files.sort(
     (a, b) => a.repository.localeCompare(b.repository) || a.path.localeCompare(b.path),
   )
-  if (workspace.targets !== undefined) {
-    const owners = await resolveTargetPaths(workspace, cwd, result.files.map(file => resolve(file.repository, file.path)))
-    result.files = result.files.filter((file, index) => owners[index]?.state === 'managed' && owners[index]?.target?.kind === 'git' && pathKey(owners[index]!.target!.path) === pathKey(file.repository))
-  }
+  const owners = await resolveTargetPaths(workspace, cwd, result.files.map(file => resolve(file.repository, file.path)))
+  result.files = result.files.filter((file, index) => owners[index]?.state === 'managed' && owners[index]?.target?.kind === 'git' && pathKey(owners[index]!.target!.path) === pathKey(file.repository))
   return result
 }
 
 export async function gitReviewDiff(
-  workspace: ReviewWorkspace,
+  workspace: ManagedWorkspace,
   cwd: string,
   request: GitReviewFileRequest,
 ): Promise<GitReviewDiff> {
-  const repo = (await resolveApprovedRepositories(workspace, cwd)).find(
+  const repo = (await resolveApprovedRepositories(workspace)).find(
     repo => pathKey(repo.path) === pathKey(request.repository),
   )
   if (!repo) throw new Error('Repository is outside this session')
   const filename = resolveRepositoryFile(repo.path, request.path)
-  if (workspace.targets !== undefined) {
-    const [owner] = await resolveTargetPaths(workspace, cwd, [filename])
-    if (owner?.state !== 'managed' || owner.target?.kind !== 'git' || pathKey(owner.target.path) !== pathKey(repo.path)) throw new Error('File belongs to another target or an unmanaged boundary')
-  }
+  const [owner] = await resolveTargetPaths(workspace, cwd, [filename])
+  if (owner?.state !== 'managed' || owner.target?.kind !== 'git' || pathKey(owner.target.path) !== pathKey(repo.path)) throw new Error('File belongs to another target or an unmanaged boundary')
   const changes = await listChangedFiles(repo.path, request, gitPathAdmission(workspace, cwd, repo.path))
   const file = changes.files.find(item => item.path === request.path)
   if (!file) throw new Error('This file changed; refresh the review')

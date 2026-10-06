@@ -12,11 +12,10 @@ import { useReviewLocale } from './use-review-locale.ts'
 import { UserGuideDialog } from './UserGuideTab.tsx'
 import { useReviewFileOpener } from './review-navigation.tsx'
 import { localizeReviewMessage } from './message-locales.ts'
-import type { ReviewWorkspace } from '../repository-types.ts'
+import type { ManagedWorkspace } from 'dsh-multi-git-repo-manager/types'
 import { useTargetOwnership } from './use-target-ownership.ts'
 import { ALL_DIRECTORIES, defaultTargetFilter, targetSelection, selectionIncludes, isDirectorySelection } from './review-target-selection.ts'
-import { fileRepository } from './repository-paths.ts'
-import { subscribeRepositories } from './repository-events.ts'
+import { subscribeRepositories } from 'dsh-multi-git-repo-manager/events'
 import { GitReviewPanel } from './GitReviewPanel.tsx'
 import { ReviewCommentsProvider } from './ReviewComments.tsx'
 import { confirmationStoreFor } from './review-confirmations.ts'
@@ -88,7 +87,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   const closeGuide = useCallback(() => setGuideOpen(false), [])
   useEffect(() => { if (!visible) closeGuide() }, [visible, closeGuide])
   const [tick, setTick] = useState(0)
-  const [workspace, setWorkspace] = useState<ReviewWorkspace | null>(null)
+  const [workspace, setWorkspace] = useState<ManagedWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
   const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
   const lastSessionMode = useRef<ReviewMode>('session')
@@ -137,7 +136,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
             const defaultValue = defaultTargetFilter(targets)
             if (current === '*') return defaultValue
             if (current === '?' || current === ALL_DIRECTORIES) return current
-            return (targets ?? result.value.repositories).some(target => target.path === current && target.state === 'ready') ? current : defaultValue
+            return targets.some(target => target.path === current && target.state === 'ready') ? current : defaultValue
           })
         }
       })
@@ -162,27 +161,15 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     [snapshot, turns, scopeBehavior, confirmationSnapshot.confirmed],
   )
   const filteredTurns = useMemo(() => {
-    if (workspace?.targets) {
+    if (workspace !== null) {
       const selected = targetSelection(repositoryFilter, workspace.targets)
       return scopeTurns.map(turn => ({
         ...turn,
         files: turn.files.filter(file => selectionIncludes(selected, ownership.owners.get(file.path))),
       })).filter(turn => turn.files.length > 0)
     }
-    if (repositoryFilter === '*') return scopeTurns
-    return scopeTurns
-      .map(turn => ({
-        ...turn,
-        files: turn.files.filter(file => {
-          const repository = fileRepository(
-            resolveSessionPath(cwd, file.path),
-            workspace?.repositories ?? [],
-          )
-          return (repository?.path ?? '?') === repositoryFilter
-        }),
-      }))
-      .filter(turn => turn.files.length > 0)
-  }, [scopeTurns, repositoryFilter, workspace, cwd, ownership.owners])
+    return []
+  }, [scopeTurns, repositoryFilter, workspace, ownership.owners])
 
   const {
     mainTurns,
@@ -237,7 +224,6 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     visible,
     ready: ready && ownership.ready,
     resolveFilter: paths => {
-      if (!workspace?.targets) return '*'
       const owner = ownership.owners.get(paths[0] ?? '')
       return owner?.state === 'managed' && owner.target ? owner.target.path : '?'
     },
@@ -286,7 +272,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
 
   const openInEditor = useCallback(
     (path: string) => {
-      if (workspace?.targets && ownership.owners.get(path)?.state !== 'managed') {
+      if (ownership.owners.get(path)?.state !== 'managed') {
         showNotice('error', 'unmanagedOperation')
         return
       }
@@ -409,7 +395,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
               }}
             >
               <option value="*">{t('repoAll')}</option>
-              {(workspace.targets ? targets.filter(target => target.kind === 'git') : repositories)
+              {targets.filter(target => target.kind === 'git')
                 .filter(repo => repo.state === 'ready')
                 .map(repo => (
                   <option key={repo.path} value={repo.path}>

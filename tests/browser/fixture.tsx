@@ -28,44 +28,40 @@ const events = observable({ entries: [] })
 const inputState = observable({ draft: lang === 'zh' ? '请保持现有接口。' : 'Keep the existing interface.', draftRev: 1, phase: 'plain', occurrences: [], attachmentIds: ['image-fixture'] })
 const pending = observable({ pendingSubmissions: [] })
 const projects = ['core', 'web'].map(name => ({ name, relativePath: name, path: cwd + '/' + name, source: 'manual', available: true, state: 'ready' }))
-let savedProject = { name: 'fixture', root: cwd, enabled: true, includeProjectRoot: true,
-  configFiles: [], repositories: [], namedRepositories: projects.map(repo => ({ name: repo.name, path: repo.relativePath })) }
+let savedProject = { name: 'fixture', root: cwd, enabled: true, includeProjectRoot: false,
+  repositories: projects.map(repo => ({ name: repo.name, path: repo.relativePath })),
+  directories: managed ? [{ name: 'Local', path: 'local' }] : [], discovery: { containers: [] } }
 let temporaryTargets = []
-let temporaryRepositories = []
 let applyPaths: string[] = []
-if (managed) savedProject = { ...savedProject, directories: [{ name: 'Local', path: 'local' }] } as typeof savedProject
 let workspaceReads = 0
 let fileRevision = 'fixture-file-revision'
-const legacyWorkspace = () => ({ project: savedProject, roots: [cwd], warnings: [], repositories: [
-  ...savedProject.namedRepositories.map(entry => ({ ...entry, path: cwd + '/' + entry.path, relativePath: entry.path, state: 'ready', source: 'dsh-file-review-repositories.json' })),
-  ...temporaryRepositories.map(entry => ({ ...entry, relativePath: entry.path, state: 'ready', source: 'temporary' })),
-] })
 const managerWorkspace = () => {
-  const workspace = legacyWorkspace()
-  if (!managed) return workspace
   const targets = [
-    ...workspace.repositories.map(repo => ({ ...repo, id: repo.path, kind: 'git', capabilities: { git: true } })),
-    ...((savedProject as any).directories ?? []).map(entry => ({ ...entry, id: cwd + '/' + entry.path, path: cwd + '/' + entry.path, relativePath: entry.path, source: 'config', state: 'ready', kind: 'directory', capabilities: { git: false } })),
-  ]
-  return { ...workspace, targets, roots: targets.map(target => target.path), boundaries: [], workspaceRevision: JSON.stringify(targets) }
+    ...savedProject.repositories.map(entry => ({ ...entry, path: cwd + '/' + entry.path, relativePath: entry.path, source: 'config', state: 'ready', kind: 'git', capabilities: { git: true } })),
+    ...savedProject.directories.map(entry => ({ ...entry, path: cwd + '/' + entry.path, relativePath: entry.path, source: 'config', state: 'ready', kind: 'directory', capabilities: { git: false } })),
+    ...temporaryTargets.map(entry => ({ ...entry, relativePath: entry.path, source: 'temporary', state: 'ready', capabilities: { git: entry.kind === 'git' } })),
+  ].map(target => ({ ...target, id: target.path }))
+  return { project: savedProject, targets, repositories: targets.filter(target => target.kind === 'git'),
+    roots: targets.map(target => target.path), warnings: [], boundaries: [], workspaceRevision: JSON.stringify(targets) }
 }
 const projectPage = () => ({ project: structuredClone(savedProject), revision: 1, configured: true,
-  workspace: managerWorkspace(), fileRevision, temporaryRepositories: structuredClone(temporaryRepositories) })
+  workspace: managerWorkspace(), fileRevision, temporaryTargets: structuredClone(temporaryTargets) })
 const managerRemote = {
   workspace: async () => { workspaceReads++; return { ok: true, value: managerWorkspace() } },
   project: async () => ({ ok: true, value: projectPage() }),
   saveProject: async request => {
-    savedProject = { ...request.project, namedRepositories: request.project.namedRepositories.filter(entry => !entry.path.includes(':')) }
+    savedProject = { ...request.project,
+      repositories: request.project.repositories.filter(entry => !entry.path.includes(':')),
+      directories: request.project.directories.filter(entry => !entry.path.includes(':')) }
     fileRevision += '-saved'
     return { ok: true, value: projectPage() }
   },
   resolveTargetPaths: async paths => ({ ok: true, value: paths.map(input => {
-    const target = (managerWorkspace() as any).targets?.find(target => input.startsWith(target.path + '/'))
+    const target = [...managerWorkspace().targets].sort((a, b) => b.path.length - a.path.length).find(target => input.startsWith(target.path + '/'))
     return { input, path: input, state: target ? 'managed' : 'unmanaged', ...(target ? { target } : {}) }
   }) }),
   discoverTargets: async () => ({ ok: true, value: { candidates: [{ id: 'discovered', name: 'Discovered', kind: 'directory', path: cwd + '/project/ordinary', relativePath: 'project/ordinary', source: 'discovery', state: 'ready', capabilities: { git: false } }], warnings: [] } }),
-  setTemporaryTargets: async entries => { temporaryTargets = entries; temporaryRepositories = entries.filter(entry => entry.kind === 'git').map(({ name, path }) => ({ name, path })); return { ok: true, value: managerWorkspace() } },
-  setTemporaryRepositories: async entries => { temporaryRepositories = entries; return { ok: true, value: managerWorkspace() } },
+  setTemporaryTargets: async entries => { temporaryTargets = entries; return { ok: true, value: managerWorkspace() } },
   directoryStart: async path => ({ ok: true, value: path ? cwd + '/' + path : cwd }),
 }
 const remote = {

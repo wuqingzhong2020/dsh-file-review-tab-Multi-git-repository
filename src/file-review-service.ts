@@ -4,9 +4,10 @@ import { FILE_REVIEW_SERVICE_NAME } from './service-names.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { resolveTargetPaths, sessionCwd, type MultiGitRepoManager, type TargetPathResolution } from 'dsh-multi-git-repo-manager'
+import { sessionCwd } from 'dsh-multi-git-repo-manager'
+import type { ManagedWorkspaceReader, TargetPathResolution } from 'dsh-multi-git-repo-manager/types'
 import type { FileReviewFileResult, FileReviewRequest, FileReviewResult, RecordedMutation, RecordedRequest, RecordedResult } from './change-types.ts'
-import type { ReviewWorkspace } from './repository-types.ts'
+import type { ManagedWorkspace } from 'dsh-multi-git-repo-manager/types'
 import { gitReview, gitReviewDiff } from './git-review.ts'
 import type {
   GitReviewDiff,
@@ -42,20 +43,18 @@ export class FileReviewService extends TypertRemoteService {
 
   constructor(
     ctx: Context,
-    private readonly repositoryManager: Pick<MultiGitRepoManager, 'workspace'> & Partial<Pick<MultiGitRepoManager, 'resolveTargetPaths'>>,
+    private readonly repositoryManager: ManagedWorkspaceReader,
   ) {
     super(ctx, FILE_REVIEW_SERVICE_NAME)
   }
 
   /** Every review operation uses the manager's authoritative session scope. */
-  async workspace(agent: Agent): Promise<ReviewWorkspace> {
+  async workspace(agent: Agent): Promise<ManagedWorkspace> {
     return this.repositoryManager.workspace(agent)
   }
 
   async resolvePaths(agent: Agent, paths: string[]): Promise<TargetPathResolution[]> {
-    return this.repositoryManager?.resolveTargetPaths
-      ? this.repositoryManager.resolveTargetPaths(agent, paths)
-      : resolveTargetPaths(await this.workspace(agent), sessionCwd(agent), paths)
+    return this.repositoryManager.resolveTargetPaths(agent, paths)
   }
 
   /** Every read/capture/write gets the concrete owner's root, never a parent fallback. */
@@ -90,7 +89,6 @@ export class FileReviewService extends TypertRemoteService {
     request: ReviewLocationRequest,
   ): Promise<ReviewLocationResult> {
     return locateReferenceOnDisk(request, {
-      workspace: () => this.workspace(agent),
       cwd: () => sessionCwd(agent),
       approvedRoots: () => this.approvedRoots(agent, request.path),
     })
@@ -98,7 +96,6 @@ export class FileReviewService extends TypertRemoteService {
 
   async openEditor(agent: Agent, request: ReviewLocationRequest): Promise<ReviewLocationResult> {
     return openReferenceInEditor(request, {
-      workspace: () => this.workspace(agent),
       cwd: () => sessionCwd(agent),
       approvedRoots: () => this.approvedRoots(agent, request.path),
       // Revalidation goes through the service method on every check.

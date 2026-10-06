@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, relative } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { MultiGitRepoManager } from 'dsh-multi-git-repo-manager'
@@ -11,23 +13,29 @@ import { FILE_REVIEW_SERVICE_NAME } from '../src/service-names.ts'
 
 test('review pins the manager release and delegates all workspace ownership to the shared service', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
-  assert.equal(pkg.peerDependencies['dsh-multi-git-repo-manager'], '0.1.3')
+  assert.equal(pkg.peerDependencies['dsh-multi-git-repo-manager'], '0.1.4')
   assert.notEqual(pkg.peerDependenciesMeta?.['dsh-multi-git-repo-manager']?.optional, true)
   assert.ok(inject.includes('multiGitRepoManagerByWqz'))
   const ctx = new Context()
+  const root = await mkdtemp(join(tmpdir(), 'dsh-manager-dependency-'))
   try {
     const manager = new MultiGitRepoManager(ctx)
     const review = new FileReviewService(ctx, manager)
-    const agent = { id: 'consumer', session: { header: { cwd: process.cwd() } } }
+    const agent = { id: 'consumer', session: { header: { cwd: root } } }
     assert.deepEqual(await review.workspace(agent), await manager.workspace(agent))
-  } finally { await ctx.fiber.dispose() }
-  for (const method of ['project', 'saveProject', 'directoryStart', 'setTemporaryRepositories', 'workspace']) {
+  } finally {
+    await ctx.fiber.dispose()
+    assert.ok(relative(tmpdir(), root).startsWith('dsh-manager-dependency-'))
+    await rm(root, { recursive: true, force: true })
+  }
+  for (const method of ['project', 'saveProject', 'directoryStart', 'setTemporaryTargets', 'workspace']) {
     assert.ok(!FILE_REVIEW_INVOCATIONS.some(descriptor => descriptor.method === method), method)
   }
 })
 
 test('package-owned services coexist with the original fileReview and another repository manager', async () => {
   const ctx = new Context()
+  const root = await mkdtemp(join(tmpdir(), 'dsh-manager-coexistence-'))
   try {
     // Match the original plugin's real Cordis/Typert registration mechanism.
     const originalReview = new TypertRemoteService(ctx, 'fileReview')
@@ -45,12 +53,16 @@ test('package-owned services coexist with the original fileReview and another re
       service.registrationMarker = Symbol(name)
       assert.equal(ctx.get(name)?.registrationMarker, service.registrationMarker)
     }
-    const agent = { id: 'coexistence', session: { header: { cwd: process.cwd() } } }
+    const agent = { id: 'coexistence', session: { header: { cwd: root } } }
     assert.deepEqual(await review.workspace(agent), await manager.workspace(agent))
     for (const descriptor of FILE_REVIEW_INVOCATIONS) {
       assert.equal(descriptor.service, FILE_REVIEW_SERVICE_NAME)
       assert.equal(descriptor.namespace, FILE_REVIEW_SERVICE_NAME)
       assert.ok(descriptor.id.includes(`#${FILE_REVIEW_SERVICE_NAME}/`))
     }
-  } finally { await ctx.fiber.dispose() }
+  } finally {
+    await ctx.fiber.dispose()
+    assert.ok(relative(tmpdir(), root).startsWith('dsh-manager-coexistence-'))
+    await rm(root, { recursive: true, force: true })
+  }
 })

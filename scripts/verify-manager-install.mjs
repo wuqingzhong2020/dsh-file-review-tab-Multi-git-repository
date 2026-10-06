@@ -43,8 +43,8 @@ try {
   assert.ok(relative(profile, managerEntry).startsWith(`node_modules${sep}`), 'Manager resolved outside the temporary install')
   const installedManager = JSON.parse(await readFile(installedRequire.resolve(managerName + '/package.json'), 'utf8'))
   const installedReview = JSON.parse(await readFile(installedRequire.resolve(pkg.name + '/package.json'), 'utf8'))
-  assert.equal(installedManager.version, '0.1.3')
-  assert.equal(installedReview.peerDependencies[managerName], '0.1.3')
+  assert.equal(installedManager.version, '0.1.4')
+  assert.equal(installedReview.peerDependencies[managerName], '0.1.4')
   const manager = await import(pathToFileURL(managerEntry))
   const review = await import(pathToFileURL(installedRequire.resolve(pkg.name)))
   const ctx = new Context()
@@ -54,7 +54,7 @@ try {
     const agent = { id: 'installed', session: { header: { cwd: profile } } }
     assert.deepEqual(await service.workspace(agent), await ctx.get('multiGitRepoManagerByWqz').workspace(agent))
   } finally { await ctx.fiber.dispose() }
-  console.log(`PASS (${pnpm ? 'pnpm' : 'npm'}): both tgz packages install together, resolve the pinned 0.1.3 dependency, and share the real Host service.`)
+  console.log(`PASS (${pnpm ? 'pnpm' : 'npm'}): both tgz packages install together, resolve the pinned 0.1.4 dependency, and share the real Host service.`)
 } finally {
   const child = relative(tmpdir(), profile)
   assert.ok(child.startsWith('dsh-manager-install-') && !child.includes(sep))

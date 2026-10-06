@@ -1,6 +1,6 @@
 import type { ProducedFileDiff } from '../change-types.ts'
 import { isReviewMode, isSessionReviewMode, type ReviewMode } from '../review-scopes.ts'
-import { normalizeReviewPath } from './repository-paths.ts'
+import { normalizeReviewPath } from 'dsh-multi-git-repo-manager/paths'
 
 export type CommentScope = ReviewMode
 export interface ReviewCommentTarget {

@@ -10,12 +10,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { FileReviewService } from './file-review-service.ts'
-import type { FileReviewConfig } from './repository-config.ts'
 import type {} from 'dsh-multi-git-repo-manager'
 import { registerLifecycleCapture } from './lifecycle-capture.ts'
 
 export type * from './change-types.ts'
-export type * from './repository-types.ts'
 export type * from './git-review-types.ts'
 export type * from './review-location.ts'
 export type * from './user-guide.ts'
@@ -42,9 +40,7 @@ const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, men
  * into line-level hunks and merges into the owning `run_code` turn.
  * @param ctx - host context carrying the system-prompt registry and tool runtime.
  */
-export function apply(ctx: Context, config: FileReviewConfig): void {
-  const projects = Array.isArray(config?.projects) ? config.projects : config?.projects?.get() ?? []
-  ctx.multiGitRepoManagerByWqz.adoptLegacyProjects(projects)
+export function apply(ctx: Context): void {
   const service = new FileReviewService(ctx, ctx.multiGitRepoManagerByWqz)
   registerLifecycleCapture(ctx, service)
   ctx.systemPrompt.section({

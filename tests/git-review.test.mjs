@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { gitReview, gitReviewDiff, parseGitNames } from '../src/git-review.ts'
 import { FileReviewService } from '../lib/index.js'
+import { previewProject, resolveManagedWorkspace } from 'dsh-multi-git-repo-manager'
 
 const directory = await mkdtemp(join(tmpdir(), 'dsh-git-review-'))
 after(async () => {
@@ -23,9 +24,11 @@ async function repo(unborn = false) {
   if (!unborn) { await writeFile(join(root, 'file.txt'), 'before\n'); command(root, 'add', '.'); command(root, 'commit', '-m', 'Initial') }
   return root
 }
-const workspace = () => ({ project: null, repositories: [], roots: [], warnings: [] })
-async function review(root, mode, extra = {}) { return gitReview(workspace(), root, { mode, ...extra }) }
-async function detail(root, mode, path, extra = {}) { return gitReviewDiff(workspace(), root, { mode, repository: root, path, ...extra }) }
+const workspace = root => resolveManagedWorkspace(root, [])
+const aggregate = (root, paths) => previewProject({ name: 'Fixture', root, enabled: true, includeProjectRoot: false,
+  repositories: paths.map((path, index) => ({ name: String(index), path })), directories: [], discovery: { containers: [] } })
+async function review(root, mode, extra = {}) { return gitReview(await workspace(root), root, { mode, ...extra }) }
+async function detail(root, mode, path, extra = {}) { return gitReviewDiff(await workspace(root), root, { mode, repository: root, path, ...extra }) }
 function text(diff, side) { return diff.diffs.map(hunk => hunk[side]).join('') }
 
 test('staged, unstaged and combined views distinguish the same file and include untracked files', async () => {
@@ -133,7 +136,7 @@ test('embedded repository files are reviewed by their own repository without a d
   const parent = await repo(); const child = join(parent, 'child')
   await mkdir(child); command(child, 'init', '-b', 'main')
   await writeFile(join(child, 'new.txt'), 'child change\n')
-  const ws = { project: { root: parent }, repositories: [parent, child].map(path => ({ name: path, path, state: 'ready' })), roots: [parent, child], warnings: [] }
+  const ws = await aggregate(parent, [parent, child])
   const result = await gitReview(ws, parent, { mode: 'uncommitted' })
   assert.deepEqual(result.files.map(file => [file.repository, file.path]), [[await realpath(child), 'new.txt']])
 })
@@ -141,14 +144,14 @@ test('embedded repository files are reviewed by their own repository without a d
 test('multiple repositories remain isolated and endpoint refuses arbitrary roots and traversals', async () => {
   const a = await repo(); const b = await repo()
   await writeFile(join(a, 'file.txt'), 'A\n'); await writeFile(join(b, 'file.txt'), 'B\n')
-  const ws = { project: { root: directory }, repositories: [a, b].map((path, index) => ({ name: String(index), path, state: 'ready' })), roots: [a, b], warnings: [] }
+  const ws = await aggregate(directory, [a, b])
   assert.equal((await gitReview(ws, a, { mode: 'unstaged' })).files.length, 2)
   assert.equal((await gitReview(ws, a, { mode: 'unstaged', repository: b })).files.length, 1)
-  await assert.rejects(gitReview(workspace(), a, { mode: 'staged', repository: b }), /outside/)
+  await assert.rejects(gitReview(await workspace(a), a, { mode: 'staged', repository: b }), /outside/)
   await assert.rejects(detail(a, 'unstaged', '../file.txt'), /Invalid/)
   await assert.rejects(detail(a, 'unstaged', join(b, 'file.txt')), /Invalid/)
   const receiver = Object.create(FileReviewService.prototype)
-  receiver.workspace = async () => workspace()
+  receiver.workspace = async () => workspace(a)
   const agent = { session: { header: { cwd: a } } }
   assert.equal((await receiver.gitReview(agent, { mode: 'unstaged' })).files.length, 1)
   await assert.rejects(receiver.gitReviewDiff(agent, { mode: 'unstaged', repository: b, path: 'file.txt' }), /outside/)

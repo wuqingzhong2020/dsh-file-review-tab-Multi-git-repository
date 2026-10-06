@@ -19,7 +19,7 @@ await writeFile(join(root, 'file.txt'), 'before\n'); await writeFile(join(plain,
 execFileSync('git', ['-C', root, 'add', '.'])
 execFileSync('git', ['-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'base'])
 await writeFile(join(root, 'file.txt'), 'after\n'); await writeFile(join(plain, 'file.txt'), 'after\n'); await writeFile(join(unknown, 'file.txt'), 'after\n')
-const configuration = { name: 'Mixed', root, enabled: true, includeProjectRoot: true, configFiles: [], repositories: [], directories: [{ name: 'Local', path: 'local' }], discovery: { containers: ['project'] } }
+const configuration = { name: 'Mixed', root, enabled: true, includeProjectRoot: true, repositories: [], directories: [{ name: 'Local', path: 'local' }], discovery: { containers: ['project'] } }
 await writeProjectFile(configuration, '')
 const ctx = new Context(); const manager = new MultiGitRepoManager(ctx); const review = new FileReviewService(ctx, manager)
 after(() => ctx.fiber.dispose())

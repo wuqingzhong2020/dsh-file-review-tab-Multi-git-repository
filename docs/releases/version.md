@@ -6,21 +6,32 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
+- [v0.3.5](#v035)
 - [v0.3.4](#v034)
 - [v0.3.3](#v033)
-- [v0.3.2](#v032) · [非 Git 目录验证](../NON_GIT_VERIFICATION.md)
-- [v0.3.1](#v031) · [验证矩阵](../MIGRATION_VERIFICATION.md)
+- [v0.3.2](#v032) · [非 Git 目录验证](#v032)
+- [v0.3.1](#v031) · [验证矩阵](#v031)
 - [v0.3.0](#v030)
 - [v0.2.0](#v020) · [验证记录 / Validation](#v020-验证记录)
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
 
+## v0.3.5
+
+- 精确依赖管理插件 0.1.4，审查服务只消费必需的 `ManagedWorkspaceReader`；取消缺少文件归属时按根目录兜底的路径。
+- 移除项目配置导入和隐藏项目清单，只维护审查偏好；源码直接使用管理包正式入口，删除管理工具转发文件与相应声明产物。
+- Git 比较继续由审查插件负责，批量读取使用同次管理快照；捕获、撤销/重做和编辑器定位重新核对当前 Agent 文件归属。
+- 工作区与浏览器 fixture 使用完整中性契约；普通目录筛选、八种范围、评论、确认和历史身份保持，卸载及切换会话忽略旧回复。
+- 176 项审查 Node 测试、8 项双 bundle 浏览器测试通过，包含原版服务/字典共存；管理插件另有 47 项测试。实际平台目标仍为 Windows Desktop 0.2.0-rc.2，完整 Web、正式版及其他平台未验收。
+
+Pin manager 0.1.4 and consume its required read-only contract. Remove project imports, hidden project settings and management forwarding modules. Git comparisons and review evidence remain here; concrete operations revalidate current ownership. Regression passes 176 review tests and 8 browser tests, alongside 47 manager tests. Original namespaces continue to coexist.
+
 ## v0.3.4
 
 - 将聊天文案字典独立为 `multiGitFileReviewByWqz.chat`，修复与原版 `dsh-file-review` 共用 `file-review` 导致的客户端启动失败。
 - 使用实际发布客户端和 DSH `LocaleRuntime` 检查两个加载顺序，并验证单独卸载不会删除原版字典；管理依赖仍为 `0.1.3`。
-- 服务、工程配置、原生 Tab 和审查偏好继续沿用。原因和实际验证见 [命名空间隔离](../NAMESPACE_ISOLATION.md)。
+- 服务、工程配置、原生 Tab 和审查偏好继续沿用。原因和实际验证见 [命名空间隔离](#v034)。
 
 Isolate chat dictionaries as `multiGitFileReviewByWqz.chat` to prevent client startup failure alongside the original plugin. Test both registration orders against DSH's real locale registry and preserve the original dictionary when unloading. The manager dependency remains `0.1.3`.
 
@@ -28,7 +39,7 @@ Isolate chat dictionaries as `multiGitFileReviewByWqz.chat` to prevent client st
 
 - 将 Host 服务、Typert 描述、Remote 类型与前端调用统一迁移至 `multiGitFileReviewByWqz`，与原版 `dsh-file-review` 的 `fileReview` 服务隔离。
 - 精确依赖管理插件 `0.1.3`，调用 `multiGitRepoManagerByWqz`；集中定义服务名称，新增实际 Cordis/Typert 同名服务共存回归。
-- 升级两个包即可沿用工程配置和审查偏好，不提供占用旧服务名的别名。验证记录见 [命名空间隔离](../NAMESPACE_ISOLATION.md)。
+- 升级两个包即可沿用工程配置和审查偏好，不提供占用旧服务名的别名。验证记录见 [命名空间隔离](#v034)。
 
 Isolate the review service as `multiGitFileReviewByWqz` and pin manager `0.1.3` with its `multiGitRepoManagerByWqz` namespace. Centralized identities and coexistence coverage preserve the original plugin's separate service.
 
@@ -43,7 +54,7 @@ Isolate the review service as `multiGitFileReviewByWqz` and pin manager `0.1.3` 
 - 审查范围增加非 Git 汇总和单目录；普通目录只使用宿主记录的会话改动，Git 五种比较模式仅适用于 Git 目标。
 - 确认按文件改动身份保存，当前范围确认不影响隐藏文件；旧整轮确认只在原修订精确匹配时迁移。
 - Host 在捕获、撤销、重做和定位前复核具体文件归属；未知子仓、异常目标、元数据路径和越界链接不能被父根兜底授权。
-- 管理 49 项、审查 172 项 Node 测试和 8 项浏览器测试通过；双包隔离联装、实际指定 Desktop 目录保存和范围切换完成。详细证据和验证限制见 [验证记录](../NON_GIT_VERIFICATION.md)。
+- 管理 49 项、审查 172 项 Node 测试和 8 项浏览器测试通过；双包隔离联装、实际指定 Desktop 目录保存和范围切换完成。详细证据和验证限制见 [验证记录](#v032)。
 
 ### English
 
@@ -52,7 +63,7 @@ Isolate the review service as `multiGitFileReviewByWqz` and pin manager `0.1.3` 
 - Review all ordinary directories or one directory using recorded session changes; Git comparisons remain available only for Git targets.
 - Confirm individual file revisions in the selected scope and migrate legacy turn confirmations only when the original revision still matches.
 - Revalidate ownership before capture, undo/reapply and navigation. Unknown nested repositories, unavailable targets, metadata and escaping links block parent fallback.
-- Passed 49 manager tests, 172 review tests and 8 browser tests, isolated package installation and actual Windows Desktop checks. See [validation evidence](../NON_GIT_VERIFICATION.md) for scope and limits.
+- Passed 49 manager tests, 172 review tests and 8 browser tests, isolated package installation and actual Windows Desktop checks. See [validation evidence](#v032) for scope and limits.
 
 Assets: `dsh-file-review-tab-multi-git-repository-0.3.2.tgz` and `dsh-multi-git-repo-manager-0.1.2.tgz`, with their SHA256 files. Install and enable both plugins.
 
@@ -86,7 +97,7 @@ Assets: `dsh-file-review-tab-multi-git-repository-0.3.1.tgz` and `dsh-multi-git-
 - Windows Desktop 0.2.0-rc.2 实装验收；修复侧栏评论提交的 Cordis 注入报错，改进空轮次提示与评论摘要。
 - 双语指南及全部 18 张实际 Desktop 截图、199 项 Node／4 项浏览器回归及包检查；来源许可证和既有功能保留。
 
-Trusted native/PTC lifecycle records and official durable replay enable safe creation undo/reapply. A shared comment Dock/reference codec supports main-input submission and immutable packet folding with host delegation. Portable Profile settings, narrow-layout fallback and bounded group copying retain existing multi-repository scopes. Actual Windows Desktop testing exposed and fixed a Cordis injection error in sidebar submission; all 18 guide screenshots now show the running Desktop. See the [verification matrix](../MIGRATION_VERIFICATION.md) for actual evidence, restart limits and unverified platforms.
+Trusted native/PTC lifecycle records and official durable replay enable safe creation undo/reapply. A shared comment Dock/reference codec supports main-input submission and immutable packet folding with host delegation. Portable Profile settings, narrow-layout fallback and bounded group copying retain existing multi-repository scopes. Actual Windows Desktop testing exposed and fixed a Cordis injection error in sidebar submission; all 18 guide screenshots now show the running Desktop. See the [verification matrix](#v031) for actual evidence, restart limits and unverified platforms.
 
 ## v0.2.0
 
