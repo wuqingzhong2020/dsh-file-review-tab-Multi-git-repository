@@ -1,6 +1,6 @@
 # File Review Plugin User Guide
 
-The Multi-repository management tab in this guide is now provided by **dsh-multi-git-repo-manager v0.1.1**. Install and enable both the manager and file review plugins. Existing project files remain compatible and the editor workflow is unchanged. See [dependency notes](REPOSITORY_MANAGER.md).
+The Multi-repository management tab in this guide is now provided by **dsh-multi-git-repo-manager v0.1.1**. Install and enable both the manager and file review plugins. Existing project files remain compatible and the editor workflow is unchanged. See the [installation instructions](../README.en.md#installation).
 
 [简体中文](USER_GUIDE.md) | [English](USER_GUIDE.en.md)
 
@@ -88,7 +88,7 @@ Figure 1: Review scope and reading controls appear above changes grouped by turn
 
 ## 3. Choosing a review scope
 
-The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed. See [non-Git directory support](REPOSITORY_MANAGER.md#配置与界面).
+The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed.
 
 Use the dropdown beside the File Review title to choose the changes you want to inspect.
 
@@ -129,7 +129,7 @@ These scopes read Git status without changing the index, creating a commit, or c
 
 Figure 3: The project repositories `core` and `cli` use relative paths. Their names label the review groups.
 
-Configuration is stored in `dsh-file-review-repositories.json` at the project root. You can keep this file with the project or commit it to Git. Sessions opened at the project root or in a child directory discover the file automatically. Projects without a configuration file continue to use the original session directory for review.
+Configuration is stored in `dsh-multi-git-repo.json` at the project root. You can keep this file with the project or commit it to Git. Sessions opened at the project root or in a child directory discover the file automatically. Projects without a configuration file continue to use the original session directory for review.
 
 ### 4.2 External repositories and list maintenance
 
@@ -397,7 +397,7 @@ Choose Chinese or English in the host's **Settings → General → Language**. F
 
 | Data | Storage and scope |
 | --- | --- |
-| Project repository configuration | `dsh-file-review-repositories.json` at the project root |
+| Project repository configuration | `dsh-multi-git-repo.json` at the project root |
 | Temporary external repositories | Current session configuration; excluded from the project file |
 | Layout, wrapping, Dock/adaptive/folding switches | Current Profile; local fallback when official settings are missing/read-only |
 | Fonts, other reading settings, editor path | App local storage, shared across review views |

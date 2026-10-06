@@ -1,6 +1,6 @@
 # 公开发布与插件市场收录
 
-当前审查插件版本为 **0.3.5**，精确依赖 **dsh-multi-git-repo-manager 0.1.4**。发布审查插件前，先交付管理插件的 tgz 或将其发布到可访问的 npm registry，并更新安装流程以同时选中两个 DSH 插件。两个安装包应成对提供。后续公开版本继续递增，不能覆盖既有发布资产。见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
+当前审查插件版本为 **0.3.5**，精确依赖 **dsh-multi-git-repo-manager 0.1.4**。发布审查插件前，先交付管理插件的 tgz 或将其发布到可访问的 npm registry，并更新安装流程以同时选中两个 DSH 插件。两个安装包应成对提供。后续公开版本继续递增，不能覆盖既有发布资产。见 [管理契约与业务边界](ARCHITECTURE.md#5-管理契约与业务边界)。
 
 本工程使用 **GitHub 公开仓库 + GitHub Release 预构建安装包** 提供插件。npm 发布是可选项，是否发布 npm 不影响申请市场收录。
 
@@ -28,30 +28,34 @@
 
 ## 2. 在本地生成安装包
 
-在本工程根目录运行：
+在审查插件仓库根目录运行（源码变更后先执行 `pnpm build`）：
 
 ~~~powershell
-pnpm pack --pack-destination dist
+pnpm test:pack
 ~~~
 
 输出：
 
 ~~~text
-dist/dsh-file-review-tab-multi-git-repository-0.3.5.tgz
+../../dist/dsh-file-review-tab-multi-git-repository-<版本>.tgz
+../../dist/<同名历史包>.tgz.sha256
+../../dist/latest/dsh-file-review-tab-multi-git-repository.tgz
+../../dist/latest/dsh-file-review-tab-multi-git-repository.tgz.sha256
+../../dist/latest/dsh-file-review-tab-multi-git-repository.json
 ~~~
 
-当前 `package.json` 没有 `prepack` 或 `prepare` 脚本，此命令只打包已有产物，不执行插件编译或测试。仅补充文档、现有 `lib/` 已与功能源码同步时，可以直接打包。若修改了功能源码，则按架构文档的开发流程先更新 `lib/`，再生成对应版本的安装包。
+安装包和摘要统一输出到本多仓工程根目录 `dist/`，从插件目录访问为 `../../dist/`。每次成功打包保存 `<包名>-<版本>.tgz` 版本包，同版本重建覆盖，并将同一份字节复制到 latest 固定文件名；JSON 记录真实版本、SHA256、对应历史包和 `buildTime`，仅保留不同版本的历史包。`buildTime` 为 `lib/client.js` 编译产物的 UTC ISO 8601 生成时间，只重新打包时保留原编译时间。校验失败不更新 latest。独立检出时默认输出到仓库上一级的 `dist/`，也可通过 `MRM_DIST_DIR` 指定目录。当前 `package.json` 没有 `prepack` 或 `prepare` 脚本，`test:pack` 打包并校验已有产物，不执行插件编译。若修改了功能源码，则先更新 `lib/` 并验证功能，再生成安装包。主工程可统一运行 `python envBuild.py pack`，按依赖顺序生成两个包；`desktop install` 默认安装最新配套包，`--archive` 可选择历史包。
 
-可在 PowerShell 生成校验文件：
+脚本已自动生成 SHA256 文件，可在插件目录用 PowerShell 独立复核：
 
 ~~~powershell
-$archivePath = Join-Path (Get-Location) 'dist\dsh-file-review-tab-multi-git-repository-0.3.5.tgz'
+$archivePath = Join-Path (Get-Location) '..\..\dist\latest\dsh-file-review-tab-multi-git-repository.tgz'
 $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 $checksumLine = "$archiveHash  $([System.IO.Path]::GetFileName($archivePath))"
 [System.IO.File]::WriteAllText("$archivePath.sha256", "$checksumLine`n", [System.Text.UTF8Encoding]::new($false))
 ~~~
 
-校验文件名为 `dsh-file-review-tab-multi-git-repository-0.3.5.tgz.sha256`，可与安装包一同上传。
+上述校验文件名为 `dsh-file-review-tab-multi-git-repository.tgz.sha256`。公开 Release 上传时按包内版本将资产命名为上表的带版本文件名，并同步生成文件名对应的 SHA256；本地 latest 固定文件名与公开资产名分别维护。
 
 检查包内容时可使用 `tar -tzf <安装包路径>`，应能找到 `package/package.json`、`package/lib/index.js`、`package/lib/client.js`、`package/cordis.patch.yml`、README、docs 和 LICENSE。这是安装包内容检查，不能替代插件功能验证。
 
@@ -83,7 +87,7 @@ git push origin main
 1. Tag 填 `v0.3.5`；如尚无标签，选择创建新标签。
 2. Target 选择刚推送的发布提交，或已包含该提交的 `main`。
 3. 标题填写 `v0.3.5`，说明可复制 [本版本发布说明](releases/version.md#v035) 中的中文或英文更新内容。
-4. 在 Assets 区上传 `dist/dsh-file-review-tab-multi-git-repository-0.3.5.tgz` 和对应 `.sha256`。
+4. 选取 latest 索引对应的安装包，按资产名 `dsh-file-review-tab-multi-git-repository-0.3.5.tgz` 上传，并提供文件名对应的 `.sha256`。
 5. 核对标签与资产后，点击 **Publish release**。
 
 界面步骤参考 [GitHub 官方 Release 文档](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)。创建本地 `.tgz` 不会自动创建 Release，推送 Git 提交也不会自动上传安装资产。

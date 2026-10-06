@@ -388,7 +388,7 @@ Search covers recorded code only, with up to 10,000 matches. Highlighting uses a
 
 ### 主要功能
 
-- 在会话顶部管理当前工程的多仓库列表，保存为 `dsh-file-review-repositories.json`。
+- 在会话顶部管理当前工程的多仓库列表，保存为 `dsh-multi-git-repo.json`。
 - 工程内仓库使用相对路径；工程外仓库作为当前会话的临时绝对路径，不写入配置文件。
 - 文件审查按仓库分组，支持文件列表折叠和局部/整轮差异内容展开。
 - 提供上一轮、本会话、待确认及 Git 工作区、暂存区、提交、分支等审查范围。

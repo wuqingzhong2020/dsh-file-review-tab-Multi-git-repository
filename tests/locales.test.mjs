@@ -94,7 +94,7 @@ test('existing diagnostics switch language at render and preserve paths and unkn
     assert.equal(localizeReviewMessage('D:/项目/config.json: Project configuration file changed; reload before saving'), 'D:/项目/config.json: 工程配置文件已发生变化，请重新加载后再保存')
     assert.equal(localizeReviewMessage('Review exceeds 10000 files; select a smaller scope'), '审查文件数超过 10000，请选择更小的范围')
     assert.equal(localizeReviewMessage('repository 3 has no path'), '第 3 个仓库没有路径')
-    assert.equal(localizeReviewMessage('dsh-file-review-repositories.json must be a regular file'), 'dsh-file-review-repositories.json 必须为普通文件')
+    assert.equal(localizeReviewMessage('dsh-multi-git-repo.json must be a regular file'), 'dsh-multi-git-repo.json 必须为普通文件')
     assert.equal(localizeReviewMessage('fatal: custom Git diagnostic'), 'fatal: custom Git diagnostic')
     assert.equal(localizeReviewMessage('File review service is unavailable'), t('remoteUnavailable'))
     host.set('en')

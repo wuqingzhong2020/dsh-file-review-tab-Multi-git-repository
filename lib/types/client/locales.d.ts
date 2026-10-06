@@ -186,7 +186,7 @@ export declare const zh: {
     readonly projectWorking: "处理中…";
     readonly projectName: "项目名称";
     readonly projectConfigFile: "工程配置文件（相对工程目录）";
-    readonly projectInactive: "当前工程没有配置文件（dsh-file-review-repositories.json）。点击上方「生成新配置文件」保存当前列表。";
+    readonly projectInactive: "当前工程没有配置文件（dsh-multi-git-repo.json）。点击上方「生成新配置文件」保存当前列表。";
     readonly projectEnable: "启用多代码仓管理";
     readonly projectDisabledHint: "已停用多代码仓管理，审查将按原有单目录方式进行；保存配置后生效。";
     readonly projectIncludeRoot: "同时审查项目根目录内的文件";

@@ -1,8 +1,8 @@
 # 整体架构与开发接入指南
 
-当前新增目录能力见 [非 Git 目录架构与使用](REPOSITORY_MANAGER.md#配置与界面)。管理、发现与文件归属由共享插件提供，审查侧仅维护业务适配；以下既有链路继续沿用。
+当前新增目录能力见 [使用手册](USER_GUIDE.md)。管理、发现与文件归属由共享插件提供，审查侧仅维护业务适配；以下既有链路继续沿用。
 
-多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.4**。`apply` 注入 `multiGitRepoManagerByWqz`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。审查宿主仅依赖 `ManagedWorkspaceReader` 的两个必需读取方法，源码直接导入管理包正式入口，管理转发文件已移除。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。详见 [公共仓库管理依赖](REPOSITORY_MANAGER.md)。
+多仓库管理已迁移到独立的 **dsh-multi-git-repo-manager 0.1.4**。`apply` 注入 `multiGitRepoManagerByWqz`，`FileReviewService.workspace(agent)` 委托共享服务；管理 Remote、右侧原生管理 Tab 和「开始」页入口由新插件注册。审查宿主仅依赖 `ManagedWorkspaceReader` 的两个必需读取方法，源码直接导入管理包正式入口，管理转发文件已移除。本文后续的多仓库算法说明指新插件实现；新增或修改管理功能应在管理仓库完成。
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
@@ -127,7 +127,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 宿主快照适配 | [snapshot-compat.ts](../src/client/snapshot-compat.ts)、[turn-deliverables.ts](../src/client/turn-deliverables.ts)、[deleted-paths.ts](../src/client/deleted-paths.ts) | 快照形状适配、审查行数据、字面删除路径识别 |
 | 对话审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx)、[produced-files-summary.tsx](../src/client/produced-files-summary.tsx)、[produced-files-toast.tsx](../src/client/produced-files-toast.tsx) | 巡检与撤销流程、文件摘要与深链操作、带自动关闭的结果提示 |
 | Git 页面与加载 | [GitReviewPanel.tsx](../src/client/GitReviewPanel.tsx)、[GitReviewFile.tsx](../src/client/GitReviewFile.tsx)、[git-review-diff-loader.ts](../src/client/git-review-diff-loader.ts) | 范围、仓库筛选与请求生命周期，文件行与差异展示，并发加载队列 |
-| 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、[repository-paths.ts](REPOSITORY_MANAGER.md#只读契约) | 文件所属仓库、组标题、列表折叠和批量内容展开 |
+| 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、`dsh-multi-git-repo-manager/paths` | 文件所属仓库、组标题、列表折叠和批量内容展开 |
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
 | 差异交互与展示 | [use-diff-selection.ts](../src/client/use-diff-selection.ts)、[unified-diff-controls.tsx](../src/client/unified-diff-controls.tsx)、[unified-diff-block.tsx](../src/client/unified-diff-block.tsx) | 选区/菜单生命周期与异步反馈、搜索导航控件、上下文与行窗口展示 |
 | 差异阅读 | [diff-search.ts](../src/client/diff-search.ts)、[diff-navigation.ts](../src/client/diff-navigation.ts)、[diff-highlight.ts](../src/client/diff-highlight.ts)、[DiffCode.tsx](../src/client/DiffCode.tsx) | 原始行搜索、修改块索引、有限语言词法着色与匹配标记 |
@@ -136,7 +136,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 范围引用与外部定位 | [review-reference.ts](../src/client/review-reference.ts)、[review-file-opener.ts](../src/client/review-file-opener.ts)、[review-location.ts](../src/review-location.ts)、[editor-launch.ts](../src/editor-launch.ts) | 完整行范围、来源、磁盘唯一匹配、受限编辑器启动 |
 | 讨论与大文件窗口 | [review-discussions.ts](../src/client/review-discussions.ts)、[VirtualDiffRows.tsx](../src/client/VirtualDiffRows.tsx)、[virtual-diff-model.ts](../src/client/virtual-diff-model.ts) | 持久化请求／轮次关联、已读／解决状态、可变高度渲染 |
 | 确认与显示偏好 | [review-confirmations.ts](../src/client/review-confirmations.ts)、[DiffViewControls.tsx](../src/client/DiffViewControls.tsx)、[diff-view-preferences.ts](../src/client/diff-view-preferences.ts) | 整轮确认、统一/并排布局、自动换行及上下文展开行数设置 |
-| 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、[repository-events.ts](REPOSITORY_MANAGER.md#通知边界) | 深链定位和配置变化通知 |
+| 页面协调 | [deep-link.ts](../src/client/deep-link.ts)、`dsh-multi-git-repo-manager/events` | 深链定位和配置变化通知 |
 | 文案 | [locales.ts](../src/client/locales.ts)、[chat-locales.ts](../src/client/chat-locales.ts)、[use-review-locale.ts](../src/client/use-review-locale.ts)、[message-locales.ts](../src/client/message-locales.ts) | 中英文词典、宿主语言订阅、界面实时刷新及已识别的错误说明翻译 |
 | Desktop 兼容适配 | [patch-desktop-directory-picker.mjs](../scripts/patch-desktop-directory-picker.mjs) | 为特定 Desktop 构建的目录选择桥增加起始目录参数 |
 
@@ -229,7 +229,7 @@ Host 的 `git-review.ts` 使用 `execFile('git', args)` 参数数组调用 Git�
 
 ## 5. 管理契约与业务边界
 
-管理插件统一维护 v2 `dsh-file-review-repositories.json`、Profile 根目录索引、`ManagedProject`、`ManagedWorkspace` 及文件归属；本仓库不解析或保存管理配置。完整接入与通知边界见 [公共管理依赖](REPOSITORY_MANAGER.md)。
+管理插件统一维护 v2 `dsh-multi-git-repo.json`、Profile 根目录索引、`ManagedProject`、`ManagedWorkspace` 及文件归属；本仓库不解析或保存管理配置。
 
 `FileReviewService` 依赖管理包 `/types` 的 `ManagedWorkspaceReader`，必需方法为 `workspace(agent)` 与 `resolveTargetPaths(agent, paths)`。`targets`、`boundaries`、`workspaceRevision` 都是必需字段，缺少归属结果不能以 `roots` 兜底。
 
@@ -443,10 +443,10 @@ pnpm test
 功能验证后，普通打包命令是：
 
 ~~~powershell
-pnpm pack --pack-destination dist
+pnpm test:pack
 ~~~
 
-默认得到 `dist/dsh-file-review-tab-multi-git-repository-0.3.1.tgz`，公开 Release 使用同名资产。同版本本地开发安装可给文件增加唯一后缀；公开发版则使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
+默认在多仓工程根目录 `dist/` 保留`<包名>-<版本>.tgz` 版本归档，并输出字节完全一致的最新副本 `dist/latest/dsh-file-review-tab-multi-git-repository.tgz`，配套 SHA256 与 JSON 索引。从插件目录访问为 `../../dist/`；打包脚本支持 `MRM_DIST_DIR` 指定目标目录。同版本重建覆盖该版本包，升级后保留旧版本；主工程安装入口根据 latest 索引安装版本包并强制刷新本地包缓存，也支持 `--archive` 选择历史版本。公开 Release 使用带版本的约定资产名；公开发版使用新版本号。GitHub Release 上传及市场收录步骤见 [发布指南](RELEASING.md)。
 
 当前 Desktop 使用 `%USERPROFILE%\.dsh\profiles\desktop`。该 Profile 由桌面宿主管理，本地 tgz 安装步骤见 [README 的安装说明](../README.md#安装)，安装后重新加载/重启宿主使 Host 和 Client 使用同一套产物。目录选择起始路径的宿主适配是单独步骤，不随插件包自动修改 Desktop。
 
@@ -521,7 +521,7 @@ aggregate-diff 输出跨仓库、来源／基线明确的操作片段报告，�
 
 pnpm run typecheck / build / test / test:e2e / test:docs / test:pack 是复现入口。浏览器夹具加载真实 lib/client.js 与官方 UI primitives，模拟 Session/Remote/输入／配置服务，不是正在运行的 Desktop。test:docs 验证双语新增章节、白名单、JPEG 与 Host wire；test:pack 生成 tgz、校验导出／声明／资源／社区依赖边界及临时方案排除，附 SHA256。测试用纯 UI 依赖均为开发依赖。
 
-Windows Desktop 的独立双仓库操作验收见 [验证记录](releases/version.md#v031)。`create-desktop-review-workspace.mjs` 只建立系统临时样例，真实截图经 `crop-desktop-guide-images.py` 裁剪后交付；浏览器调试截图写入 `test-results`，不覆盖指南资源。安装同版本新构建需使用内容摘要不同的归档路径，并核对安装产物字节，以免复用包缓存。
+Windows Desktop 的独立双仓库操作验收见 [验证记录](releases/version.md#v031)。`create-desktop-review-workspace.mjs` 只建立系统临时样例，真实截图经 `crop-desktop-guide-images.py` 裁剪后交付；浏览器调试截图写入 `test-results`，不覆盖指南资源。安装同版本覆盖后的新构建需强制刷新本地包缓存，并核对安装产物字节，以免复用包缓存。
 
 侧栏发送的 Session scope 属于宿主 fiber，不能直接访问未在本插件声明注入的 `scope.conversation`。优先使用 Session 的请求身份与提交接口；降级时通过 Cordis `scope.get('conversation')` 解析动态服务。真实 Cordis fiber 与拒绝属性访问的夹具共同覆盖这一约束。
 
