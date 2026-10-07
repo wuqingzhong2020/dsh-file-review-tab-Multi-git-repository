@@ -1,14 +1,14 @@
 # dsh-file-review-tab-multi-git-repository
 
-Git repositories and ordinary directories now share managed targets, discovery and Host admission. See the [user guide](docs/USER_GUIDE.en.md) for filtering and file-scoped confirmation.
+Git repositories and ordinary directories now share managed targets, discovery and Host admission. The target selector adds **Current project directory**, aggregating Git repositories, ordinary directories and undisclosed boundaries inside one project. See the [user guide](docs/USER_GUIDE.en.md) for filtering and file-scoped confirmation.
 
 Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.4](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.4` and uses its shared service for repository scope. Install and enable both plugins; project configuration uses `dsh-multi-git-repo.json` with the v2 schema. See [management and review boundaries](docs/ARCHITECTURE.md#5-管理契约与业务边界).
 
-See the [validation record](docs/releases/version.md#v035) for automated checks, isolated package installation and actual Windows Desktop checks, including their limits.
+See the [validation record](docs/releases/version.md#v035) for the v0.3.5 automated checks, isolated package installation and actual Windows Desktop checks, including their limits; the v0.3.6 target-filter change is described in [its release note](docs/releases/version.md#v036).
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.3.5**.
+Current version: **v0.3.6**.
 
 The Host service and Remote namespace are `multiGitFileReviewByWqz`, using `multiGitRepoManagerByWqz` for shared repository management. Chat dictionaries use `multiGitFileReviewByWqz.chat`, isolating both the original plugin's `fileReview` service and its `file-review` dictionaries. Install the matching package versions. See [namespace isolation](docs/releases/version.md#v034).
 
@@ -34,6 +34,7 @@ Release maintainers should also read the [Public release and plugin marketplace 
 - **End-of-turn review row**: After a turn ends, a row shows the edited file count, additions and deletions, and Undo / Review actions. Clicking Review or an individual filename **opens the sidebar tab through a deep link, expands the relevant file's diff, and scrolls to the top of that turn's group**, instead of opening a full-width drawer. This is a separate entry that coexists with the host's native change card; it does not replace or disable it.
 - **File review sidebar tab**: Lists files changed in the current session, grouped by turn. Expand a file to see a line-by-line red/green diff. Supports undoing a turn, undoing a single file, and reapplying changes. The tab badge updates with the changed file count.
 - **Repository groups and content expansion**: Each group header shows the repository name and changed file count, with repository-relative file paths below it. The icon beside a repository header expands or collapses all file diffs in that repository. The turn header icon controls file contents across all repositories in that turn; in Git scopes, the icon beside the file count controls all currently displayed file contents. Collapsing contents keeps filenames visible. Clicking the repository name or its left arrow hides or shows the entire file list. If some files are already expanded, the icon first expands the rest, then collapses all on the next click. Each action affects only its own scope. Git diffs load on demand and are cached; bulk expansion requests at most four files concurrently.
+- **Current project directory summary**: The target selector adds Current project directory, listing every change inside the current project directory across Git repositories, ordinary directories and undisclosed boundaries. Temporary repositories outside the project are excluded. It works in session and Git scopes; Git scopes aggregate all repositories inside the project, while ordinary directories keep using session records.
 - **GitHub-style diffs**: Old/new line-number columns, red/green change backgrounds, and blue hunk headers. By default, three context lines are kept around each change. The arrow on the left of a blue header reveals N more unchanged lines per click (20 by default). Middle intervals divide N lines between both ends; leading and trailing intervals expand outward from the change. Additional upward/downward double-arrow icons reveal all remaining unchanged lines in the adjacent interval, reaching the beginning or end of the recorded content, or the neighboring change block. An expanded interval keeps a local collapse icon, including after full expansion. Clicking it hides only that interval's expanded unchanged lines, leaving other intervals unchanged. Collapse expanded context restores the default display for all intervals.
 - **Selection references**: Click a line number, then Shift+click on the same side for a contiguous range, or drag-select code from one version side. Right-click inside the selection or press Shift+F10 to copy a complete reference, copy its path and range, add a range comment, navigate externally or clear the selection. Right-clicking outside the range selects that line. References include repository, comparison source, side, revision and start/end lines. Cross-file, mixed-version and missing-history ranges are rejected; quote and adjacent context are each limited to 64 KiB.
 - **External line navigation**: Open selections in the configured external IDE. VS Code is recommended; Antigravity IDE is also supported on Windows. The Host checks the session's permitted repository paths and current disk content before passing a new-version line number. Relocated references require confirmation. Ambiguous matches, old-version lines, deleted files and missing editors display explanations and retain the built-in file viewer.
@@ -59,26 +60,26 @@ Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as 
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.3.5.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.6.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.5.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.6.tgz"
 ```
 
 Maintainers can use `dist/latest/dsh-file-review-tab-multi-git-repository.tgz` or a version archive named `<name>-<version>.tgz` in the aggregate project's root `dist/`; same-version builds replace it and different versions remain available. Both copies contain identical bytes, and the latest JSON index identifies the history archive. These are accessible as `../../dist/` from this plugin directory. Desktop manages the `desktop` Profile; run `python envBuild.py desktop install` from the aggregate project to install latest, or select matching history archives with `--archive`. Restart Desktop after installation so that the Host and browser plugin load the new build. Open the native right sidebar's Start page using ＋, then select Multi-repository management or File Review (Multi-Git).
 
-For a rebuilt package with the same version, the aggregate installer resolves the latest index to the version archive and forces a refresh of the local package cache. Manual installation of a same-version replacement must refresh the cache too, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.5 label alone does not establish that the latest build is loaded.
+For a rebuilt package with the same version, the aggregate installer resolves the latest index to the version archive and forces a refresh of the local package cache. Manual installation of a same-version replacement must refresh the cache too, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.6 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.5/dsh-file-review-tab-multi-git-repository-0.3.5.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.6/dsh-file-review-tab-multi-git-repository-0.3.6.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -103,7 +104,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.5 package has not been published). The bilingual [Release notes](docs/releases/version.md#v035) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.6 package has not been published). The bilingual [Release notes](docs/releases/version.md#v036) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 
@@ -119,7 +120,7 @@ The dropdown beside the File review title defaults to **Last turn**. Available s
 - **Committed**: Changes in a commit relative to its first parent. After selecting a specific repository, choose from its latest 50 commits. All repositories defaults to each repository's latest commit.
 - **Branch**: Committed changes from the merge base with the selected branch to the current HEAD. After selecting a specific repository, choose a local or remote branch. All repositories automatically selects each repository's default branch or another comparable branch. A message is shown when no comparison branch is available.
 
-Git scopes use the project's repository configuration and the current session's temporary repositories. Filter by repository, expand line diffs, or open files in the editor. New, deleted, and renamed files are supported. Binary files, symbolic links, and untracked files larger than 2 MiB display an explanation. Git scopes are read-only: they do not stage, commit, switch branches, or undo changes. Use the refresh action in the upper-right corner to reread disk state.
+Git scopes use the project's repository configuration and the current session's temporary repositories. The target selector offers one repository, All Git repositories, Current project directory, non-Git directories, or Ownership unresolved. Filter by repository, expand line diffs, or open files in the editor. New, deleted, and renamed files are supported. Binary files, symbolic links, and untracked files larger than 2 MiB display an explanation. Git scopes are read-only: they do not stage, commit, switch branches, or undo changes. Use the refresh action in the upper-right corner to reread disk state.
 
 Git context comes from the actual versions in the selected comparison, including the original code for historical commits. PTC / Code Mode can expand the full recorded before/after content. If a historical standard-tool turn recorded only a partial diff, missing content is marked as not recorded; current disk content is never substituted for a historical version. Expanding context does not change the original undo diff or comment anchors. Copy diff still copies the compact diff with three context lines.
 

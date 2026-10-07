@@ -1,14 +1,14 @@
 # dsh-file-review-tab-multi-git-repository
 
-已支持 Git 仓库与非 Git 目录：类型选择、直接子目录发现、v2 配置和 Host 文件归属共用管理服务。普通目录的会话审查与按文件确认见 [使用手册](docs/USER_GUIDE.md)。
+已支持 Git 仓库与非 Git 目录：类型选择、直接子目录发现、v2 配置和 Host 文件归属共用管理服务。仓库筛选新增「当前工程目录」，一次汇总当前工程目录内的 Git 仓库、非 Git 目录和未纳管边界。普通目录的会话审查与按文件确认见 [使用手册](docs/USER_GUIDE.md)。
 
 多仓库管理现已独立到 **[dsh-multi-git-repo-manager v0.1.4](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**。本插件固定依赖 `0.1.4`，并通过共享服务取得仓库范围；管理页面从右侧「开始」页打开为原生 Tab，原会话区管理页签已移除。安装时必须同时安装并启用两个插件；工程配置文件为 `dsh-multi-git-repo.json`。接入说明见 [管理契约与业务边界](docs/ARCHITECTURE.md#5-管理契约与业务边界)。
 
-本轮类型检查、构建、自动测试、双包联装及指定 Desktop 的实际验证见 [实施验证记录](docs/releases/version.md#v035)。
+v0.3.5 的类型检查、构建、自动测试、双包联装及指定 Desktop 的实际验证见 [实施验证记录](docs/releases/version.md#v035)；v0.3.6 的仓库筛选改动见 [本版本说明](docs/releases/version.md#v036)。
 
 [简体中文](README.md) | [English](README.en.md)
 
-当前版本：**v0.3.5**。
+当前版本：**v0.3.6**。
 
 本插件的 Host 服务与 Remote 命名空间为 `multiGitFileReviewByWqz`，使用管理服务 `multiGitRepoManagerByWqz`。聊天字典独立为 `multiGitFileReviewByWqz.chat`，与原版的 `fileReview` 服务和 `file-review` 字典分别隔离。使用配套版本安装包；迁移与验证见 [命名空间隔离](docs/releases/version.md#v034)。
 
@@ -36,6 +36,7 @@
 - **对话尾部审查行**：回合结束出现「已编辑 N 个文件 +M −K / 撤销 / 审查」；点「审查」或单个文件名，**深链打开侧边栏 Tab，自动展开对应文件的 diff 并定位到该轮分组顶部**（不再弹全宽 drawer）。这是与宿主原生改动卡并存的独立列表条目，不会替换或禁用原生改动卡。
 - **侧边栏 Tab「文件审查（多git仓）」**：按轮次分组列出本会话改动文件；点击展开行级红绿 diff；支持撤销本轮 / 单文件撤销 / 重新应用；Tab 角标实时显示改动文件数。
 - **仓库分组与内容展开**：每个仓库只在组标题显示名称和修改文件数，下面列出仓库内的文件路径。仓库标题旁的图标批量展开或收起该仓库内文件的差异内容；轮次标题旁的图标控制该轮全部仓库的文件内容，Git 范围的文件数标题旁图标控制当前显示的全部文件内容。收起内容后仍显示文件名，点击仓库名称或左侧箭头则隐藏、显示整个文件列表。部分文件已展开时，图标先展开剩余内容，再次点击全部收起；操作只影响当前作用范围。Git 差异按需加载并缓存，批量展开最多同时请求 4 个文件。
+- **当前工程目录汇总**：仓库筛选新增「当前工程目录」，一次列出当前工程目录内 Git 仓库、非 Git 目录以及尚未纳管边界的全部改动；工程目录外的临时仓库不计入。会话范围与 Git 范围都可选：Git 范围按工程内全部仓库聚合，非 Git 目录继续使用会话记录。
 - **GitHub 风格差异**：双列新旧行号、红绿改动背景及蓝色差异块标题。默认保留改动附近 3 行上下文，点击蓝色条左侧箭头每次多显示 N 行未修改代码（默认 20）；中间间隔将 N 行分配到两端，首尾间隔从改动处向外展开。蓝色条另有向上、向下双箭头图标，一次展开该方向相邻间隔内的全部未修改代码；首尾展开至记录的开头或结尾，中间展开至相邻修改块。展开后蓝色条保留「收起这段」图标，只收起该间隔的未修改代码；全部展开后仍可点击，其他间隔不受影响。点击「收起展开的上下文」恢复全部间隔的默认显示。
 - **选区引用**：点击行号选择一行，Shift+点击同一侧行号选择连续范围，也可拖选同一版本侧的代码。在选区内右键打开菜单，支持复制完整代码引用、复制路径与范围、添加范围评论、外部行定位和清除选区；也可按 Shift+F10。范围外右键选择该行。引用包含仓库、比较来源、版本侧、修订和起止行；不接受跨文件、混合新旧版本或跨缺失历史片段的选区，引用正文及相邻上下文各限 64 KiB。
 - **外部行定位**：选区可在配置的外部 IDE 中打开，推荐 VS Code，Windows 也支持手动配置 Antigravity IDE。Host 核对当前会话允许的真实仓库路径及磁盘内容，只有新版引用匹配成功才传递行号。位置移动时必须确认，重复匹配、旧版删除行、文件不存在或编辑器缺失时显示原因，并保留内置文件查看入口。
@@ -62,26 +63,26 @@
 
 文件由宿主选择内置查看器；原生预览可能只读，可选编辑器插件可为其接管的格式提供编辑能力。外部 IDE 定位仍可独立使用。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.5.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.6.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.5.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.6.tgz"
 ```
 
 维护者也可以使用多仓主工程 `dist/latest/dsh-file-review-tab-multi-git-repository.tgz` 最新包，或 `dist/` 下按 `<包名>-<版本>.tgz` 保存的版本包；同版本重建会覆盖，升级后保留旧版本；两份副本内容一致，latest JSON 索引记录对应历史包。从本插件目录访问为 `../../dist/`。桌面应用管理 `desktop` Profile，主工程可用 `python envBuild.py desktop install` 安装 latest，或用 `--archive` 指定配套历史包。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；从原生右侧栏「+」打开「开始」页，在其中选择「多代码仓管理」或「文件审查（多git仓）」。
 
-重新构建但版本号未变时，主工程安装入口根据 latest 索引安装版本包并强制刷新本地包缓存。手动安装同版本覆盖包时也需刷新缓存；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.5，并不能单独证明加载了最新构建。
+重新构建但版本号未变时，主工程安装入口根据 latest 索引安装版本包并强制刷新本地包缓存。手动安装同版本覆盖包时也需刷新缓存；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.6，并不能单独证明加载了最新构建。
 
 ### 独立 Web Profile
 
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.5/dsh-file-review-tab-multi-git-repository-0.3.5.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.6/dsh-file-review-tab-multi-git-repository-0.3.6.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -106,7 +107,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.5 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v035) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.6 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v036) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
@@ -122,7 +123,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 - **已提交**：查看某次提交相对其第一父提交的改动。选择具体仓库后，可从最近 50 次提交中选择；全部仓库默认分别查看各自最新提交。
 - **分支**：查看当前 HEAD 相对指定分支共同祖先的已提交差异。选择具体仓库后可选择本地或远程分支；全部仓库分别自动选择默认分支或其他可比较分支。没有比较分支时会提示。
 
-Git 范围沿用当前工程的仓库配置和当前会话临时仓库，可筛选具体仓库、展开逐行差异或在编辑器中打开文件。支持新建、删除、重命名，二进制、符号链接或超过 2 MiB 的未跟踪文件显示说明。Git 范围只读，不执行暂存、提交、切换分支或撤销；点击右上角刷新重新读取磁盘状态。
+Git 范围沿用当前工程的仓库配置和当前会话临时仓库，可筛选具体仓库、「全部 Git 仓库」、「当前工程目录」、非 Git 目录或归属待处理，展开逐行差异或在编辑器中打开文件。支持新建、删除、重命名，二进制、符号链接或超过 2 MiB 的未跟踪文件显示说明。Git 范围只读，不执行暂存、提交、切换分支或撤销；点击右上角刷新重新读取磁盘状态。
 
 Git 范围的上下文来自所选比较的真实版本，查看历史提交时也使用当时的代码。PTC / Code Mode 可展开实际记录的完整 before/after；标准工具的历史轮次若只记录了局部差异，缺失内容显示为「历史记录未包含这些代码」，不会用当前磁盘内容替代历史版本。展开上下文不改变撤销所用的原始差异或评论定位；「复制差异」仍复制带 3 行上下文的精简差异。
 

@@ -88,7 +88,7 @@ Figure 1: Review scope and reading controls appear above changes grouped by turn
 
 ## 3. Choosing a review scope
 
-The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed.
+The target selector separates All Git repositories, All non-Git directories, individual targets and Ownership unresolved; Current project directory merges every Git repository, non-Git directory and unresolved file inside the project root while excluding temporary repositories outside it, and works in both session and Git scopes. Ordinary directories support Last turn, This session and Pending review; the five Git modes are disabled and switching restores the previous session mode. Unmanaged historical files cannot be opened or changed.
 
 Use the dropdown beside the File Review title to choose the changes you want to inspect.
 

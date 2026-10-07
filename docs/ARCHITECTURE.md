@@ -6,7 +6,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.5**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](releases/version.md#v031)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.6**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](releases/version.md#v031)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-管理契约与业务边界)。
 
@@ -127,7 +127,7 @@ CSS Module 通过 lightningcss 转换为带哈希的类名，再注入具有 `da
 | 宿主快照适配 | [snapshot-compat.ts](../src/client/snapshot-compat.ts)、[turn-deliverables.ts](../src/client/turn-deliverables.ts)、[deleted-paths.ts](../src/client/deleted-paths.ts) | 快照形状适配、审查行数据、字面删除路径识别 |
 | 对话审查行 | [ProducedFiles.tsx](../src/client/ProducedFiles.tsx)、[produced-files-summary.tsx](../src/client/produced-files-summary.tsx)、[produced-files-toast.tsx](../src/client/produced-files-toast.tsx) | 巡检与撤销流程、文件摘要与深链操作、带自动关闭的结果提示 |
 | Git 页面与加载 | [GitReviewPanel.tsx](../src/client/GitReviewPanel.tsx)、[GitReviewFile.tsx](../src/client/GitReviewFile.tsx)、[git-review-diff-loader.ts](../src/client/git-review-diff-loader.ts) | 范围、仓库筛选与请求生命周期，文件行与差异展示，并发加载队列 |
-| 仓库分组 | [ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、`dsh-multi-git-repo-manager/paths` | 文件所属仓库、组标题、列表折叠和批量内容展开 |
+| 仓库分组与筛选 | [review-target-selection.ts](../src/client/review-target-selection.ts)、[ReviewRepositoryGroup.tsx](../src/client/ReviewRepositoryGroup.tsx)、[review-repository-groups.ts](../src/client/review-repository-groups.ts)、`dsh-multi-git-repo-manager/paths` | 目标选择契约（单仓库／全部 Git 仓库／当前工程目录／非 Git 目录／归属待处理）、文件所属仓库、组标题、列表折叠和批量内容展开 |
 | 差异显示 | [UnifiedDiff.tsx](../src/client/UnifiedDiff.tsx)、[unified-diff-model.ts](../src/client/unified-diff-model.ts)、[diff-text.ts](../src/client/diff-text.ts) | 行模型、两种布局、上下文展开和复制 |
 | 差异交互与展示 | [use-diff-selection.ts](../src/client/use-diff-selection.ts)、[unified-diff-controls.tsx](../src/client/unified-diff-controls.tsx)、[unified-diff-block.tsx](../src/client/unified-diff-block.tsx) | 选区/菜单生命周期与异步反馈、搜索导航控件、上下文与行窗口展示 |
 | 差异阅读 | [diff-search.ts](../src/client/diff-search.ts)、[diff-navigation.ts](../src/client/diff-navigation.ts)、[diff-highlight.ts](../src/client/diff-highlight.ts)、[DiffCode.tsx](../src/client/DiffCode.tsx) | 原始行搜索、修改块索引、有限语言词法着色与匹配标记 |

@@ -14,7 +14,7 @@ import { useReviewFileOpener } from './review-navigation.tsx'
 import { localizeReviewMessage } from './message-locales.ts'
 import type { ManagedWorkspace } from 'dsh-multi-git-repo-manager/types'
 import { useTargetOwnership } from './use-target-ownership.ts'
-import { ALL_DIRECTORIES, defaultTargetFilter, targetSelection, selectionIncludes, isDirectorySelection } from './review-target-selection.ts'
+import { ALL_DIRECTORIES, PROJECT_DIRECTORY, defaultTargetFilter, gitRepositoryFilter, targetSelection, selectionIncludes, isDirectorySelection } from './review-target-selection.ts'
 import { subscribeRepositories } from 'dsh-multi-git-repo-manager/events'
 import { GitReviewPanel } from './GitReviewPanel.tsx'
 import { ReviewCommentsProvider } from './ReviewComments.tsx'
@@ -67,7 +67,9 @@ interface Notice {
 
 function emptyStateMessage(mode: ReviewMode, repositoryFilter: string): CopyKey {
   const behavior = sessionScopeBehavior(mode)
-  return repositoryFilter === '*' ? behavior.empty : behavior.filteredEmpty
+  // Whole-project selections are not a narrowed filter and keep the scope's own message.
+  const unfiltered = repositoryFilter === '*' || repositoryFilter === PROJECT_DIRECTORY
+  return unfiltered ? behavior.empty : behavior.filteredEmpty
 }
 
 /** The sidebar tab body; all hooks remain unconditional across review scopes. */
@@ -91,7 +93,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   const [repositoryFilter, setRepositoryFilter] = useState('*')
   const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
   const lastSessionMode = useRef<ReviewMode>('session')
-  const selection = targetSelection(repositoryFilter, workspace?.targets ?? [])
+  /** The current project root bounds the whole-project selection. */
+  const projectRoot = workspace?.project?.root ?? workspace?.targets[0]?.path ?? cwd ?? ''
+  const selection = targetSelection(repositoryFilter, workspace?.targets ?? [], projectRoot)
   const directorySelection = isDirectorySelection(selection)
   const isGitMode = isGitReviewMode(reviewMode)
   const scopeBehavior = sessionScopeBehavior(reviewMode)
@@ -135,7 +139,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
             const targets = result.value.targets
             const defaultValue = defaultTargetFilter(targets)
             if (current === '*') return defaultValue
-            if (current === '?' || current === ALL_DIRECTORIES) return current
+            if (current === '?' || current === ALL_DIRECTORIES || current === PROJECT_DIRECTORY) return current
             return targets.some(target => target.path === current && target.state === 'ready') ? current : defaultValue
           })
         }
@@ -162,14 +166,14 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   )
   const filteredTurns = useMemo(() => {
     if (workspace !== null) {
-      const selected = targetSelection(repositoryFilter, workspace.targets)
+      const selected = targetSelection(repositoryFilter, workspace.targets, projectRoot)
       return scopeTurns.map(turn => ({
         ...turn,
         files: turn.files.filter(file => selectionIncludes(selected, ownership.owners.get(file.path))),
       })).filter(turn => turn.files.length > 0)
     }
     return []
-  }, [scopeTurns, repositoryFilter, workspace, ownership.owners])
+  }, [scopeTurns, repositoryFilter, workspace, projectRoot, ownership.owners])
 
   const {
     mainTurns,
@@ -394,6 +398,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
                 setRepositoryFilter(event.target.value)
               }}
             >
+              <option value={PROJECT_DIRECTORY}>{t('repoProject')}</option>
               <option value="*">{t('repoAll')}</option>
               {targets.filter(target => target.kind === 'git')
                 .filter(repo => repo.state === 'ready')
@@ -413,6 +418,9 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
           </div>
         )}
         {directorySelection && <p className={css.pendingHint}>{t('directorySessionOnly')}</p>}
+        {repositoryFilter === PROJECT_DIRECTORY && (
+          <p className={css.pendingHint}>{t('projectDirectoryHint')}</p>
+        )}
         {!isGitMode && confirmationSnapshot.storageError && (
           <div className={`${css.notice} ${css.noticeError}`} role="alert">
             {t('confirmationStorageError')}
@@ -434,7 +442,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
             mode={reviewMode}
             visible={visible}
             tick={tick}
-            repositoryFilter={repositoryFilter}
+            repositoryFilter={gitRepositoryFilter(repositoryFilter)}
           />
         ) : (
           <div className={css.body} ref={bodyRef}>

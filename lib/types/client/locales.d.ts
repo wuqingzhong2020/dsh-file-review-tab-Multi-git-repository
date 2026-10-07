@@ -216,10 +216,12 @@ export declare const zh: {
     readonly repoMissing: "路径不存在";
     readonly repoNotGit: "不是 Git 根目录";
     readonly repoAll: "全部 Git 仓库";
+    readonly repoProject: "当前工程目录";
     readonly unmanagedOperation: "文件归属尚未纳管，无法打开或修改。";
     readonly repoDirectories: "全部非 Git 目录";
     readonly directoryKind: "非 Git 目录";
     readonly directorySessionOnly: "非 Git 目录仅支持最近一轮、会话和待确认审查；Git 比较模式不可用。";
+    readonly projectDirectoryHint: "汇总当前工程目录下的 Git 仓库与非 Git 目录改动；工程目录外的临时仓库不计入。";
     readonly confirmSelectedFiles: "确认当前范围 {count} 个文件";
     readonly repoOther: "归属待处理";
     readonly repoScope: "{name} · {count} 个仓库";

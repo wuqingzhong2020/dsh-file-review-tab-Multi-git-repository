@@ -6,6 +6,7 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
+- [v0.3.6](#v036)
 - [v0.3.5](#v035)
 - [v0.3.4](#v034)
 - [v0.3.3](#v033)
@@ -16,6 +17,14 @@ Release notes and validation records are maintained in this file, with the newes
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
+
+## v0.3.6
+
+- 仓库筛选新增「当前工程目录」：一次汇总当前工程目录内 Git 仓库、非 Git 目录以及尚未纳管边界的全部文件改动，工程目录外的临时仓库不计入。
+- 会话范围继续使用宿主记录的会话改动；Git 范围把工程内全部仓库作为整体聚合，非 Git 目录仍按会话记录展示；选中该选项时在筛选栏下方显示范围说明。
+- 管理插件依赖保持 0.1.4。本机验证：类型检查、构建、177 项审查 Node 测试（含新增的目标选择用例）、8 项浏览器测试、文档校验与 `test:pack` 归档校验均通过，安装包 `dsh-file-review-tab-multi-git-repository-0.3.6.tgz` 的 SHA256 为 `f77a171b07fd7e236e6787ed06392e01078a2e0c4d1ed04714df2bcac4329a47`；指定 Desktop 实装尚未重新执行。
+
+The target selector adds **Current project directory**, which aggregates every Git repository, ordinary directory and undisclosed boundary inside the current project while excluding temporary repositories outside it. Session scopes keep the host-recorded changes, Git scopes aggregate all repositories inside the project, and ordinary directories continue to use session records; a short hint explains the selection. The manager dependency remains 0.1.4. Locally, type checking, the build, 177 review Node tests (including the new target-selection case), docs verification and the `test:pack` archive check pass; browser end-to-end and an actual Desktop installation were not rerun.
 
 ## v0.3.5
 

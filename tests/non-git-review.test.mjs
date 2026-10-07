@@ -8,7 +8,13 @@ import { Context } from '@deepseek-ai/cordis'
 import { MultiGitRepoManager, writeProjectFile, previewProject } from 'dsh-multi-git-repo-manager'
 import { FileReviewService } from '../lib/index.js'
 import { gitReview, gitReviewDiff } from '../src/git-review.ts'
-import { selectionIncludes, targetSelection } from '../src/client/review-target-selection.ts'
+import {
+  PROJECT_DIRECTORY,
+  gitRepositoryFilter,
+  isDirectorySelection,
+  selectionIncludes,
+  targetSelection,
+} from '../src/client/review-target-selection.ts'
 
 const root = await mkdtemp(join(tmpdir(), 'dsh-plain-review-'))
 after(async () => { assert.ok(relative(tmpdir(), root).startsWith('dsh-plain-review-')); await rm(root, { recursive: true, force: true }) })
@@ -48,4 +54,17 @@ test('all Git and all directory selections use the same Host ownership and never
   const owners = await manager.resolveTargetPaths(agent, ['file.txt', 'local/file.txt', 'project/unknown/file.txt'])
   for (const [value, expected] of [['*', [true, false, false]], ['@directories', [false, true, false]], ['?', [false, false, true]], [plain, [false, true, false]]])
     assert.deepEqual(owners.map(owner => selectionIncludes(targetSelection(value, workspace.targets), owner)), expected)
+})
+
+test('the current project directory selection aggregates Git, directory and undisclosed files inside the root', async () => {
+  const workspace = await manager.workspace(agent)
+  const outside = join(root, '..', 'outside-project.txt')
+  const owners = await manager.resolveTargetPaths(agent, ['file.txt', 'local/file.txt', 'project/unknown/file.txt', outside])
+  const project = targetSelection(PROJECT_DIRECTORY, workspace.targets, workspace.project.root)
+  assert.deepEqual(owners.map(owner => selectionIncludes(project, owner)), [true, true, true, false])
+  // A whole-project selection still allows Git comparisons and keeps every Git repository.
+  assert.equal(isDirectorySelection(project), false)
+  assert.equal(gitRepositoryFilter(PROJECT_DIRECTORY), '*')
+  assert.equal(gitRepositoryFilter(plain), plain)
+  assert.equal(selectionIncludes(project, undefined), false)
 })
