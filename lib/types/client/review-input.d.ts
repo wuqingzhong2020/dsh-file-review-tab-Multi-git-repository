@@ -1,4 +1,3 @@
-/** Official reference codec + session admission tracking, with no draft replacement. */
 import type { Context } from '@deepseek-ai/cordis';
 import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client';
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client';

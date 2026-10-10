@@ -6,7 +6,7 @@
 
 本文面向首次接手工程的开发人员，说明当前实现的模块边界、数据流、状态存储和修改入口。功能使用说明见 [README](../README.md)。
 
-文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.6**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](releases/version.md#v031)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
+文档基线：插件 `dsh-file-review-tab-multi-git-repository` **v0.3.7**；目标 DSH 正式接口 **>=0.2.0**，实测 RC **0.2.0-rc.2**，实际平台边界见 [验证记录](releases/version.md#v031)；文件审查直接接入原生右侧栏，第三方侧栏可选。本文按当前源码整理；宿主接口或数据模型变化时，应同步更新本文。目录名中的 `Multi` 大小写不等于 npm 包名，注册和发布时以 [package.json](../package.json) 中的名称为准。
 
 阅读导航：先看 [运行架构](#2-运行架构与加载方式) 和 [代码地图](#3-代码地图)；接入功能开发看 [工作流程与修改入口](#10-新开发者的工作流程)；涉及仓库范围时先看 [配置生命周期](#5-管理契约与业务边界)。
 
@@ -350,10 +350,7 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 | 可信标准／PTC 文件图像 | 官方 tool/result 与 tool/ptc-dispatch | 会话/root/sub-call 校验；最近 4000 条、16 MiB，超限说明 |
 | 旧 PTC 兼容补录 | Host recordLog | 最多 4000 条；重载后丢失，不授权新建文件删除 |
 | 临时外部仓库 | Host `temporaryRepositories` | 当前 Agent/会话内有效，Host 重启后丢失 |
-| 评论草稿 | localStorage 的 `…:comments:<sessionId>` | 按会话持久化 |
-| 已提交意见／讨论 | localStorage 的 `…:discussions:<sessionId>` | 按会话保存请求／轮次、答复、已读／解决状态 |
-| 轮次确认 | localStorage 的 `…:confirmations:<sessionId>` | 按会话持久化 |
-| 归档展开状态 | localStorage 的 `…:archive:<sessionId>` | 按会话持久化，兼容旧前缀迁移 |
+| 评论、讨论、确认、归档与重置水位 | localStorage 的 `…:review-state:<sessionId>` | 单一权威键，按会话保存四个 slice、generation/revision 和 reset 元数据；兼容旧分散键迁移 |
 | 布局、换行、Dock／adaptive／foldMessages | 本插件 Profile reviewSettings | 官方权威值；无损迁移缺少的便携字段，本地降级 |
 | 上下文、外观、编辑器路径、快捷键与讨论／虚拟化 | localStorage 的 `…:diff-view` | 本机偏好，不上传到 Profile |
 | 文件内容、仓库列表、上下文展开 | React/组件内存 | 页面状态，不写工程 JSON |
@@ -366,6 +363,18 @@ Host 相对自身模块定位随包安装的 `docs/USER_GUIDE.md` / `docs/USER_G
 确认记录使用整轮文件差异的修订标识。只能确认已完成且有改动的轮次；该轮后续补录或改变差异，修订标识变化后自动重新进入「待确认」。撤销、Git 状态与确认记录分别处理。
 
 客户端直接订阅管理包 `/events` 通知通道，在独立浏览器 bundle 间共享，不是跨进程文件监听器；手工修改 JSON 后通过「重新加载已保存配置」读取。`deep-link.ts` 按会话保存最新跳转目标，以 nonce 区分重复点击，完成滚动后消费；定位归档轮次时自动打开归档并加载所需页。`sidebar-navigation.ts` 检查顶层控制器的当前会话，审查正文则通过自己的 `tab.actions.openResource` 打开文件；统一导航 Provider 供文件头和选区菜单使用，避免异步操作误打开到其他会话。
+
+### 8.1 会话审查重置
+
+`review-session-state.ts` 提供每会话的单一权威状态。首次加载在状态锁内迁移旧 comments/discussions/confirmations/archive 键及旧 archive 前缀：先保存并验证新值，再移除旧键。数据损坏或清理失败禁用重置，保留可用数据，不以空数据覆盖损坏记录。四个 store 通过 slice adapter 订阅同一快照；常规保存合并条目及实际变更字段，失败保留内存和待重试写入。
+
+重置在共享 activity 锁的独占许可与状态写锁内执行：再次核对 generation 和当前会话空闲状态，以一次 `setItem` 原子写入新的 generation、reset 元数据和四个空 slice，持久化成功后发布。评论发送／重发、输入引用序列化至入轮／中止、文件撤销／重新应用持有共享 activity 许可；重置不等待活动许可，冲突即失败。所有写入重读权威值并按 generation 拒绝旧窗口／旧队列回写。缺少持久化或 Web Locks 时保留普通审查的内存回退，但禁止重置。
+
+`review-reset.ts` 从官方 Session eventSource 中仅取 durable `type=event` 的整数 `event.seq` 最大值，忽略 transient。提交时读取最新 Session、权威 Inbox 的 next-turn/next-step 队列及 Conversation 运行状态，禁止运行中、待提交或历史不明时重置。它不调用修改宿主历史或文件的接口，也不增加 Host 协议。
+
+`session-changes.ts` 在聚合前排除 seq 不超过水位的 accepted 节点；补录数据按通过该水位的 rootCallId 过滤，保持原始 before/after 和宿主轮次身份。`use-file-review-conversation.ts` 通过 `loadThrough(boundarySeq)` 补齐覆盖水位的官方连续窗口，等待所有相关补录结果后只持久化一次首个有改动的 baseHostTurn。展示编号为 hostTurn − baseHostTurn + 1；评论标签和复制报告使用展示编号，RPC、确认、撤销身份仍使用原始宿主轮次。
+
+状态同步监听随插件注册／卸载统一管理，同窗口订阅及跨窗口 storage/focus 事件更新正文、Dock 和原生标题角标。generation 变化清理局部展开、编辑、分页、状态缓存及深链；旧异步结果不回写。历史文件卡保留摘要并禁用旧记录操作，旧输入评论批次失效，保留输入正文和其他附件。Git 比较仍读取当前 Git 状态。
 
 ## 9. 文件写入边界与性能约束
 

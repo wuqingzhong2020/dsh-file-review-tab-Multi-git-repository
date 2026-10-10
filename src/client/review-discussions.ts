@@ -33,9 +33,13 @@ export interface ReviewDiscussion {
   readonly replies: readonly DiscussionReply[]
   readonly readSeq: number
   readonly resolved: readonly string[]
+  /** Host error code (or message) recorded when the last submission did not go through. */
+  readonly error?: string | undefined
 }
 
 interface DiscussionStorage {
+  subscribe?(listener: () => void): () => void
+  hasError?(): boolean
   getItem(key: string): string | null
   setItem(key: string, value: string): void
 }
@@ -64,8 +68,15 @@ const ADMITTED_STATES: readonly DiscussionState[] = [
   'cancelled',
 ]
 
+const RETRYABLE_STATES: readonly DiscussionState[] = ['failed', 'unknown']
+
 export function isAdmittedDiscussionState(state: DiscussionState): boolean {
   return ADMITTED_STATES.includes(state)
+}
+
+/** Failed and uncertain batches can be resent; admitted batches already reached the turn queue. */
+export function isRetryableDiscussionState(state: DiscussionState): boolean {
+  return RETRYABLE_STATES.includes(state)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -118,6 +129,8 @@ export function parseReviewDiscussions(raw: string): readonly ReviewDiscussion[]
     }
     if (entry.parentId !== undefined && typeof entry.parentId !== 'string')
       throw new Error('Invalid parent discussion')
+    if (entry.error !== undefined && typeof entry.error !== 'string')
+      throw new Error('Invalid discussion error')
     // Keep persisted extra fields; in-flight sends reopen as uncertain after a restart.
     return {
       ...entry,
@@ -142,6 +155,15 @@ export class ReviewDiscussionStore {
     } catch {
       this.snapshot = { records: [], storageError: true }
     }
+    storage?.subscribe?.(() => {
+      try {
+        const records = parseReviewDiscussions(storage.getItem(key) ?? '{"version":1,"records":[]}')
+        // Live in-flight records retain their state; restart normalization is only for construction.
+        const live = JSON.parse(storage.getItem(key) ?? '{"records":[]}').records as ReviewDiscussion[]
+        this.snapshot = { records: records.map((record, i) => ({ ...record, state: live[i]!.state })), storageError: storage.hasError?.() ?? false }
+      } catch { this.snapshot = { ...this.snapshot, storageError: true } }
+      for (const listener of this.listeners) listener()
+    })
   }
 
   getSnapshot = (): DiscussionSnapshot => this.snapshot
@@ -185,15 +207,29 @@ export class ReviewDiscussionStore {
     return id
   }
 
-  settle(id: string, state: DiscussionState): void {
+  settle(id: string, state: DiscussionState, error?: string): void {
     this.publish(
       this.snapshot.records.map(discussion => {
         const canSettle =
           discussion.id === id &&
           (discussion.state === 'submitting' || discussion.state === 'unknown')
-        return canSettle ? { ...discussion, state } : discussion
+        return canSettle ? { ...discussion, state, error } : discussion
       }),
     )
+  }
+
+  /** Reuse a failed or uncertain discussion for a resend, under a fresh request identity. */
+  reopen(id: string, requestId: string): string {
+    let reopened = false
+    this.publish(
+      this.snapshot.records.map(discussion => {
+        if (discussion.id !== id || !isRetryableDiscussionState(discussion.state)) return discussion
+        reopened = true
+        return { ...discussion, requestId, state: 'submitting' as const, error: undefined }
+      }),
+    )
+    if (!reopened) throw new Error('Review discussion is not retryable')
+    return id
   }
 
   read(id: string): void {

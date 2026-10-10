@@ -14,6 +14,7 @@ interface FileReviewActionState {
 interface FileReviewActionOptions {
     readonly sessions: ISessions;
     readonly sessionId: string;
+    readonly generation: string;
     readonly visible: boolean;
     readonly isGitMode: boolean;
     readonly flat: readonly FlatChange[];
@@ -24,7 +25,7 @@ interface FileReviewActionOptions {
     readonly state: FileReviewActionState;
 }
 /** Inspect displayed changes and serialize per-turn/per-file undo and redo. */
-export declare function useFileReviewActions({ sessions, sessionId, visible, isGitMode, flat, inspectable, flatKey, tick, showNotice, state, }: FileReviewActionOptions): {
+export declare function useFileReviewActions({ sessions, sessionId, generation, visible, isGitMode, flat, inspectable, flatKey, tick, showNotice, state, }: FileReviewActionOptions): {
     states: ReadonlyMap<string, FileReviewFileState>;
     statusPending: boolean;
     busyKey: string | null;

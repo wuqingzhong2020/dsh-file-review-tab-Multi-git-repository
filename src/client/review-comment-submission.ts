@@ -1,3 +1,4 @@
+import { reviewStateFor } from './review-session-state.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import { formatReviewComments, type ReviewComment } from './review-comments.ts'
 import { ReviewSendFailure, sendReviewComments } from './review-comments-send.ts'
@@ -49,16 +50,19 @@ interface ReviewSubmissionOptions {
   discussions: readonly ReviewDiscussion[]
   discussionStore: ReviewDiscussionStore
   discussionEnabled: boolean
+  /** Resend an existing failed/uncertain batch instead of opening a new discussion. */
+  resubmitId?: string | undefined
 }
 
 /** Persist request identity before sending so late admission can acknowledge the right drafts. */
-export async function submitReviewCommentBatch({
+async function sendReviewCommentBatch({
   ctx,
   sessionId,
   comments,
   discussions,
   discussionStore,
   discussionEnabled,
+  resubmitId,
 }: ReviewSubmissionOptions): Promise<void> {
   const message = serializeReviewPacket({
     package: REVIEW_PACKET_PACKAGE,
@@ -71,7 +75,10 @@ export async function submitReviewCommentBatch({
   let discussionId: string | undefined
   const prepare = discussionEnabled
     ? (requestId: string) => {
-        discussionId = discussionStore.begin(comments, requestId, comments[0]?.discussionId)
+        discussionId =
+          resubmitId === undefined
+            ? discussionStore.begin(comments, requestId, comments[0]?.discussionId)
+            : discussionStore.reopen(resubmitId, requestId)
       }
     : undefined
 
@@ -91,8 +98,27 @@ export async function submitReviewCommentBatch({
     if (admitted && isAdmittedDiscussionState(admitted.state)) return
     if (discussionId) {
       const definiteFailure = cause instanceof ReviewSendFailure && !cause.uncertain
-      discussionStore.settle(discussionId, definiteFailure ? 'failed' : 'unknown')
+      discussionStore.settle(
+        discussionId,
+        definiteFailure ? 'failed' : 'unknown',
+        submissionError(cause),
+      )
     }
     throw cause
   }
+}
+
+/** Host rejection code, or the transport message when the send never reached the gateway. */
+function submissionError(cause: unknown): string {
+  if (cause instanceof ReviewSendFailure) return cause.code
+  return cause instanceof Error ? cause.message : String(cause)
+}
+
+/** Shared activity permission prevents reset from overlapping admission or resend. */
+export async function submitReviewCommentBatch(options: ReviewSubmissionOptions): Promise<void> {
+  const state = reviewStateFor(options.sessionId)
+  const generation = state.getSnapshot().generation
+  if (options.comments.some(comment => comment.anchor.generation !== undefined && comment.anchor.generation !== generation))
+    throw new Error(t('reviewResetTargetGone'))
+  return state.runActivity(generation, () => sendReviewCommentBatch(options))
 }

@@ -292,6 +292,7 @@ export declare const zh: {
     readonly discussionRead: string;
     readonly discussionReply: string;
     readonly discussionRetry: string;
+    readonly discussionFailureReason: string;
     readonly discussionResponse: string;
     readonly discussionInterrupted: string;
     readonly discussionReadOriginal: string;
@@ -300,6 +301,18 @@ export declare const zh: {
     readonly referenceRelocateApply: string;
     readonly referenceExact: string;
     readonly referenceHistorical: string;
+    readonly reviewReset: "重置";
+    readonly reviewResetTitle: "重置本会话的文件审查？";
+    readonly reviewResetBody: "将隐藏此前的会话审查改动，并永久删除本会话各审查范围的本地讨论记录、评论草稿与确认状态，无法撤销。已发送的意见和回复、会话对话历史及工作区文件不受影响。新改动从第 1 轮开始。";
+    readonly reviewResetConfirm: "确认重置";
+    readonly reviewResetCancel: "取消";
+    readonly reviewResetDone: "已重置；新改动从第 1 轮开始";
+    readonly reviewResetBusy: "请等待会话与审查操作结束后再重置";
+    readonly reviewResetNotReady: "审查数据尚未就绪，暂时无法重置";
+    readonly reviewResetFailed: "重置未完成，原审查状态保留";
+    readonly reviewResetReload: "重置已保存，请重新加载审查面板";
+    readonly reviewResetTargetGone: "该审查记录已重置";
+    readonly reviewResetStorage: "重置需要可用的本地存储和共享锁；请重新加载后再试。";
     readonly reviewPacketCount: "审查意见 {count} 条";
     readonly reviewAttach: "随输入发送";
     readonly reviewClear: "清空待提交意见";

@@ -1,3 +1,4 @@
+import type { SetStateAction } from 'react';
 import { type TurnFileChanges } from './session-changes.ts';
 import type { ReviewMode } from './file-review-model.ts';
 /** Pending queues page newest-first; other session scopes use a saved archive. */
@@ -9,7 +10,7 @@ export declare function useFileReviewArchive(sessionId: string, filteredTurns: r
     pendingRemaining: number;
     archivedRemaining: number;
     archiveOpen: boolean;
-    setArchiveOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-    setArchivePages: import("react").Dispatch<import("react").SetStateAction<number>>;
+    setArchiveOpen: (value: SetStateAction<boolean>) => void;
+    setArchivePages: (value: SetStateAction<number>) => void;
 };
 //# sourceMappingURL=use-file-review-archive.d.ts.map

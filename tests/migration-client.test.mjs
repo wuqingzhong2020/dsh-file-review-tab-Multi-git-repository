@@ -79,7 +79,7 @@ test('trusted merging replaces the matching call without hiding uncaptured same-
 
 test('failed program roots still fetch independently accepted nested records', () => {
   const roots = deriveSessionRoots({ nodes: [{ kind: 'tool-result', callId: 'failed-program', seq: 1, isError: true }], turnEnds: new Map([[1, 2]]), partial: null, runningCalls: [] })
-  assert.deepEqual(roots, [{ rootCallId: 'failed-program', turn: 1, live: false }])
+  assert.deepEqual(roots, [{ rootCallId: 'failed-program', turn: 1, live: false, seq: 1 }])
 })
 
 function profileFixture({ writable = true, user, base, fail = false } = {}) {

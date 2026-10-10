@@ -11,6 +11,8 @@ import type { NS } from './chat-locales.ts';
 /** Matched file reviews plus the opener and locale supplied by the turn-tail slot. */
 export type ProducedFilesProps = Pick<TurnTailOwnerProps, 'openFile' | 'turn'> & {
     matched: readonly ProducedFileReview[];
+    reviewSessionId?: string | undefined;
+    sourceSeq?: number | undefined;
     /** Session workspace root (reserved; the chat card shows tool paths verbatim). */
     projectRoot?: string | undefined;
     inspectChanges?: (request: FileReviewRequest) => Promise<FileReviewResult>;
@@ -24,5 +26,5 @@ export type ProducedFilesProps = Pick<TurnTailOwnerProps, 'openFile' | 'turn'> &
     openInSidebarTab?: (paths: readonly string[], turn?: number) => void;
 } & PropsLocale<typeof NS>;
 /** Render one turn's produced files as a summary card opening the sidebar tab. */
-export declare function ProducedFiles({ matched: reviews, openFile, turn: turnLocation, inspectChanges, applyChanges, openInSidebarTab, t, }: ProducedFilesProps): import("react").JSX.Element;
+export declare function ProducedFiles({ matched: reviews, reviewSessionId, sourceSeq, openFile, turn: turnLocation, inspectChanges, applyChanges, openInSidebarTab, t, }: ProducedFilesProps): import("react").JSX.Element;
 //# sourceMappingURL=ProducedFiles.d.ts.map

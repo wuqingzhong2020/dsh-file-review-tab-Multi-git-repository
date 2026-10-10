@@ -4,7 +4,8 @@
  * inspection and undo/redo requests keep the original reversible diff data.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { reviewStateFor } from './review-session-state.ts'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { FileReviewAction, FileReviewRequest, FileReviewResult } from '../change-types.ts'
@@ -21,6 +22,8 @@ import { ResultToast, type NoticeFile, type ToggleNotice } from './produced-file
 /** Matched file reviews plus the opener and locale supplied by the turn-tail slot. */
 export type ProducedFilesProps = Pick<TurnTailOwnerProps, 'openFile' | 'turn'> & {
   matched: readonly ProducedFileReview[]
+  reviewSessionId?: string | undefined
+  sourceSeq?: number | undefined
   /** Session workspace root (reserved; the chat card shows tool paths verbatim). */
   projectRoot?: string | undefined
   inspectChanges?: (request: FileReviewRequest) => Promise<FileReviewResult>
@@ -52,6 +55,8 @@ function noticeDescription(notice: ToggleNotice, t: ProducedFilesProps['t']): st
 /** Render one turn's produced files as a summary card opening the sidebar tab. */
 export function ProducedFiles({
   matched: reviews,
+  reviewSessionId,
+  sourceSeq,
   openFile,
   turn: turnLocation,
   inspectChanges = unavailableChanges,
@@ -60,6 +65,9 @@ export function ProducedFiles({
   t,
 }: ProducedFilesProps) {
   useReviewLocale()
+  const reviewStore = useMemo(() => reviewStateFor(reviewSessionId ?? '__unbound-card'), [reviewSessionId])
+  const reviewState = useSyncExternalStore(reviewStore.subscribe, reviewStore.getSnapshot, reviewStore.getSnapshot)
+  const retired = !!reviewSessionId && reviewState.reset !== null && (sourceSeq === undefined || sourceSeq <= reviewState.reset.boundarySeq)
   // The owning turn number (TurnLocation.turn) rides every deep link so the
   // sidebar tab expands this turn's rows only.
   const turnNumber = turnLocation.turn
@@ -69,6 +77,12 @@ export function ProducedFiles({
   const [toast, setToast] = useState<ToggleNotice | null>(null)
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const toastSeqRef = useRef(0)
+  useEffect(() => {
+    setToggleAction('undo')
+    setTogglePending(false)
+    setToast(null)
+    setNavigationError(null)
+  }, [reviewState.generation])
 
   const reviewsWithStats = useMemo(
     () =>
@@ -122,6 +136,7 @@ export function ProducedFiles({
   )
 
   useEffect(() => {
+    if (retired) { setStatusPending(false); return }
     let active = true
     setStatusPending(true)
     void inspectChanges({ action: 'undo', files: toggleFiles })
@@ -144,14 +159,15 @@ export function ProducedFiles({
     return () => {
       active = false
     }
-  }, [inspectChanges, reversiblePaths, toggleFiles])
+  }, [inspectChanges, reversiblePaths, toggleFiles, retired, reviewState.generation])
 
   const runToggle = useCallback(() => {
-    if (statusPending || togglePending || !hasReversibleFiles) return
+    if (retired || statusPending || togglePending || !hasReversibleFiles) return
     const action = toggleAction
     setTogglePending(true)
-    void applyChanges({ action, files: toggleFiles })
+    void reviewStore.runActivity(reviewState.generation, () => applyChanges({ action, files: toggleFiles }))
       .then(result => {
+        if (reviewStore.getSnapshot().generation !== reviewState.generation) return
         setToggleAction(phaseForResult(result, action))
         const targetState = action === 'undo' ? 'undone' : 'applied'
         const byPath = new Map(result.files.map(file => [file.path, file]))
@@ -179,6 +195,7 @@ export function ProducedFiles({
         })
       })
       .catch((error: unknown) => {
+        if (reviewStore.getSnapshot().generation !== reviewState.generation) return
         showToast({
           tone: 'error',
           title: action === 'undo' ? 'produced.undoError' : 'produced.redoError',
@@ -187,10 +204,13 @@ export function ProducedFiles({
         })
       })
       .finally(() => {
-        setTogglePending(false)
+        if (reviewStore.getSnapshot().generation === reviewState.generation) setTogglePending(false)
       })
   }, [
     applyChanges,
+    retired,
+    reviewState.generation,
+    reviewStore,
     hasReversibleFiles,
     phaseForResult,
     showToast,
@@ -208,11 +228,17 @@ export function ProducedFiles({
         totalStats={totalStats}
         allPaths={allPaths}
         hasReversibleFiles={hasReversibleFiles}
-        toggleDisabled={statusPending || togglePending || !hasReversibleFiles}
+        toggleDisabled={retired || statusPending || togglePending || !hasReversibleFiles}
         togglePending={togglePending}
         toggleAction={toggleAction}
         onToggle={runToggle}
         onReview={paths => {
+          reviewStore.reload()
+          const point = reviewStore.getSnapshot().reset
+          if (reviewSessionId && point && (sourceSeq === undefined || sourceSeq <= point.boundarySeq)) {
+            setNavigationError(reviewText('reviewResetTargetGone'))
+            return
+          }
           setNavigationError(null)
           try { openInSidebarTab?.(paths, turnNumber) }
           catch (error) {
@@ -223,6 +249,7 @@ export function ProducedFiles({
         t={t}
       />
 
+      {retired && <p role="status">{reviewText('reviewResetTargetGone')}</p>}
       {navigationError && <p role="alert">{navigationError}</p>}
 
       {toast !== null && (

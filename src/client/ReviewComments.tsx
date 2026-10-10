@@ -1,6 +1,7 @@
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
+import { reviewStateFor } from './review-session-state.ts'
 import { commentAnchorKey } from './review-comments.ts'
 import {
   ReviewCommentsContext as Comments,
@@ -11,6 +12,7 @@ import {
 } from './review-comment-context.ts'
 import { CommentCard, CommentEditor, DiscussionCard } from './review-comment-components.tsx'
 import { submitReviewCommentBatch } from './review-comment-submission.ts'
+import { isRetryableDiscussionState, type ReviewDiscussion } from './review-discussions.ts'
 import {
   useAdmittedReviewComments,
   useReviewDiscussionEvents,
@@ -51,6 +53,8 @@ export function ReviewCommentsProvider({
   useReviewLocale()
   const store = useMemo(() => commentStoreFor(sessionId), [sessionId])
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const reviewStore = useMemo(() => reviewStateFor(sessionId), [sessionId])
+  const reviewState = useSyncExternalStore(reviewStore.subscribe, reviewStore.getSnapshot, reviewStore.getSnapshot)
   const preferences = useDiffViewPreferences()
   const discussionStore = useMemo(() => discussionStoreFor(sessionId), [sessionId])
   const discussions = useSyncExternalStore(
@@ -62,6 +66,14 @@ export function ReviewCommentsProvider({
   const [open, setOpen] = useState(false)
   const [discussionOpen, setDiscussionOpen] = useState(false)
   const [notice, setNotice] = useState<SubmissionNotice | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  useEffect(() => {
+    setComposer(null)
+    setOpen(false)
+    setDiscussionOpen(false)
+    setNotice(null)
+    setResendingId(null)
+  }, [reviewState.generation])
   useReviewDiscussionEvents(ctx, sessionId, discussionStore)
   useAdmittedReviewComments(discussions, store)
 
@@ -80,6 +92,7 @@ export function ReviewCommentsProvider({
 
   const submit = async () => {
     if (composer || snapshot.busy) return
+    const generation = reviewState.generation
     setNotice(null)
     try {
       const sent = await store.submit(comments =>
@@ -92,16 +105,52 @@ export function ReviewCommentsProvider({
           discussionEnabled: preferences.discussionEnabled,
         }),
       )
-      if (sent) {
+      if (sent && reviewStore.getSnapshot().generation === generation) {
         setNotice({ key: 'commentSent' })
         setOpen(false)
       }
     } catch (cause) {
+      if (reviewStore.getSnapshot().generation !== generation) return
       setNotice({
         key: 'commentSendFailed',
         details: cause instanceof Error ? cause.message : String(cause),
       })
     }
+  }
+
+  /** Resend a failed/uncertain batch in place: same opinions, same record, fresh request id. */
+  const resend = (discussion: ReviewDiscussion) => {
+    if (snapshot.busy || resendingId !== null || !isRetryableDiscussionState(discussion.state)) {
+      return
+    }
+    const generation = reviewState.generation
+    setNotice(null)
+    setResendingId(discussion.id)
+    // A retry rewires the record it came from, so history stays on for that record even when
+    // the preference was switched off after the batch had been recorded.
+    void submitReviewCommentBatch({
+      ctx,
+      sessionId,
+      comments: discussion.comments,
+      discussions: discussions.records,
+      discussionStore,
+      discussionEnabled: true,
+      resubmitId: discussion.id,
+    })
+      .then(() => {
+        if (reviewStore.getSnapshot().generation !== generation) return
+        setNotice({ key: 'commentSent' })
+      })
+      .catch((cause: unknown) => {
+        if (reviewStore.getSnapshot().generation !== generation) return
+        setNotice({
+          key: 'commentSendFailed',
+          details: cause instanceof Error ? cause.message : String(cause),
+        })
+      })
+      .finally(() => {
+        if (reviewStore.getSnapshot().generation === generation) setResendingId(null)
+      })
   }
 
   const toggleComments = () => {
@@ -123,6 +172,8 @@ export function ReviewCommentsProvider({
         discussionStore,
         ctx,
         sessionId,
+        resend,
+        resendingId,
       }}
     >
       <div className={css.toolbar}>

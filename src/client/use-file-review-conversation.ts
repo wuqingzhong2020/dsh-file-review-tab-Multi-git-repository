@@ -1,3 +1,5 @@
+import { reviewStateFor } from './review-session-state.ts'
+import { loadReviewHistory, reviewHistoryCovered } from './review-reset.ts'
 import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
@@ -27,6 +29,23 @@ export function useFileReviewConversation(
   visible: boolean,
   tick: number,
 ) {
+  const reviewStore = useMemo(() => reviewStateFor(sessionId), [sessionId])
+  const reviewState = useSyncExternalStore(reviewStore.subscribe, reviewStore.getSnapshot, reviewStore.getSnapshot)
+  const { reset, generation } = reviewState
+  const binding = sessions.binding?.(sessionId as SessionId)
+  const [coverage, setCoverage] = useState('')
+  const [resetError, setResetError] = useState<string | null>(null)
+  const coverageKey = sessionId + ':' + generation
+  useEffect(() => {
+    setResetError(null)
+    if (!reset || !visible || !binding) return
+    let active = true
+    void loadReviewHistory(binding, reset.boundarySeq).then(() => {
+      if (active) setCoverage(coverageKey)
+    }).catch(cause => { if (active) setResetError(String(cause)) })
+    return () => { active = false }
+  }, [binding, visible, generation, sessionId])
+  const covered = !reset || (coverage === coverageKey && !!binding && reviewHistoryCovered(binding, reset.boundarySeq))
   // Live target-neutral Conversation projection for THIS session. DSH 0.2
   // keeps Chat-owned transcript state under the `chat` entry of `views`.
   const uiConversation = (ctx as unknown as { get(name: string): unknown }).get(
@@ -55,10 +74,11 @@ export function useFileReviewConversation(
   // dispatches carry no reuseable views, so each root's file changes are
   // fetched async and merged into the snapshot-derived turns below. The
   // fetch re-arms on the root set (a new run_code turn) or a manual refresh.
-  const roots = useMemo(() => (snapshot === null ? [] : deriveSessionRoots(snapshot)), [snapshot])
+  const roots = useMemo(() => (snapshot === null ? [] : deriveSessionRoots(snapshot, reset)), [snapshot, reset?.boundarySeq, generation])
   const rootsKey = useMemo(() => roots.map(root => root.rootCallId).join('|'), [roots])
   const [recorded, setRecorded] = useState<{
     sessionId: string
+    generation: string
     rootsKey: string
     result: RecordedResult
   } | null>(null)
@@ -76,7 +96,7 @@ export function useFileReviewConversation(
         .recorded({ rootCallIds: roots.map(root => root.rootCallId) })
         .then(result => {
           if (!result.ok || !active) return
-          setRecorded({ sessionId, rootsKey, result: result.value })
+          setRecorded({ sessionId, generation, rootsKey, result: result.value })
         })
         .catch(() => {
           // Transient fetch failure: keep the previous record; the next
@@ -88,15 +108,28 @@ export function useFileReviewConversation(
       window.clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, rootsKey, tick, sessions, sessionId, snapshot])
+  }, [visible, rootsKey, tick, sessions, sessionId, snapshot, generation])
 
-  const currentRecords = recorded?.sessionId === sessionId ? recorded : null
-  const turns = useMemo(
-    () => mergeRecordedTurns(deriveSessionChanges(snapshot), roots, currentRecords?.result.mutations ?? []),
-    [snapshot, roots, currentRecords],
+  const currentRecords = recorded?.sessionId === sessionId && recorded.generation === generation && recorded.rootsKey === rootsKey ? recorded : null
+  const merged = useMemo(
+    () => mergeRecordedTurns(deriveSessionChanges(snapshot, reset, generation), roots, currentRecords?.result.mutations ?? []),
+    [snapshot, roots, currentRecords, reset?.boundarySeq, generation],
   )
-  const ready = snapshot !== null && (roots.length === 0 || currentRecords?.rootsKey === rootsKey)
+  const ready = !reviewState.invalid && covered && snapshot !== null && (roots.length === 0 || currentRecords?.rootsKey === rootsKey)
+  const firstHostTurn = merged[0]?.turn
+  useEffect(() => {
+    if (!visible || !ready || !reset || reset.baseHostTurn !== null || firstHostTurn === undefined) return
+    let active = true
+    void reviewStore.establishBase(generation, firstHostTurn).catch(cause => {
+      if (active) setResetError(String(cause))
+    })
+    return () => { active = false }
+  }, [visible, ready, generation, reset?.baseHostTurn, firstHostTurn, reviewStore])
+  const turns = !reviewState.invalid && covered && (!reset || reset.baseHostTurn !== null) ? merged : []
   return {
+    reviewState,
+    reviewStore,
+    resetError,
     snapshot,
     turns,
     recordedWarnings: currentRecords?.result.warnings ?? [],

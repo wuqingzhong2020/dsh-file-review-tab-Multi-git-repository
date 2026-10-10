@@ -23,8 +23,9 @@ import {
   commentPositionLabel as position,
   discussionStateLabel,
 } from './review-comment-labels.ts'
-import type { ReviewDiscussion } from './review-discussions.ts'
+import { isRetryableDiscussionState, type ReviewDiscussion } from './review-discussions.ts'
 import { referenceRequest, reviewLocation } from './review-file-opener.ts'
+import { displayReviewTurn } from './review-session-state.ts'
 import { t } from './locales.ts'
 import css from './ReviewComments.module.css'
 
@@ -173,7 +174,7 @@ export function CommentCard({
           <small className={css.meta} title={comment.anchor.absolutePath}>
             {comment.anchor.repositoryName} · {comment.anchor.path} ·{' '}
             {commentScopeLabel(comment.anchor.scope)}
-            {comment.anchor.turn === undefined ? '' : ` · ${t('turn', { n: comment.anchor.turn })}`}
+            {comment.anchor.turn === undefined ? '' : ` · ${t('turn', { n: comment.anchor.displayTurn ?? comment.anchor.turn })}`}
           </small>
           {comment.anchor.side !== 'file' && (
             <pre className={css.quote}>{comment.anchor.quote}</pre>
@@ -398,12 +399,14 @@ export function DiscussionCard({
 }) {
   const context = useContext(Comments)
   if (!context) return null
-  const { discussionStore, start, snapshot, ctx, sessionId } = context
+  const { discussionStore, start, snapshot, ctx, sessionId, resend, resendingId } = context
   const comments = anchor
     ? discussion.comments.filter(item => commentMatchesAnchor(item.anchor, anchor))
     : discussion.comments
   const unread = (discussion.replies.at(-1)?.seq ?? 0) > discussion.readSeq
   const stateLabel = discussionStateLabel(discussion.state)
+  const retryable = isRetryableDiscussionState(discussion.state)
+  const resending = resendingId === discussion.id
   const readOriginal = () => {
     const sessions = (ctx as Context & { sessions: ISessions }).sessions
     const session =
@@ -422,11 +425,27 @@ export function DiscussionCard({
         <strong>{stateLabel}</strong>
         <small>
           {discussion.turn
-            ? t('turn', { n: discussion.turn })
+            ? t('turn', { n: displayReviewTurn(sessionId, discussion.turn) })
             : new Date(discussion.createdAt).toLocaleString()}
         </small>
         {unread && <span className={css.unread}>{t('discussionUnread')}</span>}
+        {retryable && (
+          <button
+            type="button"
+            className={css.button}
+            disabled={resending || resendingId !== null || snapshot.busy}
+            title={discussion.state === 'unknown' ? t('discussionUnknown') : undefined}
+            onClick={() => resend(discussion)}
+          >
+            {resending ? t('discussionSubmitting') : t('discussionRetry')}
+          </button>
+        )}
       </div>
+      {retryable && discussion.error && (
+        <p className={css.meta}>
+          {t('discussionFailureReason')}: {discussion.error}
+        </p>
+      )}
       {comments.map(comment => (
         <div key={comment.id} className={css.discussionOpinion}>
           <small className={css.meta}>

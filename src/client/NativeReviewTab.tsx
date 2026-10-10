@@ -1,3 +1,4 @@
+import { reviewStateFor } from './review-session-state.ts'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -61,8 +62,10 @@ export function NativeReviewTitle({ ctx, reviewSessionId: sessionId, sessions }:
   const subscribe = useCallback((notify: () => void) => source?.subscribe(notify) ?? (() => {}), [source])
   const getSnapshot = useCallback(() => source?.getSnapshot() ?? null, [source])
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const reviewStore = useMemo(() => reviewStateFor(sessionId), [sessionId])
+  const review = useSyncExternalStore(reviewStore.subscribe, reviewStore.getSnapshot, reviewStore.getSnapshot)
   // Use actual snapshot revisions, not node counts: a completed tool can update an existing node.
-  const count = useMemo(() => countChangedFiles(splitArchivedTurns(deriveSessionChanges(snapshot)).main), [snapshot])
+  const count = useMemo(() => review.invalid ? 0 : countChangedFiles(splitArchivedTurns(deriveSessionChanges(snapshot, review.reset, review.generation)).main), [snapshot, review.reset, review.generation, review.invalid])
   const title = t('tabTitle')
   return <span title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
     <FileReviewIcon /><span>{title}</span>

@@ -380,6 +380,19 @@ In **Last turn / This session / Pending review**, click **Undo** for a reversibl
 
 These actions restore files on disk. The plugin checks content, permissions and identity, and refuses conflicts. Empty/nonempty creations with complete Host lifecycle records can be removed by Undo and recreated exclusively by Reapply; contiguous create-then-edit records reverse together. Legacy, terminal-deletion and incomplete records do not authorize lifecycle writes. Inspect per-file batch failures; Git scopes stay read-only. See section 17 for restart and budget limits.
 
+### 12.3 Resetting the current session review
+
+1. Wait until the session, queued messages, comment sends, and file operations finish.
+2. Click **Reset** in **Last turn / This session / Pending review**. Git comparison scopes hide the button.
+3. Review the dialog: reset permanently deletes local drafts, submitted opinions and discussions, confirmations, and archive state for every repository in this session, including opinions from Git scopes. The repository filter does not narrow this action.
+4. Choose **Confirm reset**. Cancel, close, or Escape leaves all data unchanged.
+
+Reset cannot be undone. The review list, badge, and input comment summary clear together. Existing feedback references expire; remove and reattach them. Opinions, replies, and file summaries already in conversation history remain. Input prose and other attachments, actual files, Git state, project configuration, reading preferences, and other sessions are preserved. Old file-card review and undo/reapply actions explain that the review was reset.
+
+The next turn with file changes displays as **Turn 1**. Later numbers follow actual session-turn gaps, including turns without file changes. Refresh and restart preserve the starting point; another reset starts over. New changes may appear immediately after a reset.
+
+Hover a disabled button for the reason. Reset requires working local storage, cross-window locks, an idle session, and ready history. A failed reset preserves the old data and shows the reason; retry after the cause is resolved.
+
 ## 13. Long sessions, large files, and special files
 
 - **Earlier turns:** This session initially keeps the latest 5 turns, plus any running turn. Expand **Archived turns (N)** at the bottom and use **Load more** to add 10 turns at a time. Archiving here folds the list without deleting records. Earlier Pending review turns use direct pagination.

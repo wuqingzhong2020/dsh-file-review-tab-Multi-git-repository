@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { type ReviewComment, type ReviewCommentAnchor, type ReviewCommentTarget } from './review-comments.ts';
 import { ReviewCommentsContext as Comments, type CommentComposer as Composer } from './review-comment-context.ts';
-import type { ReviewDiscussion } from './review-discussions.ts';
+import { type ReviewDiscussion } from './review-discussions.ts';
 export declare function CommentEditor(): import("react").JSX.Element | null;
 type CurrentCommentAnchor = (anchor: ReviewCommentAnchor, line: number) => ReviewCommentAnchor | null;
 interface CommentCardProps {

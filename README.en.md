@@ -4,11 +4,11 @@ Git repositories and ordinary directories now share managed targets, discovery a
 
 Repository management now belongs to **[dsh-multi-git-repo-manager v0.1.4](https://github.com/wuqingzhong2020/dsh-multi-git-repo-manager)**. This plugin pins `0.1.4` and uses its shared service for repository scope. Install and enable both plugins; project configuration uses `dsh-multi-git-repo.json` with the v2 schema. See [management and review boundaries](docs/ARCHITECTURE.md#5-管理契约与业务边界).
 
-See the [validation record](docs/releases/version.md#v035) for the v0.3.5 automated checks, isolated package installation and actual Windows Desktop checks, including their limits; the v0.3.6 target-filter change is described in [its release note](docs/releases/version.md#v036).
+See the [validation record](docs/releases/version.md#v035) for the v0.3.5 automated checks, isolated package installation and actual Windows Desktop checks, including their limits; the v0.3.6 target-filter change is described in [its release note](docs/releases/version.md#v036), and the v0.3.7 resend and failure-reason work in [the same file](docs/releases/version.md#v037).
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.3.6**.
+Current version: **v0.3.7**.
 
 The Host service and Remote namespace are `multiGitFileReviewByWqz`, using `multiGitRepoManagerByWqz` for shared repository management. Chat dictionaries use `multiGitFileReviewByWqz.chat`, isolating both the original plugin's `fileReview` service and its `file-review` dictionaries. Install the matching package versions. See [namespace isolation](docs/releases/version.md#v034).
 
@@ -60,26 +60,26 @@ Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as 
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.3.6.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.7.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.6.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.7.tgz"
 ```
 
 Maintainers can use `dist/latest/dsh-file-review-tab-multi-git-repository.tgz` or a version archive named `<name>-<version>.tgz` in the aggregate project's root `dist/`; same-version builds replace it and different versions remain available. Both copies contain identical bytes, and the latest JSON index identifies the history archive. These are accessible as `../../dist/` from this plugin directory. Desktop manages the `desktop` Profile; run `python envBuild.py desktop install` from the aggregate project to install latest, or select matching history archives with `--archive`. Restart Desktop after installation so that the Host and browser plugin load the new build. Open the native right sidebar's Start page using ＋, then select Multi-repository management or File Review (Multi-Git).
 
-For a rebuilt package with the same version, the aggregate installer resolves the latest index to the version archive and forces a refresh of the local package cache. Manual installation of a same-version replacement must refresh the cache too, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.6 label alone does not establish that the latest build is loaded.
+For a rebuilt package with the same version, the aggregate installer resolves the latest index to the version archive and forces a refresh of the local package cache. Manual installation of a same-version replacement must refresh the cache too, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.7 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.6/dsh-file-review-tab-multi-git-repository-0.3.6.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.7/dsh-file-review-tab-multi-git-repository-0.3.7.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -104,9 +104,17 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.6 package has not been published). The bilingual [Release notes](docs/releases/version.md#v036) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.7 package has not been published). The bilingual [Release notes](docs/releases/version.md#v036) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
+
+## Resetting the current session review
+
+Click **Reset** in Last turn, This session, or Pending review, then choose **Confirm reset**. This permanently deletes local drafts, discussions, confirmations, and archive state for every repository in the current session, including feedback added in Git scopes, and hides pre-reset session changes. The current repository filter does not limit the reset; it cannot be undone.
+
+Conversation history, input prose and other attachments, actual files, Git state, project configuration, global preferences, and other sessions are preserved. The first subsequent turn with file changes displays as Turn 1; later numbers follow actual session-turn gaps and survive restart. Historical file cards remain readable, while their old review and undo/reapply actions report the reset. Remove and reattach expired feedback references.
+
+Reset is unavailable during running or queued session work, comment submission, or file operations, and while storage, cross-window locks, or history are unavailable. Failed resets preserve existing data and show the reason. See [user guide 12.3](docs/USER_GUIDE.en.md#123-resetting-the-current-session-review).
 
 ## Switching review scopes
 

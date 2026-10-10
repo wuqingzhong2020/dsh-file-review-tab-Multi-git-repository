@@ -96,7 +96,7 @@ async function clientHarness({ delayed = false, failTitle = false, locale: regis
         if (name === '@deepseek-ai/dsh-client-ui-primitives') return {}
         assert.fail(`Unexpected browser runtime dependency: ${name}`)
       })
-    } } }, console: { ...console, error: (...args) => diagnostics.push(args) }, Map, Set, WeakMap, AbortController,
+    } } }, console: { ...console, error: (...args) => diagnostics.push(args) }, Map, Set, WeakMap, AbortController, queueMicrotask,
   })
   const effects = [], types = new Map(), seats = new Map(), pending = [], listeners = new Set()
   const snapshots = new Map()

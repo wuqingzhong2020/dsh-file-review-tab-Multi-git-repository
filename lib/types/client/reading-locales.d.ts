@@ -64,6 +64,7 @@ export declare const readingZh: {
     discussionRead: string;
     discussionReply: string;
     discussionRetry: string;
+    discussionFailureReason: string;
     discussionResponse: string;
     discussionInterrupted: string;
     discussionReadOriginal: string;

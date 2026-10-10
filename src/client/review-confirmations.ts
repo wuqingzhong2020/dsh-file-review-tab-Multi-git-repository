@@ -1,3 +1,4 @@
+import { reviewStateFor } from './review-session-state.ts'
 import type { SessionFileChange, TurnFileChanges } from './session-changes.ts'
 
 const revisions = new WeakMap<TurnFileChanges, string>()
@@ -52,13 +53,13 @@ export function pendingTurnChanges(turns: readonly TurnFileChanges[], confirmed:
   }).filter(turn => turn.files.length > 0)
 }
 
-interface ConfirmationStorage { getItem(key: string): string | null; setItem(key: string, value: string): void }
+interface ConfirmationStorage { subscribe?(listener: () => void): () => void; hasError?(): boolean; getItem(key: string): string | null; setItem(key: string, value: string): void }
 export interface ReviewConfirmationSnapshot {
   readonly confirmed: ReadonlyMap<number, string>
   readonly storageError: boolean
 }
 
-function parseConfirmations(raw: string): ReadonlyMap<number, string> {
+export function parseConfirmations(raw: string): ReadonlyMap<number, string> {
   const value = JSON.parse(raw) as { version?: unknown; confirmed?: unknown } | null
   if ((value?.version !== 1 && value?.version !== 2) || !Array.isArray(value.confirmed)) throw new Error('Invalid review confirmations')
   const confirmed = new Map<number, string>()
@@ -89,6 +90,12 @@ export class ReviewConfirmationStore {
       const raw = storage?.getItem(key)
       if (raw !== null && raw !== undefined) this.snapshot = { confirmed: parseConfirmations(raw), storageError: false }
     } catch { this.snapshot = { ...this.snapshot, storageError: true } }
+    storage?.subscribe?.(() => {
+      try {
+        this.snapshot = { confirmed: parseConfirmations(storage.getItem(key) ?? '{"version":2,"confirmed":[]}'), storageError: storage.hasError?.() ?? false }
+      } catch { this.snapshot = { ...this.snapshot, storageError: true } }
+      for (const listener of this.listeners) listener()
+    })
   }
   getSnapshot = (): ReviewConfirmationSnapshot => this.snapshot
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
@@ -121,8 +128,7 @@ const stores = new Map<string, ReviewConfirmationStore>()
 export function confirmationStoreFor(sessionId: string): ReviewConfirmationStore {
   let store = stores.get(sessionId)
   if (!store) {
-    let storage: Storage | undefined
-    try { storage = window.localStorage } catch { /* Review decisions remain usable in memory. */ }
+    const storage = reviewStateFor(sessionId).sliceStorage('confirmations')
     store = new ReviewConfirmationStore(storage, `dsh-file-review-tab-multi-git-repository:confirmations:${sessionId}`)
     stores.set(sessionId, store)
   }

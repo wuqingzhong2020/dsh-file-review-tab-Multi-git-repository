@@ -10,8 +10,10 @@ interface ReviewSubmissionOptions {
     discussions: readonly ReviewDiscussion[];
     discussionStore: ReviewDiscussionStore;
     discussionEnabled: boolean;
+    /** Resend an existing failed/uncertain batch instead of opening a new discussion. */
+    resubmitId?: string | undefined;
 }
-/** Persist request identity before sending so late admission can acknowledge the right drafts. */
-export declare function submitReviewCommentBatch({ ctx, sessionId, comments, discussions, discussionStore, discussionEnabled, }: ReviewSubmissionOptions): Promise<void>;
+/** Shared activity permission prevents reset from overlapping admission or resend. */
+export declare function submitReviewCommentBatch(options: ReviewSubmissionOptions): Promise<void>;
 export {};
 //# sourceMappingURL=review-comment-submission.d.ts.map

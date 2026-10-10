@@ -1,4 +1,5 @@
 /** Frozen batches and submission locks, independent of the editor and Dock lifetime. */
+import { reviewStateFor } from './review-session-state.ts'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import { commentStoreFor, discussionStoreFor } from './review-comment-context.ts'
 import { parseReviewPacket, serializeReviewPacket, type ReviewCommentPacket } from './review-comment-packet.ts'
@@ -8,11 +9,13 @@ const PENDING_BATCH_LIMIT = 256
 
 interface Submission {
   removeAbort: () => void
+  releaseActivity?: (() => void) | undefined
   request?: { id: string; discussionId: string }
 }
 
 interface PendingBatch {
   packet: ReviewCommentPacket
+  generation: string
   discussions: ReviewDiscussionStore
   /** Absent while attached; created only after acquiring the shared comment lock. */
   submission?: Submission
@@ -27,6 +30,7 @@ function releaseSubmission(batch: PendingBatch): void {
   if (!submission) return
   delete batch.submission
   submission.removeAbort()
+  submission.releaseActivity?.()
   commentStoreFor(batch.packet.sessionId).release()
 }
 
@@ -61,6 +65,7 @@ export class ReviewInputBatches {
     }
     this.batches.set(reviewBatchReference(packet), {
       packet,
+      generation: reviewStateFor(packet.sessionId).getSnapshot().generation,
       discussions: discussionEnabled
         ? discussionStoreFor(packet.sessionId)
         : new ReviewDiscussionStore(),
@@ -70,7 +75,7 @@ export class ReviewInputBatches {
 
   serialize(ref: string, signal: AbortSignal): string {
     const batch = this.batches.get(ref)
-    if (!batch || batch.submission || signal.aborted) {
+    if (!batch || batch.submission || signal.aborted || batch.generation !== reviewStateFor(batch.packet.sessionId).getSnapshot().generation) {
       throw new Error('Review reference expired; attach the pending comments again')
     }
     const store = commentStoreFor(batch.packet.sessionId)
@@ -86,8 +91,32 @@ export class ReviewInputBatches {
     }
   }
 
+  async serializeAsync(ref: string, signal: AbortSignal): Promise<string> {
+    const batch = this.batches.get(ref)
+    if (!batch) throw new Error('Review reference expired; remove it and attach the pending comments again')
+    const release = await reviewStateFor(batch.packet.sessionId).acquireActivity(batch.generation)
+    try {
+      const text = this.serialize(ref, signal)
+      batch.submission!.releaseActivity = release
+      return text
+    } catch (cause) { release(); throw cause }
+  }
+
+  invalidateSession(sessionId: string): void {
+    let removed = false
+    for (const [ref, batch] of this.batches) {
+      if (batch.packet.sessionId === sessionId && batch.generation !== reviewStateFor(sessionId).getSnapshot().generation) {
+        this.batches.delete(ref)
+        releaseSubmission(batch)
+        removed = true
+      }
+    }
+    if (removed) this.notify()
+  }
+
   /** Admission acknowledges only the frozen comments, preserving edits made after attachment. */
   reconcile(sessionId: string, submissions: readonly PendingSubmission[], entries: readonly unknown[]): void {
+    this.invalidateSession(sessionId)
     const echoes = new Map(submissions.flatMap(submission => {
       const parsed = parseReviewPacket(submission.text)
       return parsed ? [[parsed.packet.batchId, submission] as const] : []

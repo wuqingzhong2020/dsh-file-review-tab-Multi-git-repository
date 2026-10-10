@@ -24,6 +24,9 @@ coverage/
 *.swp
 *.swo
 
+# Temporary planning documents (not part of the deliverable)
+docs/TEMP_*.md
+
 # Operating system files
 .DS_Store
 Thumbs.db

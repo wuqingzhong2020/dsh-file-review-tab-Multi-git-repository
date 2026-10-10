@@ -9,6 +9,9 @@ import { basename, resolveSessionPath, type TurnFileChanges } from './session-ch
 import { summarizeDiffs, type UnifiedDiffStats } from './UnifiedDiff.tsx'
 import { t, type CopyKey } from './locales.ts'
 import { useReviewLocale } from './use-review-locale.ts'
+import { captureReviewBoundary } from './review-reset.ts'
+import { ReviewResetDialog } from './ReviewResetDialog.tsx'
+import { discardFileReviewSeed } from './deep-link.ts'
 import { UserGuideDialog } from './UserGuideTab.tsx'
 import { useReviewFileOpener } from './review-navigation.tsx'
 import { localizeReviewMessage } from './message-locales.ts'
@@ -85,6 +88,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     () => new Set(),
   )
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [resetDialog, setResetDialog] = useState<{ generation: string } | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
   const closeGuide = useCallback(() => setGuideOpen(false), [])
   useEffect(() => { if (!visible) closeGuide() }, [visible, closeGuide])
@@ -152,7 +156,26 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
     }
   }, [sessions, sessionId, visible, tick])
 
-  const { snapshot, turns, ready, recordedWarnings } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
+  const { snapshot, turns, ready, recordedWarnings, reviewState, reviewStore, resetError } = useFileReviewConversation(ctx, sessions, sessionId, visible, tick)
+  const previousGeneration = useRef(reviewState.generation)
+  useEffect(() => {
+    setResetDialog(null)
+    setStates(new Map())
+    setExpanded(new Set())
+    setCollapsedRepositories(new Set())
+    setPendingPages(1)
+    setStatusPending(false)
+    setBusyKey(null)
+    if (previousGeneration.current !== reviewState.generation) discardFileReviewSeed(sessionId)
+    previousGeneration.current = reviewState.generation
+  }, [sessionId, reviewState.generation])
+  useEffect(() => { if (!visible) setResetDialog(null) }, [visible])
+  let resetUnavailable: string | null = null
+  try {
+    if (!ready) resetUnavailable = t('reviewResetNotReady')
+    else if (!reviewStore.canReset()) resetUnavailable = reviewState.error ?? t('reviewResetStorage')
+    else captureReviewBoundary(ctx, sessions, sessionId)
+  } catch (cause) { resetUnavailable = cause instanceof Error ? cause.message : String(cause) }
   const repositories = workspace?.repositories ?? []
   const targets = workspace?.targets ?? []
   const ownership = useTargetOwnership(sessions, sessionId, cwd, visible, workspace, turns)
@@ -224,6 +247,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
 
   const { rowRefs, turnRefs, bodyRef } = useFileReviewDeepLink({
     sessionId,
+    generation: reviewState.generation,
     turns,
     visible,
     ready: ready && ownership.ready,
@@ -255,6 +279,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   const actions = useFileReviewActions({
     sessions,
     sessionId,
+    generation: reviewState.generation,
     visible,
     isGitMode,
     flat,
@@ -359,6 +384,12 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
           {t('userGuide')}
         </button>
         {!isGitMode && flat.length > 0 && <FileReviewStats stats={totalStats} />}
+        {!isGitMode && <button type="button" className={css.button}
+          disabled={resetUnavailable !== null || resetDialog !== null}
+          title={resetUnavailable ?? t('reviewReset')}
+          onClick={() => setResetDialog({ generation: reviewState.generation })}>
+          {t('reviewReset')}
+        </button>}
         <button
           type="button"
           className={css.refreshButton}
@@ -371,6 +402,15 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
           ⟳
         </button>
       </header>
+      {resetDialog && visible && <ReviewResetDialog onClose={() => setResetDialog(null)} onConfirm={async () => {
+        if (!visible || resetDialog.generation !== reviewStore.getSnapshot().generation) throw new Error(t('reviewResetNotReady'))
+        await reviewStore.reset(resetDialog.generation, () => captureReviewBoundary(ctx, sessions, sessionId))
+        discardFileReviewSeed(sessionId)
+        setResetDialog(null)
+        setTick(value => value + 1)
+        showNotice('success', 'reviewResetDone')
+      }} />}
+      {!isGitMode && resetError && <p role="alert" className={css.notice}>{t('reviewResetNotReady')}: {resetError}</p>}
       {guideOpen && visible && <UserGuideDialog ctx={ctx} sessionId={sessionId} onClose={closeGuide} />}
       <ReviewCommentsProvider
         key={sessionId}

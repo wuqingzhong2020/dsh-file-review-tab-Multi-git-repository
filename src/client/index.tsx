@@ -1,3 +1,4 @@
+import { registerReviewStateSynchronization } from './review-session-state.ts'
 import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 /**
  * File-review-tab plugin, browser half: TWO coexisting surfaces over the same
@@ -71,6 +72,7 @@ interface FileReviewRemote {
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
+  ctx.effect(registerReviewStateSynchronization, 'file-review-tab: review state synchronization')
   ctx.effect(() => attachLocale(ctx.locale), 'file-review-tab: follow host language')
   ctx.effect(() => {
     const offZh = ctx.locale.register(LOCALE_NS, 'zh', zh)
@@ -145,6 +147,7 @@ export function apply(ctx: Context): void {
               }
               return {
                 projectRoot,
+                reviewSessionId: sessionId,
                 inspectChanges: (request: FileReviewRequest) => invoke('status', request),
                 applyChanges: (request: FileReviewRequest) => invoke('apply', request),
                 openInSidebarTab: (paths: readonly string[], turn?: number) => {
@@ -158,6 +161,7 @@ export function apply(ctx: Context): void {
             seq,
             openFile,
             projectRoot,
+            reviewSessionId,
             inspectChanges,
             applyChanges,
             openInSidebarTab,
@@ -167,6 +171,8 @@ export function apply(ctx: Context): void {
             return matched === null ? null : (
               <ProducedFiles
                 matched={matched}
+                reviewSessionId={reviewSessionId}
+                sourceSeq={seq}
                 turn={turn}
                 openFile={openFile}
                 projectRoot={projectRoot}

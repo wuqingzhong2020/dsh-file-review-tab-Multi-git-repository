@@ -30,7 +30,9 @@ export interface TurnFileChanges {
     readonly files: readonly SessionFileChange[];
 }
 /** Derive per-turn produced-file changes for one session snapshot. */
-export declare function deriveSessionChanges(snapshot: ConversationSnapshot | null): TurnFileChanges[];
+export declare function deriveSessionChanges(snapshot: ConversationSnapshot | null, reset?: {
+    boundarySeq: number;
+} | null, generation?: string): TurnFileChanges[];
 /** Latest actual conversation turn, including a turn that changed no files. */
 export declare function lastTurnChanges(snapshot: ConversationSnapshot | null, turns: readonly TurnFileChanges[]): readonly TurnFileChanges[];
 /**
@@ -41,12 +43,15 @@ export declare function lastTurnChanges(snapshot: ConversationSnapshot | null, t
  * not survive into the snapshot.
  */
 export interface SessionRoot {
+    readonly seq?: number;
     readonly turn: number;
     readonly live: boolean;
     readonly rootCallId: string;
 }
 /** Settled roots include failed programs whose nested calls were accepted before failure. */
-export declare function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[];
+export declare function deriveSessionRoots(snapshot: ConversationSnapshot, reset?: {
+    boundarySeq: number;
+} | null): SessionRoot[];
 /**
  * Merge Host-recorded Code Mode mutations into the snapshot-derived turns:
  * hunks rebuilt from the full before/after are appended to the owning turn's

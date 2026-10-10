@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { ReviewCommentStore, type ReviewComment, type ReviewCommentAnchor, type ReviewCommentSnapshot } from './review-comments.ts';
-import { ReviewDiscussionStore, type DiscussionSnapshot } from './review-discussions.ts';
+import { ReviewDiscussionStore, type DiscussionSnapshot, type ReviewDiscussion } from './review-discussions.ts';
 export interface CommentComposer {
     anchor: ReviewCommentAnchor;
     id?: string | undefined;
@@ -18,8 +18,13 @@ export interface ReviewCommentsContext {
     discussionStore: ReviewDiscussionStore;
     ctx: Context;
     sessionId: string;
+    /** Resend a failed or uncertain batch, reusing its existing discussion record. */
+    resend: (discussion: ReviewDiscussion) => void;
+    /** Discussion being resent right now, when any. */
+    resendingId: string | null;
 }
 export declare const ReviewCommentsContext: import("react").Context<ReviewCommentsContext | null>;
+/** Missing browser storage still allows drafts and discussions to work in memory. */
 export declare function commentStoreFor(sessionId: string): ReviewCommentStore;
 export declare function discussionStoreFor(sessionId: string): ReviewDiscussionStore;
 //# sourceMappingURL=review-comment-context.d.ts.map

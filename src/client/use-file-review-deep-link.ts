@@ -12,6 +12,7 @@ interface PendingScroll {
 
 interface DeepLinkOptions {
   readonly sessionId: string
+  readonly generation?: string
   readonly turns: readonly TurnFileChanges[]
   readonly visible: boolean
   readonly resolveFilter?: (paths: readonly string[]) => string
@@ -31,6 +32,7 @@ interface DeepLinkOptions {
 /** Replay chat links without replacing the user's expansion or scrolling the sidebar shell. */
 export function useFileReviewDeepLink({
   sessionId,
+  generation,
   turns,
   visible,
   ready,
@@ -133,7 +135,7 @@ export function useFileReviewDeepLink({
       pendingScrollRef.current = null
       setSeed(seed)
     })
-  }, [sessionId])
+  }, [sessionId, generation])
 
   useEffect(() => {
     if (!visible || !ready || !seed || lastSeedNonceRef.current === seed.nonce) return
@@ -184,7 +186,7 @@ export function useFileReviewDeepLink({
     const timer = window.setTimeout(scroll, 150)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, expanded, meta, flatKey, seed, sessionId])
+  }, [visible, expanded, meta, flatKey, seed, sessionId, generation])
 
   return { rowRefs, turnRefs, bodyRef }
 }

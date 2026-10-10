@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { parseArchive, reviewStateFor } from './review-session-state.ts'
+import type { SetStateAction } from 'react'
 import { ARCHIVE_PAGE_TURNS, splitArchivedTurns, type TurnFileChanges } from './session-changes.ts'
 import type { ReviewMode } from './file-review-model.ts'
 import { sessionScopeBehavior } from './review-scope-model.ts'
-
-const ARCHIVE_STORAGE_PREFIX = 'dsh-file-review-tab-multi-git-repository:archive:'
-const LEGACY_ARCHIVE_STORAGE_PREFIX = 'dsh-file-review-tab:archive:'
 
 /** Pending queues page newest-first; other session scopes use a saved archive. */
 export function useFileReviewArchive(
@@ -24,41 +23,18 @@ export function useFileReviewArchive(
     return { main, archived: [] }
   }, [filteredTurns, pendingQueue, pendingPages])
   const pendingRemaining = pendingQueue ? filteredTurns.length - mainTurns.length : 0
-  const [archiveOpen, setArchiveOpen] = useState(false)
-  const [archivePages, setArchivePages] = useState(1)
-  // Archive UI state persists per session, so reopening a long session
-  // doesn't re-mount everything the user already collapsed away.
-  useEffect(() => {
-    try {
-      const storageKey = `${ARCHIVE_STORAGE_PREFIX}${sessionId}`
-      let raw = window.localStorage.getItem(storageKey)
-      if (raw === null) {
-        raw = window.localStorage.getItem(`${LEGACY_ARCHIVE_STORAGE_PREFIX}${sessionId}`)
-        if (raw !== null) window.localStorage.setItem(storageKey, raw)
-      }
-      const parsed =
-        raw === null ? undefined : (JSON.parse(raw) as { open?: unknown; pages?: unknown })
-      setArchiveOpen(parsed?.open === true)
-      setArchivePages(
-        typeof parsed?.pages === 'number' && Number.isInteger(parsed.pages) && parsed.pages >= 1
-          ? parsed.pages
-          : 1,
-      )
-    } catch {
-      setArchiveOpen(false)
-      setArchivePages(1)
-    }
-  }, [sessionId])
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        `${ARCHIVE_STORAGE_PREFIX}${sessionId}`,
-        JSON.stringify({ open: archiveOpen, pages: archivePages }),
-      )
-    } catch {
-      // Storage unavailable (private mode &c.): archive state stays in-memory.
-    }
-  }, [sessionId, archiveOpen, archivePages])
+  const store = useMemo(() => reviewStateFor(sessionId), [sessionId])
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const archive = useMemo(() => parseArchive(state.slices.archive), [state.slices.archive])
+  const archiveOpen = archive.open
+  const archivePages = archive.pages
+  const update = useCallback((field: 'open' | 'pages', value: SetStateAction<boolean> | SetStateAction<number>) => {
+    const current = parseArchive(store.getSnapshot().slices.archive)
+    const next = typeof value === 'function' ? (value as (previous: boolean | number) => boolean | number)(current[field]) : value
+    store.sliceStorage('archive').setItem('', JSON.stringify({ ...current, [field]: next }))
+  }, [store])
+  const setArchiveOpen = useCallback((value: SetStateAction<boolean>) => update('open', value), [update])
+  const setArchivePages = useCallback((value: SetStateAction<number>) => update('pages', value), [update])
   // Collapsed ⇒ nothing from the archive mounts; open ⇒ the loaded pages only.
   const archivedVisible = useMemo(
     () => (archiveOpen ? archivedTurns.slice(0, archivePages * ARCHIVE_PAGE_TURNS) : []),

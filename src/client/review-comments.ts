@@ -6,6 +6,8 @@ export type CommentScope = ReviewMode
 export interface ReviewCommentTarget {
   readonly scope: CommentScope
   readonly turn?: number | undefined
+  readonly displayTurn?: number | undefined
+  readonly generation?: string | undefined
   readonly repository: string
   readonly repositoryName: string
   readonly path: string
@@ -50,6 +52,7 @@ export function commentFileKey(target: ReviewCommentTarget): string {
     pathKey(target.absolutePath),
     source,
     target.ref ?? '',
+    ...(target.generation && target.generation !== 'initial' ? [target.generation] : []),
   ])
 }
 export function commentAnchorKey(anchor: ReviewCommentAnchor): string {
@@ -190,9 +193,10 @@ export function parseReviewComments(raw: string): readonly ReviewComment[] {
         anchor.endLine < Number(anchor.line))
     )
       throw new Error('Invalid review range')
-    for (const field of ['ref', 'sourceKey'])
+    for (const field of ['ref', 'sourceKey', 'generation'])
       if (anchor[field] !== undefined && typeof anchor[field] !== 'string')
         throw new Error('Invalid review source')
+    if (anchor.displayTurn !== undefined && (typeof anchor.displayTurn !== 'number' || !Number.isSafeInteger(anchor.displayTurn) || anchor.displayTurn < 1)) throw new Error('Invalid display turn')
     if (isSessionReviewMode(anchor.scope)) {
       if (typeof anchor.turn !== 'number' || !Number.isInteger(anchor.turn) || anchor.turn < 1)
         throw new Error('Invalid review turn')
@@ -236,7 +240,7 @@ export function formatReviewComments(
         `${index + 1}. [${anchor.repositoryName}] ${anchor.path}`,
         `${labels.repository}: ${anchor.repository}`,
         `${labels.file}: ${anchor.absolutePath}`,
-        `${labels.source}: ${labels.scope(anchor.scope)}${anchor.turn === undefined ? '' : ` · ${labels.turn(anchor.turn)}`}${anchor.ref ? ` · ${anchor.ref}` : ''} · ${labels.position(anchor)}${anchor.revision ? ` · ${anchor.revision}` : ''}`,
+        `${labels.source}: ${labels.scope(anchor.scope)}${anchor.turn === undefined ? '' : ` · ${labels.turn(anchor.displayTurn ?? anchor.turn)}`}${anchor.ref ? ` · ${anchor.ref}` : ''} · ${labels.position(anchor)}${anchor.revision ? ` · ${anchor.revision}` : ''}`,
         ...(anchor.side === 'file'
           ? []
           : [
@@ -261,6 +265,8 @@ export function formatReviewComments(
 }
 
 interface CommentStorage {
+  subscribe?(listener: () => void): () => void
+  hasError?(): boolean
   getItem(key: string): string | null
   setItem(key: string, value: string): void
 }
@@ -284,6 +290,13 @@ export class ReviewCommentStore {
     } catch {
       this.snapshot = { ...this.snapshot, storageError: true }
     }
+    storage?.subscribe?.(() => {
+      try {
+        const comments = parseReviewComments(storage.getItem(key) ?? '{"version":1,"comments":[]}')
+        this.snapshot = { comments, busy: this.snapshot.busy, storageError: storage.hasError?.() ?? false }
+      } catch { this.snapshot = { ...this.snapshot, storageError: true } }
+      for (const listener of this.listeners) listener()
+    })
   }
   getSnapshot = (): ReviewCommentSnapshot => this.snapshot
   subscribe = (listener: () => void): (() => void) => {

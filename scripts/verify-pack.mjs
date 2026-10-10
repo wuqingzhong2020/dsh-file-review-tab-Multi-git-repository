@@ -18,7 +18,7 @@ await withPackOutput(async output => {
     if (typeof target === 'string') assert.ok(files.has(target.replace(/^\.\//, '')), entry)
     else for (const path of Object.values(target)) assert.ok(files.has(path.replace(/^\.\//, '')), entry)
   }
-  assert.ok(![...files].some(path => path.includes('TEMP_REF_FEATURE') || path.startsWith('tests/') || path.startsWith('node_modules/')))
+  assert.ok(![...files].some(path => (path.startsWith('docs/TEMP_') && path.endsWith('.md')) || path.startsWith('tests/') || path.startsWith('node_modules/')))
   assert.ok(!Object.keys(pkg.dependencies).some(name => /better-sidebar|file-review-tab|left0ver/.test(name)))
   assert.match(pkg.peerDependencies['dsh-multi-git-repo-manager'], /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.+-]+)?$/)
   assert.notEqual(pkg.peerDependenciesMeta?.['dsh-multi-git-repo-manager']?.optional, true)

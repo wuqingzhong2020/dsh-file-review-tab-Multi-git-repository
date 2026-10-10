@@ -4,6 +4,8 @@ export type CommentScope = ReviewMode;
 export interface ReviewCommentTarget {
     readonly scope: CommentScope;
     readonly turn?: number | undefined;
+    readonly displayTurn?: number | undefined;
+    readonly generation?: string | undefined;
     readonly repository: string;
     readonly repositoryName: string;
     readonly path: string;
@@ -54,6 +56,8 @@ export interface CommentMessageLabels {
 }
 export declare function formatReviewComments(comments: readonly ReviewComment[], labels: CommentMessageLabels): string;
 interface CommentStorage {
+    subscribe?(listener: () => void): () => void;
+    hasError?(): boolean;
     getItem(key: string): string | null;
     setItem(key: string, value: string): void;
 }

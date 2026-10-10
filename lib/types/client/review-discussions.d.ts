@@ -19,8 +19,12 @@ export interface ReviewDiscussion {
     readonly replies: readonly DiscussionReply[];
     readonly readSeq: number;
     readonly resolved: readonly string[];
+    /** Host error code (or message) recorded when the last submission did not go through. */
+    readonly error?: string | undefined;
 }
 interface DiscussionStorage {
+    subscribe?(listener: () => void): () => void;
+    hasError?(): boolean;
     getItem(key: string): string | null;
     setItem(key: string, value: string): void;
 }
@@ -29,6 +33,8 @@ export interface DiscussionSnapshot {
     readonly storageError: boolean;
 }
 export declare function isAdmittedDiscussionState(state: DiscussionState): boolean;
+/** Failed and uncertain batches can be resent; admitted batches already reached the turn queue. */
+export declare function isRetryableDiscussionState(state: DiscussionState): boolean;
 export declare function parseReviewDiscussions(raw: string): readonly ReviewDiscussion[];
 export declare class ReviewDiscussionStore {
     private snapshot;
@@ -40,7 +46,9 @@ export declare class ReviewDiscussionStore {
     subscribe: (listener: () => void) => (() => void);
     private publish;
     begin(comments: readonly ReviewComment[], requestId: string, parentId?: string): string;
-    settle(id: string, state: DiscussionState): void;
+    settle(id: string, state: DiscussionState, error?: string): void;
+    /** Reuse a failed or uncertain discussion for a resend, under a fresh request identity. */
+    reopen(id: string, requestId: string): string;
     read(id: string): void;
     resolve(id: string, commentId: string, resolved: boolean): void;
     reconcile(entries: readonly unknown[]): void;

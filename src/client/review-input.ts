@@ -1,4 +1,5 @@
 /** Official reference codec + session admission tracking, with no draft replacement. */
+import { reviewStateFor } from './review-session-state.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -22,7 +23,7 @@ export function reviewInputSource(): InputTriggerSource {
     onPick: () => undefined,
     codec: {
       clipboardText: () => REFERENCE_CLIPBOARD_TEXT,
-      serialize: async (ref, signal) => batches.serialize(ref, signal),
+      serialize: async (ref, signal) => batches.serializeAsync(ref, signal),
     },
   }
 }
@@ -89,10 +90,19 @@ export function bindReviewInputAdmission(sessions: ISessions, sessionId: string)
   )
   const offSession = session.subscribe(sync)
   const offEvents = binding.eventSource.subscribe(sync)
+  const state = reviewStateFor(sessionId)
+  let generation = state.getSnapshot().generation
+  const offReview = state.subscribe(() => {
+    if (state.getSnapshot().generation !== generation) {
+      generation = state.getSnapshot().generation
+      batches.invalidateSession(sessionId)
+    }
+  })
   sync()
   return () => {
     offSession()
     offEvents()
+    offReview()
   }
 }
 

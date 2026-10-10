@@ -263,3 +263,62 @@ test('late admission of an uncertain submission preserves a subsequently edited 
   assert.equal(drafts.getSnapshot().comments[0].text, 'A newer opinion')
   assert.equal(drafts.getSnapshot().comments[0].id, original.id)
 })
+
+function resubmit(discussion, discussions, ctx, discussionEnabled = true) {
+  return submitReviewCommentBatch({
+    ctx,
+    sessionId: 'review-session',
+    comments: discussion.comments,
+    discussions: discussions.getSnapshot().records,
+    discussionStore: discussions,
+    discussionEnabled,
+    resubmitId: discussion.id,
+  })
+}
+
+test('a failed batch records the host reason and resends in place without a duplicate record', async () => {
+  const { drafts, discussions } = stores()
+  const failed = sessionContext({
+    prompt: async () => ({ ok: false, error: { code: 'gateway/forbidden' } }),
+  })
+  await assert.rejects(submit(drafts, discussions, failed), ReviewSendFailure)
+  const record = discussions.getSnapshot().records[0]
+  assert.equal(record.state, 'failed')
+  assert.equal(record.error, 'gateway/forbidden')
+
+  const retry = sessionContext({ prompt: async () => ({ ok: true, value: { accepted: true } }) })
+  await resubmit(record, discussions, retry)
+  const records = discussions.getSnapshot().records
+  assert.equal(records.length, 1)
+  assert.equal(records[0].id, record.id)
+  assert.equal(records[0].state, 'queued')
+  assert.equal(records[0].error, undefined)
+})
+
+test('an uncertain batch keeps its reason and reopens for a resend', async () => {
+  const { drafts, discussions } = stores()
+  const uncertain = sessionContext({
+    prompt: async () => ({ ok: false, error: { code: 'gateway/internal' } }),
+  })
+  await assert.rejects(submit(drafts, discussions, uncertain), ReviewSendFailure)
+  const record = discussions.getSnapshot().records[0]
+  assert.equal(record.state, 'unknown')
+  assert.equal(record.error, 'gateway/internal')
+
+  const retry = sessionContext({ prompt: async () => ({ ok: true, value: { accepted: true } }) })
+  await resubmit(record, discussions, retry)
+  assert.equal(discussions.getSnapshot().records[0].state, 'queued')
+})
+
+test('reopen refuses batches that already reached the turn queue', async () => {
+  const { drafts, discussions } = stores()
+  const ctx = sessionContext({ prompt: async () => ({ ok: true, value: { accepted: true } }) })
+  await submit(drafts, discussions, ctx)
+  const queued = discussions.getSnapshot().records[0]
+  assert.equal(queued.state, 'queued')
+
+  const retry = sessionContext({ prompt: async () => ({ ok: true, value: { accepted: true } }) })
+  await assert.rejects(resubmit(queued, discussions, retry), /not retryable/)
+  assert.equal(discussions.getSnapshot().records.length, 1)
+  assert.equal(discussions.getSnapshot().records[0].state, 'queued')
+})

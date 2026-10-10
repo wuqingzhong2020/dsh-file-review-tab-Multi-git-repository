@@ -1,3 +1,4 @@
+import { reviewStateFor } from './review-session-state.ts'
 import { FILE_REVIEW_REMOTE_NAMESPACE } from '../service-names.ts'
 import { useCallback, useEffect } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -24,6 +25,7 @@ interface FileReviewActionState {
 interface FileReviewActionOptions {
   readonly sessions: ISessions
   readonly sessionId: string
+  readonly generation: string
   readonly visible: boolean
   readonly isGitMode: boolean
   readonly flat: readonly FlatChange[]
@@ -38,6 +40,7 @@ interface FileReviewActionOptions {
 export function useFileReviewActions({
   sessions,
   sessionId,
+  generation,
   visible,
   isGitMode,
   flat,
@@ -58,11 +61,15 @@ export function useFileReviewActions({
       if (scope === undefined) throw new Error(t('sessionUnavailable'))
       const remote = scope.get(FILE_REVIEW_REMOTE_NAMESPACE) as FileReviewRemote | undefined
       if (remote === undefined) throw new Error(t('remoteUnavailable'))
-      const result = await remote[method](request)
+      const store = reviewStateFor(sessionId)
+      const result = method === 'apply'
+        ? await store.runActivity(generation, () => remote[method](request))
+        : await remote[method](request)
+      if (store.getSnapshot().generation !== generation) throw new Error(t('reviewResetTargetGone'))
       if (!result.ok) throw new Error(result.error.message)
       return result.value
     },
-    [sessions, sessionId],
+    [sessions, sessionId, generation],
   )
 
   // Host-side state inspection: which recorded changes are still applied,

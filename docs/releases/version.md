@@ -6,6 +6,7 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
+- [v0.3.7](#v037)
 - [v0.3.6](#v036)
 - [v0.3.5](#v035)
 - [v0.3.4](#v034)
@@ -17,6 +18,20 @@ Release notes and validation records are maintained in this file, with the newes
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
+
+## v0.3.7
+
+- 会话审查新增「重置」及二次确认：清理当前会话所有仓库的本地草稿、讨论、确认与归档状态，隐藏此前工具改动，后续首个有改动的轮次显示为第 1 轮。保留实际文件、Git 状态、对话历史、输入正文、其他附件及其他会话。
+- 会话运行／排队、评论发送及文件操作阻止重置；以单一权威键原子保存，迁移旧键、跨窗口锁与 generation 检查共同防止旧记录回写。历史文件卡保留摘要并禁用旧记录操作；旧审查意见引用需移除后重新附加。
+- 2026-10-10 会话重置实现验证：构建与类型检查通过，196 项 Node 单测和 12 项 Chromium 浏览器测试通过，含中英文取消／提交、重新编号、Dock／原生角标同步、历史卡片、跨窗口锁、持久化失败与损坏数据。Windows Git 测试在本次进程使用完整 TEMP/TMP 路径后全部通过，不修改永久环境变量。
+
+Session review reset clears local feedback, discussions, confirmations and archive state across all repositories in the current session, hides prior tool changes and displays the first subsequent changed turn as Turn 1. Atomic session storage, migration, shared activity locks and generation checks protect concurrent work. Conversation history, files, Git state, ordinary input and other sessions remain. The 2026-10-10 implementation passes the build, 196 Node tests and 12 Chromium browser tests; full TEMP/TMP paths resolve the Windows short-path test discrepancy without changing permanent environment settings.
+
+- 提交失败或结果待核对的批次新增「重新发送」：复用原讨论记录与其中的原始意见重发，成功后状态回到「已提交，等待入轮」并清除失败原因，不产生重复记录；已入轮的批次不允许重发。
+- 讨论记录新增失败原因：网关拒绝时记录宿主错误码，未到达网关时记录传输异常信息，并显示在讨论卡片上，便于区分会话不可用与网关拒绝。
+- 管理插件依赖保持 0.1.4。本机验证：类型检查、构建、180 项审查 Node 测试（含新增的 3 项重发用例）、文档校验通过；其中 10 项 Git 比较类用例在本机因 Windows 短路径名（`ADMINI~1` 与 `Administrator`）差异失败，已在未改动的 HEAD 代码上复现，与本次改动无关；浏览器端到端与 `test:pack` 归档校验本次未重跑。
+
+The failed-batch retry adds **Resend**, which reuses the existing record and its original opinions, returns the batch to the queue on success and clears the recorded reason without creating a duplicate record; admitted batches cannot be resent. Discussions now record why a submission did not go through (the host error code on gateway rejection, or the transport error when the send never reached the gateway) and show it on the card. The manager dependency remains 0.1.4. Locally, type checking, the build, 180 review Node tests (including three resend cases) and docs verification pass; ten Git-comparison cases fail on this machine because of Windows short-path differences and reproduce on the unmodified HEAD.
 
 ## v0.3.6
 

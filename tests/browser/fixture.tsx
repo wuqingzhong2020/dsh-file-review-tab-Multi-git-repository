@@ -3,6 +3,7 @@ import * as React from 'react'
 import * as jsx from 'react/jsx-runtime'
 import { createRoot } from 'react-dom/client'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
+import { en as chatEn, zh as chatZh } from '../../src/client/chat-locales.ts'
 
 const packageName = 'dsh-file-review-tab-multi-git-repository'
 const managerPackage = 'dsh-multi-git-repo-manager'
@@ -24,9 +25,10 @@ const rawPacket = `<dsh_review package="${packageName}" version="1">\n${JSON.str
 const oldText = 'export function review(input) {\n  return input\n}\n'
 const newText = 'export function review(input) {\n  return validate(input)\n}\n'
 const snapshot = observable({ nodes: [...['core/service.ts', 'web/service.ts'], ...(managed ? ['local/plain.ts', 'unknown/unmanaged.ts'] : [])].map((path, i) => ({ kind: 'tool-result', seq: i + 1, callId: `call-${i}`, isError: false, call: { callId: `call-${i}`, name: 'edit', argsRaw: JSON.stringify({ file_path: path, old_string: oldText, new_string: newText }) } })), turnEnds: new Map([[1, 4]]), partial: null, runningCalls: [] })
-const events = observable({ entries: [] })
+const events = observable({ entries: [1, 2, 3, 4].map(seq => ({ type: 'event', event: { seq } })), hasMore: false })
 const inputState = observable({ draft: lang === 'zh' ? '请保持现有接口。' : 'Keep the existing interface.', draftRev: 1, phase: 'plain', occurrences: [], attachmentIds: ['image-fixture'] })
-const pending = observable({ pendingSubmissions: [] })
+const pending = observable({ pendingSubmissions: [], running: false, removed: false, blank: false, awaitingFirstTurn: false,
+  openState: 'open', openError: null, loadingOlder: false, hasMore: false })
 const projects = ['core', 'web'].map(name => ({ name, relativePath: name, path: cwd + '/' + name, source: 'manual', available: true, state: 'ready' }))
 let savedProject = { name: 'fixture', root: cwd, enabled: true, includeProjectRoot: false,
   repositories: projects.map(repo => ({ name: repo.name, path: repo.relativePath })),
@@ -88,7 +90,20 @@ const scope = { get: name => name === 'remote.multiGitFileReviewByWqz' ? remote 
   inputState.set({ ...inputState.getSnapshot(), draftRev: inputState.getSnapshot().draftRev + 1, occurrences: [{ ...request.reference, offset: 0, length: request.reference.clipboardText.length }] })
   return true
 } }
-const binding = { ctx: scope, eventSource: events }
+const inbox = observable({ 'next-turn': [], 'next-step': [] })
+const binding = { sessionId, ctx: scope, eventSource: events, session: { ...pending,
+  projections: { faceOf: () => inbox }, loadThrough: async () => {} } }
+;(window as any).__reviewResetFixture = {
+  busy(value: boolean) { pending.set({ ...pending.getSnapshot(), running: value }); snapshot.set({ ...snapshot.getSnapshot() }) },
+  queued(value: boolean) { inbox.set({ 'next-turn': value ? [{}] : [], 'next-step': [] }); snapshot.set({ ...snapshot.getSnapshot() }) },
+  change() {
+    const before = snapshot.getSnapshot()
+    snapshot.set({ ...before, nodes: [...before.nodes, { kind: 'tool-result', seq: 5, callId: 'new-reset-call', isError: false,
+      call: { callId: 'new-reset-call', name: 'edit', argsRaw: JSON.stringify({ file_path: 'core/service.ts', old_string: newText, new_string: newText.replace('validate(input)', 'validateNext(input)') }) } }],
+      turnEnds: new Map([[1, 4], [2, 6]]) })
+    events.set({ entries: [...events.getSnapshot().entries, { type: 'event', event: { seq: 5 } }, { type: 'event', event: { seq: 6 } }], hasMore: false })
+  },
+}
 const sessions = { list: observable({ byId: { [sessionId]: { cwd } } }), binding: () => binding, scope: () => scope, sessionOf: () => pending, retainInfo: () => observable({}) }
 const Original = ({ node }) => <article data-host-message=""><primitives.MarkdownText text={node.data.content.filter(block => block.type === 'text').map(block => block.text).join('\n')} />
   {node.data.content.filter(block => block.type === 'image').map((_, i) => <span data-host-attachment="" key={i}>📎 image.png</span>)}<time>12:00</time><button data-host-edit="">Edit / resend</button></article>
@@ -124,6 +139,10 @@ function Fixture() {
   const [visitedRepositories, setVisitedRepositories] = React.useState(false)
   const [folded, setFolded] = React.useState(true)
   const body = seats.get(`sidebar.right.pane.tab:${packageName}:file-review`)!
+  const reviewTitle = seats.get('sidebar.right.pane.tab.title:' + packageName + ':file-review')!
+  const tail = seats.get('conversation.chat.turnTail:' + packageName)!
+  const tailTurn = { turn: 1, data: new Map([['fileReviewTab', { produced: [{ seq: 2, path: 'core/service.ts', diffs: [{ path: 'core/service.ts', oldText, newText, oldStart: 1, newStart: 1 }] }] }]]) }
+  const tailText = (key, values = {}) => (lang === 'zh' ? chatZh : chatEn)[key].replace(/\{([^}]+)\}/g, (_, name) => values[name] ?? '')
   const dock = seats.get(`conversation.input.dock:${packageName}:comments`)!
   const setting = seats.get(`plugins.row.config:${packageName}#file-review-tab-multi-git-repository`)!
   const message = seats.get('conversation.chat.node:user')!
@@ -144,6 +163,7 @@ function Fixture() {
       <button onClick={() => setPage('settings')}>Profile</button><button onClick={() => setPage('review')}>Review</button><button onClick={() => setPage('messages')}>Messages</button>
       <span id="start-guides">{managerType.guide.map(entry => <button key={entry.id}
         onClick={() => ctx.sidebarRight.openTab(managerType.kind)} title={entry.description()}>{entry.title()}</button>)}</span></header>
+    <div id='review-native-title'><reviewTitle.component {...reviewTitle.options.inject(sessionId)} /></div>
     {page === 'review' && <main style={{ width }} id="review-surface"><body.component {...body.options.inject(sessionId)} useTabInfo={() => ({ tab })} /></main>}
     {page === 'settings' && <main id="settings-surface"><setting.component view="page" form={{ ...form, state: formState }} /></main>}
     {visitedRepositories && <main id="repositories-pane" style={{ width, height: 660, display: page === 'repositories' ? 'block' : 'none' }}>
@@ -152,6 +172,7 @@ function Fixture() {
     </main>}
     {page === 'messages' && <main id="messages-surface"><message.component node={{ data: { content: [{ type: 'text', text: folded ? rawPacket : 'An ordinary **Markdown** message.' }, { type: 'image', data: 'fixture' }] } }} />
       <steering.component node={{ data: { content: [{ type: 'text', text: 'Ordinary steering message' }] } }} /><button onClick={() => setFolded(!folded)}>Toggle fixture message</button></main>}
+    {page === 'messages' && <div id='historical-file-card'><tail.component {...tail.options.inject(sessionId)} turn={tailTurn} seq={4} openFile={() => {}} t={tailText} /></div>}
     <footer id="input-surface"><dock.component {...dock.options.inject(sessionId)} inputActions={inputActions} />
       {input.occurrences.map(item => <span data-input-reference="" key={item.ref}>{item.label}</span>)}
       <p data-input-prose="">{input.draft}</p><span data-input-attachment="">📎 image.png</span></footer>

@@ -139,12 +139,12 @@ function turnAttribution(snapshot: ConversationSnapshot): (seq: number) => { tur
 }
 
 /** Derive one session's per-turn produced-file changes (uncached core). */
-function derive(snapshot: ConversationSnapshot): TurnFileChanges[] {
+function derive(snapshot: ConversationSnapshot, boundarySeq = -1): TurnFileChanges[] {
   const attribute = turnAttribution(snapshot)
   const byTurn = new Map<number, { live: boolean; files: Map<string, FileAccumulator> }>()
   const view = normalizeSnapshot(snapshot)
   for (const node of (view?.nodes ?? []) as readonly ToolResultNode[]) {
-    if (node.kind !== 'tool-result' || node.isError) continue
+    if (node.kind !== 'tool-result' || node.isError || node.seq <= boundarySeq) continue
     const changes: BlockChange[] = []
     collectChanges(node, changes)
     if (changes.length === 0) continue
@@ -187,15 +187,16 @@ function derive(snapshot: ConversationSnapshot): TurnFileChanges[] {
  * tab-bar render, so the result is memoized per immutable snapshot reference
  * (the session publishes a fresh reference only when content changes).
  */
-const cache = new WeakMap<ConversationSnapshot, TurnFileChanges[]>()
+const cache = new WeakMap<ConversationSnapshot, { key: string; turns: TurnFileChanges[] }>()
 
 /** Derive per-turn produced-file changes for one session snapshot. */
-export function deriveSessionChanges(snapshot: ConversationSnapshot | null): TurnFileChanges[] {
+export function deriveSessionChanges(snapshot: ConversationSnapshot | null, reset?: { boundarySeq: number } | null, generation = ''): TurnFileChanges[] {
   if (snapshot === null) return []
+  const key = generation + ':' + (reset?.boundarySeq ?? -1)
   const hit = cache.get(snapshot)
-  if (hit !== undefined) return hit
-  const derived = derive(snapshot)
-  cache.set(snapshot, derived)
+  if (hit?.key === key) return hit.turns
+  const derived = derive(snapshot, reset?.boundarySeq ?? -1)
+  cache.set(snapshot, { key, turns: derived })
   return derived
 }
 
@@ -215,20 +216,21 @@ export function lastTurnChanges(snapshot: ConversationSnapshot | null, turns: re
  * not survive into the snapshot.
  */
 export interface SessionRoot {
+  readonly seq?: number
   readonly turn: number
   readonly live: boolean
   readonly rootCallId: string
 }
 
 /** Settled roots include failed programs whose nested calls were accepted before failure. */
-export function deriveSessionRoots(snapshot: ConversationSnapshot): SessionRoot[] {
+export function deriveSessionRoots(snapshot: ConversationSnapshot, reset?: { boundarySeq: number } | null): SessionRoot[] {
   const attribute = turnAttribution(snapshot)
   const roots: SessionRoot[] = []
   const view = normalizeSnapshot(snapshot)
   for (const node of (view?.nodes ?? []) as readonly ToolResultNode[]) {
-    if (node.kind !== 'tool-result') continue
+    if (node.kind !== 'tool-result' || node.seq <= (reset?.boundarySeq ?? -1)) continue
     const { turn, live } = attribute(node.seq)
-    roots.push({ turn, live, rootCallId: node.callId })
+    roots.push({ turn, live, rootCallId: node.callId, seq: node.seq })
   }
   return roots
 }

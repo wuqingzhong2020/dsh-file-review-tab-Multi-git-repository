@@ -6,6 +6,8 @@ export declare function isFileConfirmed(fullTurn: TurnFileChanges, file: Session
 export declare function isTurnConfirmed(turn: TurnFileChanges, confirmed: ReadonlyMap<number, string>, fullTurn?: TurnFileChanges): boolean;
 export declare function pendingTurnChanges(turns: readonly TurnFileChanges[], confirmed: ReadonlyMap<number, string>): readonly TurnFileChanges[];
 interface ConfirmationStorage {
+    subscribe?(listener: () => void): () => void;
+    hasError?(): boolean;
     getItem(key: string): string | null;
     setItem(key: string, value: string): void;
 }
@@ -13,6 +15,7 @@ export interface ReviewConfirmationSnapshot {
     readonly confirmed: ReadonlyMap<number, string>;
     readonly storageError: boolean;
 }
+export declare function parseConfirmations(raw: string): ReadonlyMap<number, string>;
 /** Session-local review decisions; confirming never writes project files or Git. */
 export declare class ReviewConfirmationStore {
     private snapshot;

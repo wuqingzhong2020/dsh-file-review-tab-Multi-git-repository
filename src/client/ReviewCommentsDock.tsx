@@ -1,4 +1,5 @@
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { reviewStateFor } from './review-session-state.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -29,7 +30,7 @@ function PendingCommentsPreview({ comments }: { comments: readonly ReviewComment
           </strong>
           <small className={css.meta}>
             {commentScopeLabel(comment.anchor.scope)}
-            {comment.anchor.turn !== undefined && ` · ${t('turn', { n: comment.anchor.turn })}`}
+            {comment.anchor.turn !== undefined && ` · ${t('turn', { n: comment.anchor.displayTurn ?? comment.anchor.turn })}`}
             {(comment.anchor.ref ?? comment.anchor.revision) && ` · ${comment.anchor.ref ?? comment.anchor.revision}`}
           </small>
           {comment.anchor.quote && <pre className={css.quote}>{comment.anchor.quote}</pre>}
@@ -52,6 +53,9 @@ export function ReviewCommentsDock({ ctx, sessionId, inputActions }: ReviewComme
   )
   const preferences = useDiffViewPreferences()
   const [notice, setNotice] = useState('')
+  const reviewStore = useMemo(() => reviewStateFor(sessionId), [sessionId])
+  const reviewState = useSyncExternalStore(reviewStore.subscribe, reviewStore.getSnapshot, reviewStore.getSnapshot)
+  useEffect(() => { setNotice('') }, [reviewState.generation])
   const sessions = ctx.sessions as unknown as ISessions
   useReviewDiscussionEvents(ctx, sessionId, discussionStore)
   useAdmittedReviewComments(discussions, store)
@@ -65,6 +69,7 @@ export function ReviewCommentsDock({ ctx, sessionId, inputActions }: ReviewComme
     }
   }
   const submit = async () => {
+    const generation = reviewState.generation
     setNotice('')
     try {
       await store.submit(comments => submitReviewCommentBatch({
@@ -76,7 +81,7 @@ export function ReviewCommentsDock({ ctx, sessionId, inputActions }: ReviewComme
         discussionEnabled: preferences.discussionEnabled,
       }))
     } catch (error) {
-      setNotice(String(error))
+      if (reviewStore.getSnapshot().generation === generation) setNotice(String(error))
     }
   }
   if (!snapshot.comments.length || !preferences.dock) return null

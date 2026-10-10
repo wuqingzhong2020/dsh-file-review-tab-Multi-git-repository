@@ -13,6 +13,16 @@ import { readingZh, readingEn } from './reading-locales.ts'
 
 /** The zh dictionary (the key-set source of truth). */
 export const zh = {
+  reviewReset: '重置', reviewResetTitle: '重置本会话的文件审查？',
+  reviewResetBody: '将隐藏此前的会话审查改动，并永久删除本会话各审查范围的本地讨论记录、评论草稿与确认状态，无法撤销。已发送的意见和回复、会话对话历史及工作区文件不受影响。新改动从第 1 轮开始。',
+  reviewResetConfirm: '确认重置', reviewResetCancel: '取消',
+  reviewResetDone: '已重置；新改动从第 1 轮开始',
+  reviewResetBusy: '请等待会话与审查操作结束后再重置',
+  reviewResetNotReady: '审查数据尚未就绪，暂时无法重置',
+  reviewResetFailed: '重置未完成，原审查状态保留',
+  reviewResetReload: '重置已保存，请重新加载审查面板',
+  reviewResetTargetGone: '该审查记录已重置',
+  reviewResetStorage: '重置需要可用的本地存储和共享锁；请重新加载后再试。',
   reviewPacketCount: '审查意见 {count} 条',
   reviewAttach: '随输入发送',
   reviewClear: '清空待提交意见',
@@ -186,6 +196,17 @@ export type CopyKey = keyof typeof zh
 
 /** The en dictionary. */
 export const en: Record<CopyKey, string> = {
+  reviewReset: 'Reset', reviewResetTitle: 'Reset file review for this session?',
+  reviewResetBody: "Earlier session changes will be hidden. Local review discussions, comment drafts and confirmations across this session's review scopes will be permanently deleted. This cannot be undone. Sent comments, replies, conversation history and workspace files remain unchanged. New changes start at Turn 1.",
+  reviewResetConfirm: 'Confirm reset', reviewResetCancel: 'Cancel',
+  reviewResetDone: 'Reset complete. New changes start at Turn 1.',
+  reviewResetBusy: 'Wait for conversation and review operations to finish before resetting.',
+  reviewResetNotReady: 'Review data is not ready. Reset is temporarily unavailable.',
+  reviewResetFailed: 'Reset was not completed. The previous review state was preserved.',
+  reviewResetReload: 'Reset was saved. Reload the review panel.',
+  reviewResetTargetGone: 'This review record has been reset.',
+  reviewResetStorage: 'Reset needs available local storage and shared locks. Reload and try again.',
+
   reviewPacketCount: '{count} review comments',
   reviewAttach: 'Send with input',
   reviewClear: 'Clear pending comments',

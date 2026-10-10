@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import { reviewStateFor } from './review-session-state.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   ReviewCommentStore,
@@ -6,7 +7,11 @@ import {
   type ReviewCommentAnchor,
   type ReviewCommentSnapshot,
 } from './review-comments.ts'
-import { ReviewDiscussionStore, type DiscussionSnapshot } from './review-discussions.ts'
+import {
+  ReviewDiscussionStore,
+  type DiscussionSnapshot,
+  type ReviewDiscussion,
+} from './review-discussions.ts'
 
 export interface CommentComposer {
   anchor: ReviewCommentAnchor
@@ -31,6 +36,10 @@ export interface ReviewCommentsContext {
   discussionStore: ReviewDiscussionStore
   ctx: Context
   sessionId: string
+  /** Resend a failed or uncertain batch, reusing its existing discussion record. */
+  resend: (discussion: ReviewDiscussion) => void
+  /** Discussion being resent right now, when any. */
+  resendingId: string | null
 }
 
 export const ReviewCommentsContext = createContext<ReviewCommentsContext | null>(null)
@@ -39,19 +48,12 @@ const commentStores = new Map<string, ReviewCommentStore>()
 const discussionStores = new Map<string, ReviewDiscussionStore>()
 
 /** Missing browser storage still allows drafts and discussions to work in memory. */
-function browserStorage(): Storage | undefined {
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
-}
 
 export function commentStoreFor(sessionId: string): ReviewCommentStore {
   let store = commentStores.get(sessionId)
   if (store === undefined) {
     store = new ReviewCommentStore(
-      browserStorage(),
+      reviewStateFor(sessionId).sliceStorage('comments'),
       `dsh-file-review-tab-multi-git-repository:comments:${sessionId}`,
     )
     commentStores.set(sessionId, store)
@@ -63,7 +65,7 @@ export function discussionStoreFor(sessionId: string): ReviewDiscussionStore {
   let store = discussionStores.get(sessionId)
   if (store === undefined) {
     store = new ReviewDiscussionStore(
-      browserStorage(),
+      reviewStateFor(sessionId).sliceStorage('discussions'),
       `dsh-file-review-tab-multi-git-repository:discussions:${sessionId}`,
     )
     discussionStores.set(sessionId, store)

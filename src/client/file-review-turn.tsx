@@ -1,3 +1,4 @@
+import { displayReviewTurn, reviewStateFor } from './review-session-state.ts'
 import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react'
 import type { FileReviewAction, FileReviewFileState } from '../change-types.ts'
@@ -215,7 +216,7 @@ export function FileReviewTurn({
   const copyFiles = (files: readonly SessionFileChange[]): AggregateDiffFile[] => files.map(file => ({
     repository: ownerOf(file.path)?.path ?? cwd ?? '?',
     path: file.path,
-    source: `Session ${sessionId}; turn ${turn.turn}; ${view.reviewMode}`,
+    source: `Session ${sessionId}; turn ${displayReviewTurn(sessionId, turn.turn)}; ${view.reviewMode}`,
     diffs: file.diffs,
     ...(file.note || file.deleted ? { note: file.note ?? 'Terminal deletion: no recoverable snapshot' } : {}),
   }))
@@ -229,7 +230,7 @@ export function FileReviewTurn({
       className={css.turnGroup}
     >
       <header className={css.turnHeader}>
-        <span className={css.turnTitle}>{t('turn', { n: turn.turn })}</span>
+        <span className={css.turnTitle}>{t('turn', { n: displayReviewTurn(sessionId, turn.turn) })}</span>
         {turn.live && <span className={css.liveBadge}>{t('turnLive')}</span>}
         {confirmed && <span className={css.confirmedBadge}>{t('turnConfirmed')}</span>}
         <span className={css.turnCount}>
@@ -272,6 +273,8 @@ export function FileReviewTurn({
                   .filter(file => file.deleted !== true && canOperateFile(view, file.path))
                   .map(file => ({
                     turn: turn.turn,
+                    displayTurn: displayReviewTurn(sessionId, turn.turn),
+                    generation: reviewStateFor(sessionId).getSnapshot().generation,
                     path: file.path,
                     diffs: file.diffs,
                   })),
@@ -355,6 +358,8 @@ function FileReviewFile({
   const commentTarget: ReviewCommentTarget = {
     scope: isSessionReviewMode(reviewMode) ? reviewMode : 'session',
     turn: turn.turn,
+    displayTurn: displayReviewTurn(sessionId, turn.turn),
+    generation: reviewStateFor(sessionId).getSnapshot().generation,
     repository: repository?.path ?? cwd ?? '',
     repositoryName: repository?.name ?? basename(cwd ?? ''),
     path: repository
