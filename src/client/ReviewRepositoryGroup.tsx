@@ -12,22 +12,25 @@ export function FileContentsButton({ expanded, label, onClick, controls }: { exp
   </button>
 }
 
-export function ReviewRepositoryGroup({ name, path, count, children, collapsed, onCollapsedChange, contentsExpanded, onContentsExpandedChange, actions }: {
+export function ReviewRepositoryGroup({ name, path, count, children, collapsed, onCollapsedChange, contentsExpanded, onContentsExpandedChange, actions, titleActions }: {
   name: string; path: string; count: number; children: ReactNode
   collapsed: boolean; onCollapsedChange: (collapsed: boolean) => void
   contentsExpanded: boolean; onContentsExpandedChange: (expanded: boolean) => void
-  actions?: ReactNode
+  actions?: ReactNode; titleActions?: ReactNode
 }) {
   useReviewLocale()
   const bodyId = useId()
   const expanded = contentsExpanded && !collapsed
   return <section className={css.repositoryGroup} aria-label={name}>
     <div className={css.repositoryGroupHeader}>
+    <div className={css.repositoryGroupHeading}>
     <button type="button" className={css.repositoryGroupTitle} aria-expanded={!collapsed} aria-controls={bodyId}
       title={path ? `${name}\n${path}` : name} onClick={() => { onCollapsedChange(!collapsed) }}>
       <svg viewBox="0 0 20 20" aria-hidden="true" className={`${css.chevron} ${collapsed ? '' : css.chevronOpen}`}><path d="m7 5 5 5-5 5" /></svg>
       <span className={css.repositoryGroupName}>{name}</span>
     </button>
+    {titleActions}
+    </div>
     <FileContentsButton expanded={expanded} controls={bodyId} label={t(expanded ? 'collapseRepositoryFiles' : 'expandRepositoryFiles', { name })} onClick={() => {
       if (!expanded) onCollapsedChange(false)
       onContentsExpandedChange(!expanded)

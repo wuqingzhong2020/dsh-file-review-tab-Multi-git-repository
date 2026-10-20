@@ -176,6 +176,11 @@ export declare const zh: {
     readonly stats: "新增 {added} 行，删除 {removed} 行";
     readonly unavailable: "无法为此更改还原可审查的差异。";
     readonly refresh: "刷新状态";
+    readonly updateReview: "更新";
+    readonly updateRepository: "更新 {name}";
+    readonly updateRepositoryHint: "只更新 {name} 的文件列表和修改前后差异";
+    readonly updateRepositoryBusy: "更新中…";
+    readonly updateReviewHint: "重新读取当前范围的文件列表和修改前后差异";
     readonly projectTab: "多代码仓管理";
     readonly projectCurrentRoot: "当前工程目录";
     readonly projectIntro: "为当前工程增删改 Git 仓库，保存到工程目录中的配置文件。仓库路径以当前工程目录为基准。";

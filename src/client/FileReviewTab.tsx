@@ -93,6 +93,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
   const closeGuide = useCallback(() => setGuideOpen(false), [])
   useEffect(() => { if (!visible) closeGuide() }, [visible, closeGuide])
   const [tick, setTick] = useState(0)
+  const updateReview = useCallback(() => setTick(value => value + 1), [])
   const [workspace, setWorkspace] = useState<ManagedWorkspace | null>(null)
   const [repositoryFilter, setRepositoryFilter] = useState('*')
   const [reviewMode, setReviewMode] = useState<ReviewMode>('last-turn')
@@ -395,9 +396,7 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
           className={css.refreshButton}
           disabled={!isGitMode && statusPending}
           title={t('refresh')}
-          onClick={() => {
-            setTick(value => value + 1)
-          }}
+          onClick={updateReview}
         >
           ⟳
         </button>
@@ -451,6 +450,15 @@ export function FileReviewTab({ ctx, sessionId, cwd, visible, meta }: FileReview
               {targets.filter(target => target.kind === 'directory' && target.state === 'ready').map(target => <option key={target.id} value={target.path}>{target.name} ({t('directoryKind')})</option>)}
               {turns.some(turn => turn.files.some(file => ownership.owners.get(file.path)?.state !== 'managed')) && <option value="?">{t('repoOther')}</option>}
             </select>
+            <button
+              type="button"
+              className={css.guideButton}
+              title={t('updateReviewHint')}
+              disabled={!visible || (!isGitMode && (statusPending || busyKey !== null))}
+              onClick={updateReview}
+            >
+              {t('updateReview')}
+            </button>
             <small title={workspace.warnings.map(localizeReviewMessage).join('\n')}>
               {t('repoSettingsHint')}
               {workspace.warnings.length > 0 ? ' ⚠' : ''}

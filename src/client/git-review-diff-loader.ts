@@ -6,6 +6,10 @@ export class ReviewDiffQueue<T> {
   private readonly waiting: (() => void)[] = []
   private readonly requests = new Map<string, Promise<T>>()
 
+  invalidate(keys: Iterable<string>): void {
+    for (const key of keys) this.requests.delete(key)
+  }
+
   load(key: string, fetch: () => Promise<T>): Promise<T> {
     const existing = this.requests.get(key)
     if (existing) return existing
@@ -16,7 +20,7 @@ export class ReviewDiffQueue<T> {
           .then(fetch)
           .then(resolve, error => {
             // An aborted bulk copy must not poison a later file expansion.
-            this.requests.delete(key)
+            if (this.requests.get(key) === request) this.requests.delete(key)
             reject(error)
           })
           .finally(() => {

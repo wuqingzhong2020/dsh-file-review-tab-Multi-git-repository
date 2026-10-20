@@ -46,8 +46,10 @@ function gitPathAdmission(workspace: ManagedWorkspace, cwd: string, root: string
 
 async function resolveApprovedRepositories(
   workspace: ManagedWorkspace,
+  repository?: string,
 ): Promise<GitReviewRepository[]> {
-  const candidates = workspace.targets.filter(target => target.state === 'ready' && target.capabilities.git)
+  const candidates = workspace.targets.filter(target => target.state === 'ready' && target.capabilities.git
+    && (!repository || pathKey(target.path) === pathKey(repository)))
   const repositories: GitReviewRepository[] = []
   const seen = new Set<string>()
   for (const candidate of candidates) {
@@ -232,7 +234,7 @@ export async function gitReview(
   cwd: string,
   request: GitReviewRequest,
 ): Promise<GitReviewResult> {
-  const repositories = await resolveApprovedRepositories(workspace)
+  const repositories = await resolveApprovedRepositories(workspace, request.repository)
   if (
     request.repository &&
     !repositories.some(repo => pathKey(repo.path) === pathKey(request.repository!))
@@ -275,7 +277,7 @@ export async function gitReviewDiff(
   cwd: string,
   request: GitReviewFileRequest,
 ): Promise<GitReviewDiff> {
-  const repo = (await resolveApprovedRepositories(workspace)).find(
+  const repo = (await resolveApprovedRepositories(workspace, request.repository)).find(
     repo => pathKey(repo.path) === pathKey(request.repository),
   )
   if (!repo) throw new Error('Repository is outside this session')

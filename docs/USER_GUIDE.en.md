@@ -74,7 +74,7 @@ Switching to another sidebar tab preserves expanded diffs, searches, selected li
 ### 2.2 Trying the workflow with existing changes
 
 1. Choose **Uncommitted** in the dropdown beside the File Review title.
-2. Click the **Refresh status** icon at the top right to read Git changes saved on disk.
+2. Click **Update** beside the repository selector to read Git changes saved on disk. The top-right **Refresh status** icon also works.
 3. Expand a file under its repository. Use **Unified / Split** to change the layout.
 4. Click an after-version line number to select code. For multiple lines, hold **Shift** and click another line number on the same side.
 5. **Right-click** the selected code or line numbers and choose **Comment on selection**. Enter feedback and click **Comment** to save a draft.
@@ -111,7 +111,9 @@ Figure 2: **All repositories** groups Git changes across configured repositories
 
 In **Committed / Branch**, selecting one repository also lets you choose its commit or baseline branch. The commit list contains the most recent 50 commits. With All repositories, each repository uses its own latest commit or default baseline branch. Branch comparisons exclude uncommitted changes. A repository with only its current branch reports that a comparison branch is needed; other repositories can still show results.
 
-These scopes read Git status without changing the index, creating a commit, or checking out a branch.
+These scopes read Git status without changing the index, creating a commit, or checking out a branch. After editing, staging, or committing elsewhere, click **Update** beside the repository selector to reload files and before/after differences. The current scope, repository filter, and open files are preserved; open diffs reload automatically, and files with no remaining changes disappear from the list. Save editor changes before updating.
+
+To update one Git repository, click **Update** beside its name. Only its file list, statistics, and open diffs reload; other repositories retain their diffs, searches, and expansion state. The button displays **Updating…** and is disabled during the request. Failures show the reason within that repository and preserve the original list for retry. Files without changes disappear; if the entire group disappears, use the top **Update** action to discover later changes.
 
 ## 4. Configuring multiple repositories
 

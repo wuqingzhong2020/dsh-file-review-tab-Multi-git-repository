@@ -162,3 +162,19 @@ test('zero-delimited Git paths preserve tabs and newlines and rename metadata', 
   assert.equal(files[0].path, 'tab\tname\n.txt'); assert.equal(files[1].oldPath, 'old.txt'); assert.equal(files[1].path, 'new.txt')
   assert.deepEqual(parseGitNames('U\0conflict.txt\0M\0conflict.txt\0', 'root').map(file => file.status), ['U'])
 })
+
+
+test('a selected repository scan and diff return only its data in a multi-repository workspace', async () => {
+  const a = await repo(), b = await repo()
+  await writeFile(join(a, 'file.txt'), 'changed A\n')
+  await writeFile(join(b, 'file.txt'), 'changed B\n')
+  const ws = await aggregate(directory, [a, b])
+  const selected = await gitReview(ws, directory, { mode: 'uncommitted', repository: b })
+  assert.deepEqual(selected.repositories.map(item => item.path), [await realpath(b)])
+  assert.deepEqual(selected.files.map(item => item.repository), [await realpath(b)])
+  const diff = await gitReviewDiff(ws, directory, { mode: 'uncommitted', repository: b, path: 'file.txt' })
+  assert.equal(text(diff, 'oldText'), 'before\n')
+  assert.equal(text(diff, 'newText'), 'changed B\n')
+  assert.equal((await gitReview(ws, directory, { mode: 'uncommitted' })).repositories.length, 2)
+  assert.equal(await readFile(join(a, 'file.txt'), 'utf8'), 'changed A\n')
+})

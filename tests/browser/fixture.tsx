@@ -24,6 +24,14 @@ const packet = { package: packageName, version: 1, sessionId, batchId: 'e8f5ec8f
 const rawPacket = `<dsh_review package="${packageName}" version="1">\n${JSON.stringify(packet)}\n</dsh_review>\n\n${lang === 'zh' ? '请按这些意见修改。' : 'Please apply these comments.'}`
 const oldText = 'export function review(input) {\n  return input\n}\n'
 const newText = 'export function review(input) {\n  return validate(input)\n}\n'
+let gitNewText = newText
+let gitListReads = 0
+let gitDiffReads = 0
+const gitTexts = new Map<string, string>()
+const gitPaths = new Map<string, string[]>()
+const gitFailures = new Set<string>()
+const gitRequests: { lists: any[]; diffs: any[] } = { lists: [], diffs: [] }
+let gitHold: { repository: string; promise: Promise<void>; release: () => void } | undefined
 const snapshot = observable({ nodes: [...['core/service.ts', 'web/service.ts'], ...(managed ? ['local/plain.ts', 'unknown/unmanaged.ts'] : [])].map((path, i) => ({ kind: 'tool-result', seq: i + 1, callId: `call-${i}`, isError: false, call: { callId: `call-${i}`, name: 'edit', argsRaw: JSON.stringify({ file_path: path, old_string: oldText, new_string: newText }) } })), turnEnds: new Map([[1, 4]]), partial: null, runningCalls: [] })
 const events = observable({ entries: [1, 2, 3, 4].map(seq => ({ type: 'event', event: { seq } })), hasMore: false })
 const inputState = observable({ draft: lang === 'zh' ? '请保持现有接口。' : 'Keep the existing interface.', draftRev: 1, phase: 'plain', occurrences: [], attachmentIds: ['image-fixture'] })
@@ -71,8 +79,21 @@ const remote = {
   recorded: async () => ({ ok: true, value: { mutations: [] } }),
   status: async (request) => ({ ok: true, value: { files: request.files.map(file => ({ path: file.path, state: 'applied', changed: false })) } }),
   userGuideDocument: async (language) => ({ ok: true, value: await (await fetch(`/guide/${language}`)).json() }),
-  gitReview: async () => ({ ok: true, value: { repositories: projects, comparisons: ['HEAD -> working tree'], warnings: [], files: projects.map(repo => ({ repository: repo.path, path: 'service.ts', status: 'M', added: 1, removed: 1 })) } }),
-  gitReviewDiff: async (request) => ({ ok: true, value: { ...request, diffs: [{ path: request.path, oldText, newText }] } }),
+  gitReview: async request => {
+    gitListReads++
+    gitRequests.lists.push({ ...request })
+    if (gitFailures.has(request.repository)) throw new Error('Fixture repository unavailable')
+    const selected = projects.filter(repo => !request.repository || request.repository === repo.path)
+    const result = { ok: true, value: { repositories: selected, comparisons: selected.map(repo => repo.name + ': HEAD -> working tree'), warnings: [],
+      files: selected.flatMap(repo => (gitPaths.get(repo.path) ?? ['service.ts']).map(path => ({ repository: repo.path, path, status: 'M', added: 1, removed: 1 }))) } }
+    if (gitHold && gitHold.repository === request.repository) await gitHold.promise
+    return result
+  },
+  gitReviewDiff: async request => {
+    gitDiffReads++
+    gitRequests.diffs.push({ ...request })
+    return { ok: true, value: { ...request, diffs: [{ path: request.path, oldText, newText: gitTexts.get(request.repository) ?? gitNewText }] } }
+  },
 }
 const effects: (() => void)[] = []
 const seats = new Map<string, { options: any; component: React.ComponentType<any> }>()
@@ -179,6 +200,17 @@ function Fixture() {
   </>
 }
 Object.assign(window, { fixture: { form, inputState, seats, tabTypes, effects, source: () => source,
+  updateGitText: (text: string, repository?: string) => { if (repository) gitTexts.set(repository, text); else gitNewText = text },
+  updateGitFiles: (repository: string, paths: string[]) => { gitPaths.set(repository, paths) },
+  failGitUpdate: (repository: string, fail: boolean) => { if (fail) gitFailures.add(repository); else gitFailures.delete(repository) },
+  holdGitUpdate: (repository: string) => {
+    let release!: () => void
+    const promise = new Promise<void>(resolve => { release = resolve })
+    gitHold = { repository, promise, release }
+  },
+  releaseGitUpdate: () => { gitHold?.release(); gitHold = undefined },
+  gitRequests: () => structuredClone(gitRequests),
+  gitReads: () => ({ lists: gitListReads, diffs: gitDiffReads }),
   workspaceReads: () => workspaceReads, projectPage, applyPaths: () => applyPaths, temporaryTargets: () => temporaryTargets,
   unmount: () => { root.unmount(); for (const dispose of effects.reverse()) dispose?.() },
 } })

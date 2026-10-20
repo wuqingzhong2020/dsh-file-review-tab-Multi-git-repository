@@ -25,6 +25,7 @@ import {
   setFileContentsExpanded,
   setRepositoryGroupsCollapsed,
 } from './review-repository-groups.ts'
+import { mergeGitRepositoryReview } from './git-review-repository-update.ts'
 import { FileContentsButton, ReviewRepositoryGroup } from './ReviewRepositoryGroup.tsx'
 import { loadMissingReviewDiffs, ReviewDiffQueue } from './git-review-diff-loader.ts'
 import { AggregateCopyButton } from './AggregateCopyButton.tsx'
@@ -72,7 +73,14 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
     () => new Set(),
   )
   const [diffs, setDiffs] = useState<Map<string, GitReviewDiff | string | null>>(new Map())
+  const expandedRef = useRef(expanded)
+  expandedRef.current = expanded
   const version = useRef(0)
+  const loadedComparison = useRef<string | null>(null)
+  const repositoryVersions = useRef(new Map<string, number>())
+  const pendingRepositories = useRef(new Set<string>())
+  const [updatingRepositories, setUpdatingRepositories] = useState<ReadonlySet<string>>(new Set())
+  const [repositoryErrors, setRepositoryErrors] = useState<ReadonlyMap<string, string>>(new Map())
   const requestedDiffs = useRef(new Set<string>())
   const diffQueue = useRef(new ReviewDiffQueue<GitReviewDiff>())
   const keyOf = gitReviewFileKey
@@ -88,17 +96,29 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
   useEffect(() => {
     if (!visible) return
     const current = ++version.current
+    repositoryVersions.current = new Map()
+    pendingRepositories.current = new Set()
+    setUpdatingRepositories(new Set())
+    setRepositoryErrors(new Map())
+    const comparison = JSON.stringify([sessionId, mode, repository, ref])
+    // Refresh the same comparison without closing the files the user is reading.
+    const retainedExpanded = loadedComparison.current === comparison ? expanded : new Set<string>()
+    loadedComparison.current = comparison
     requestedDiffs.current = new Set()
     diffQueue.current = new ReviewDiffQueue<GitReviewDiff>()
     setLoading(true)
     setError('')
-    setExpanded(new Set())
+    setExpanded(retainedExpanded)
     setDiffs(new Map())
     void Promise.resolve()
       .then(() => unwrap(remote().gitReview(request())))
       .then(result => {
         if (version.current !== current) return
         setData(result)
+        const openFiles = result.files.filter(file => retainedExpanded.has(keyOf(file)))
+        setExpanded(new Set(openFiles.map(keyOf)))
+        // A new queue and empty cache ensure every open diff comes from this refresh.
+        loadDiffs(openFiles)
       })
       .catch(cause => {
         if (version.current === current) {
@@ -115,27 +135,74 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
   const loadDiffs = (files: readonly GitReviewFileChange[]) => {
     const current = version.current
     const comparison = request()
+    const revisions = new Map(files.map(file => [file.repository, repositoryVersions.current.get(file.repository) ?? 0]))
+    const isCurrent = (file: GitReviewFileChange) => version.current === current
+      && revisions.get(file.repository) === (repositoryVersions.current.get(file.repository) ?? 0)
+    const queue = diffQueue.current
     void loadMissingReviewDiffs(files, keyOf, requestedDiffs.current, async file => {
-      if (version.current !== current) return
+      if (!isCurrent(file)) return
       const key = keyOf(file)
       setDiffs(value => new Map(value).set(key, null))
       try {
-        const result = await diffQueue.current.load(key, () => unwrap(
-          remote().gitReviewDiff({
+        const result = await queue.load(key, () => {
+          if (!isCurrent(file)) throw new Error('Comparison changed; refresh again')
+          return unwrap(remote().gitReviewDiff({
             ...comparison,
             repository: file.repository,
             path: file.path,
-          }),
-        ))
-        if (version.current === current) setDiffs(value => new Map(value).set(key, result))
+          }))
+        })
+        if (isCurrent(file)) setDiffs(value => new Map(value).set(key, result))
       } catch (cause) {
-        if (version.current === current) {
+        if (isCurrent(file)) {
           setDiffs(value =>
             new Map(value).set(key, cause instanceof Error ? cause.message : String(cause)),
           )
         }
       }
     })
+  }
+  const updateRepository = async (path: string) => {
+    if (!visible || loading || data === null || pendingRepositories.current.has(path)) return
+    const current = version.current
+    let revision = (repositoryVersions.current.get(path) ?? 0) + 1
+    repositoryVersions.current.set(path, revision)
+    pendingRepositories.current.add(path)
+    setUpdatingRepositories(new Set(pendingRepositories.current))
+    setRepositoryErrors(value => { const next = new Map(value); next.delete(path); return next })
+    const isCurrent = () => version.current === current && repositoryVersions.current.get(path) === revision
+    // Invalidate only this repository, including entries used by an in-flight copy.
+    const keys = data.files.filter(file => file.repository === path).map(keyOf)
+    diffQueue.current.invalidate(keys)
+    for (const key of keys) requestedDiffs.current.delete(key)
+    try {
+      const result = await unwrap(remote().gitReview({ ...request(), repository: path }))
+      if (!isCurrent()) return
+      const merged = mergeGitRepositoryReview(data, path, result)
+      setData(value => value === null ? value : mergeGitRepositoryReview(value, path, result))
+      const nextFiles = merged.files.filter(file => file.repository === path)
+      // Reads started while the list was loading must also belong to the new list.
+      repositoryVersions.current.set(path, ++revision)
+      const invalidated = new Set([...keys, ...nextFiles.map(keyOf)])
+      diffQueue.current.invalidate(invalidated)
+      for (const key of invalidated) requestedDiffs.current.delete(key)
+      const remaining = new Set(nextFiles.map(keyOf))
+      setExpanded(value => new Set([...value].filter(key => !keys.includes(key) || remaining.has(key))))
+      setDiffs(value => {
+        const next = new Map(value)
+        for (const key of invalidated) next.delete(key)
+        return next
+      })
+      loadDiffs(nextFiles.filter(file => expandedRef.current.has(keyOf(file))))
+    } catch (cause) {
+      if (isCurrent()) setRepositoryErrors(value =>
+        new Map(value).set(path, cause instanceof Error ? cause.message : String(cause)))
+    } finally {
+      if (isCurrent()) {
+        pendingRepositories.current.delete(path)
+        setUpdatingRepositories(new Set(pendingRepositories.current))
+      }
+    }
   }
   const setContents = (files: readonly GitReviewFileChange[], open: boolean) => {
     setExpanded(current => setFileContentsExpanded(current, files.map(keyOf), open))
@@ -145,9 +212,12 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
     const current = version.current
     const comparison = request()
     const queue = diffQueue.current
+    const revisions = new Map(files.map(file => [file.repository, repositoryVersions.current.get(file.repository) ?? 0]))
     const ensureActive = () => {
       signal.throwIfAborted()
-      if (current !== version.current) throw new Error('Comparison changed; copy again')
+      if (current !== version.current || [...revisions].some(([path, revision]) =>
+        revision !== (repositoryVersions.current.get(path) ?? 0)))
+        throw new Error('Comparison changed; copy again')
     }
     return loadGitReviewReport(files, {
       source: `${mode}; ${ref || data?.comparisons.join('; ') || 'current comparison'}`,
@@ -275,6 +345,13 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
                   name={group.name}
                   path={group.path}
                   count={group.files.length}
+                  titleActions={<button type="button" className={css.smallButton}
+                    aria-label={t('updateRepository', { name: group.name })}
+                    title={t('updateRepositoryHint', { name: group.name })}
+                    disabled={updatingRepositories.has(group.key)}
+                    onClick={() => { void updateRepository(group.key) }}>
+                    {t(updatingRepositories.has(group.key) ? 'updateRepositoryBusy' : 'updateReview')}
+                  </button>}
                   actions={<AggregateCopyButton key={version.current} load={signal => copyFiles(group.files, signal)} />}
                   collapsed={collapsedRepositories.has(groupId)}
                   onCollapsedChange={collapsed => {
@@ -287,6 +364,9 @@ export function GitReviewPanel({ ctx, sessionId, mode, visible, tick, repository
                     setContents(group.files, open)
                   }}
                 >
+                  {repositoryErrors.has(group.key) && <p role="alert" className={`${css.notice} ${css.noticeError}`}>
+                    {localizeReviewMessage(repositoryErrors.get(group.key)!)}
+                  </p>}
                   <ul className={css.fileList}>
                     {group.files.map(file => {
                       const key = keyOf(file)

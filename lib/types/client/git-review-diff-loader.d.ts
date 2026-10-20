@@ -3,6 +3,7 @@ export declare class ReviewDiffQueue<T> {
     private active;
     private readonly waiting;
     private readonly requests;
+    invalidate(keys: Iterable<string>): void;
     load(key: string, fetch: () => Promise<T>): Promise<T>;
 }
 export declare function loadMissingReviewDiffs<T>(files: readonly T[], keyOf: (file: T) => string, requested: Set<string>, load: (file: T) => Promise<void>): Promise<void>;

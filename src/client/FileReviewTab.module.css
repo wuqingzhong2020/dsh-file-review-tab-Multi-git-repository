@@ -410,6 +410,9 @@
   font: inherit;
 }
 
+.repositoryGroupHeading { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.repositoryGroupHeading .repositoryGroupTitle { flex: 0 1 auto; }
+
 .repositoryGroupTitle:hover {
   background: var(--dsw-alias-border-l1);
 }
