@@ -126,6 +126,8 @@ export declare const zh: {
     readonly openInEditor: "在内置查看器中打开";
     readonly open: "打开 {name}";
     readonly copy: "复制差异";
+    readonly copyAbsolutePath: "复制路径";
+    readonly copyRelativePath: "复制相对路径";
     readonly copied: "已复制";
     readonly showUnchanged: "显示 {count} 行未更改内容";
     readonly hideUnchanged: "隐藏 {count} 行未更改内容";
@@ -232,6 +234,7 @@ export declare const zh: {
     readonly repoScope: "{name} · {count} 个仓库";
     readonly repoFilterEmpty: "此仓库暂无会话文件改动";
     readonly repoSettingsHint: "仓库来源和维护范围可在右侧“开始”页打开“多代码仓管理”Tab 配置";
+    readonly referenceCopyContent: string;
     readonly appearance: string;
     readonly diffFontSize: string;
     readonly diffFontFamily: string;

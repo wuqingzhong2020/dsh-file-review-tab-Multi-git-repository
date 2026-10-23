@@ -460,3 +460,19 @@
   /* Nested groups drop the card chrome inside the archive box. */
   margin: 0 8px 8px;
 }
+
+.filePathMenuAnchor { position: absolute; width: 0; height: 0; }
+.filePathMenu {
+  max-width: calc(100vw - 24px);
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  color: var(--dsw-alias-label-primary, #1f2328);
+  border: 1px solid var(--dsw-alias-border-l2, #d0d7de);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px #0003;
+}
+.filePathNotice {
+  margin: 0;
+  padding: 4px 10px;
+  color: var(--dsw-alias-label-secondary, #656d76);
+  font-size: 12px;
+}

@@ -1,4 +1,5 @@
 export const readingZh = {
+  referenceCopyContent: '复制选中的内容',
   appearance: '外观', diffFontSize: '代码字号（px）', diffFontFamily: '代码字体', diffSystemMono: '系统等宽字体', diffFontHint: '使用本机已安装字体，未安装时使用系统等宽字体。',
   diffLineHeight: '行高倍数', diffTabSize: 'Tab 宽度', diffColors: '差异配色', diffThemeColors: '跟随主题（红 / 绿）', diffAccessibleColors: '蓝 / 橙', diffColorStrength: '背景颜色强度（%）',
   externalEditor: '外部 IDE', editorPath: '外部 IDE 程序路径', editorAutoDetect: '留空自动检测推荐的 VS Code', editorPathHint: '推荐 VS Code，也可使用 Antigravity。Windows 填写 Code.exe 或 Antigravity IDE.exe 的完整路径；不需要填写启动参数。',
@@ -14,6 +15,7 @@ export const readingZh = {
   referenceRelocate: '核对当前位置', referenceRelocateApply: '将草稿引用更新到第 {line} 行', referenceExact: '引用仍位于原位置', referenceHistorical: '历史来源保留原始位置，不自动移动。',
 }
 export const readingEn: Record<keyof typeof readingZh, string> = {
+  referenceCopyContent: 'Copy selected content',
   appearance: 'Appearance', diffFontSize: 'Code font size (px)', diffFontFamily: 'Code font', diffSystemMono: 'System monospace', diffFontHint: 'Uses installed fonts; unavailable fonts fall back to system monospace.',
   diffLineHeight: 'Line height multiplier', diffTabSize: 'Tab width', diffColors: 'Diff colors', diffThemeColors: 'Follow theme (red / green)', diffAccessibleColors: 'Blue / orange', diffColorStrength: 'Background intensity (%)',
   externalEditor: 'External IDE', editorPath: 'External IDE executable path', editorAutoDetect: 'Leave empty to detect the recommended VS Code', editorPathHint: 'VS Code is recommended; Antigravity is also supported. On Windows, enter the full path to Code.exe or Antigravity IDE.exe without launch arguments.',

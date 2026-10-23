@@ -37,6 +37,7 @@ import css from './FileReviewTab.module.css'
 import { AggregateCopyButton } from './AggregateCopyButton.tsx'
 import type { AggregateDiffFile } from './aggregate-diff.ts'
 import { localizeReviewMessage } from './message-locales.ts'
+import { useFilePathMenu } from './use-file-path-menu.tsx'
 
 interface FileReviewExpansion {
   readonly expanded: ReadonlySet<string>
@@ -367,6 +368,7 @@ function FileReviewFile({
       : (relativeProjectDirectory(cwd ?? '', absolutePath) ?? file.path),
     absolutePath,
   }
+  const pathMenu = useFilePathMenu(absolutePath, commentTarget.path)
   return (
     <li
       key={file.path}
@@ -382,10 +384,13 @@ function FileReviewFile({
         tabIndex={0}
         title={file.path}
         aria-expanded={isOpen}
+        onContextMenu={pathMenu.onContextMenu}
         onClick={() => {
           toggleExpanded(key)
         }}
         onKeyDown={event => {
+          pathMenu.onKeyDown(event)
+          if (event.defaultPrevented) return
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             toggleExpanded(key)
@@ -443,6 +448,7 @@ function FileReviewFile({
             : t(fileAction === 'undo' ? 'undo' : 'redo')}
         </button>
       </div>
+      {pathMenu.menu}
       <ReviewFileCommentThread target={commentTarget} />
       {isOpen && (
         <div className={css.diffWrap}>

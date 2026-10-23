@@ -1,4 +1,5 @@
 export declare const readingZh: {
+    referenceCopyContent: string;
     appearance: string;
     diffFontSize: string;
     diffFontFamily: string;

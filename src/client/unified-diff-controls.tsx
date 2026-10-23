@@ -295,6 +295,9 @@ export function DiffReferenceMenu({
                 end: reference.endLine,
               })}
             </strong>
+            <MenuItemButton onSelect={() => void selection.copySelectedContent()}>
+              {t('referenceCopyContent')}
+            </MenuItemButton>
             <MenuItemButton onSelect={() => void selection.copyReference(false)}>
               {t('referenceCopy')}
             </MenuItemButton>

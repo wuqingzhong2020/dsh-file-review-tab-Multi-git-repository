@@ -5,6 +5,8 @@ export interface DiffReferenceSelection {
   readonly start: DiffLocation
   readonly end: DiffLocation
   readonly side: 'old' | 'new'
+  /** Exact dragged text, captured before the context menu takes focus. */
+  readonly text?: string
 }
 
 /** Right-clicking inside a range preserves it; other rows start a single-line reference. */

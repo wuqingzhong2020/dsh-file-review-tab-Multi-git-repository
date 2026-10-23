@@ -8,7 +8,9 @@ v0.3.5 的类型检查、构建、自动测试、双包联装及指定 Desktop �
 
 [简体中文](README.md) | [English](README.en.md)
 
-当前版本：**v0.3.7**。
+当前版本：**v0.3.8**。
+
+新增文件行右键菜单「复制路径」「复制相对路径」，详见 [v0.3.8 说明](docs/releases/version.md#v038)。
 
 本插件的 Host 服务与 Remote 命名空间为 `multiGitFileReviewByWqz`，使用管理服务 `multiGitRepoManagerByWqz`。聊天字典独立为 `multiGitFileReviewByWqz.chat`，与原版的 `fileReview` 服务和 `file-review` 字典分别隔离。使用配套版本安装包；迁移与验证见 [命名空间隔离](docs/releases/version.md#v034)。
 
@@ -63,26 +65,26 @@ v0.3.5 的类型检查、构建、自动测试、双包联装及指定 Desktop �
 
 文件由宿主选择内置查看器；原生预览可能只读，可选编辑器插件可为其接管的格式提供编辑能力。外部 IDE 定位仍可独立使用。
 
-公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.7.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
+公开安装包统一命名为 `dsh-file-review-tab-multi-git-repository-0.3.8.tgz`，由维护者上传到 [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases) 的 Assets。下载和 URL 安装需要先完成该版本的 Release 发布及同名资产上传，具体步骤见 [发布指南](docs/RELEASING.md)。
 
 ### DeepSeek Harness Desktop
 
 对于安装在 `D:\app\DeepSeekHarnessDesktop` 的桌面版，先下载 Release 中的 `.tgz`，完全退出 Desktop，再在 PowerShell 中运行以下命令。将示例路径替换为实际下载位置：
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.7.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.8.tgz"
 ```
 
 维护者也可以使用多仓主工程 `dist/latest/dsh-file-review-tab-multi-git-repository.tgz` 最新包，或 `dist/` 下按 `<包名>-<版本>.tgz` 保存的版本包；同版本重建会覆盖，升级后保留旧版本；两份副本内容一致，latest JSON 索引记录对应历史包。从本插件目录访问为 `../../dist/`。桌面应用管理 `desktop` Profile，主工程可用 `python envBuild.py desktop install` 安装 latest，或用 `--archive` 指定配套历史包。安装后重新启动 Desktop，让 Host 和浏览器插件加载新产物；从原生右侧栏「+」打开「开始」页，在其中选择「多代码仓管理」或「文件审查（多git仓）」。
 
-重新构建但版本号未变时，主工程安装入口根据 latest 索引安装版本包并强制刷新本地包缓存。手动安装同版本覆盖包时也需刷新缓存；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.7，并不能单独证明加载了最新构建。
+重新构建但版本号未变时，主工程安装入口根据 latest 索引安装版本包并强制刷新本地包缓存。手动安装同版本覆盖包时也需刷新缓存；安装后核对 Profile 中的 `lib/client.js` 与本次构建的 SHA256。插件版本显示 v0.3.8，并不能单独证明加载了最新构建。
 
 ### 独立 Web Profile
 
 Release 发布后，可从固定版本的安装包 URL 安装：
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.7/dsh-file-review-tab-multi-git-repository-0.3.7.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.8/dsh-file-review-tab-multi-git-repository-0.3.8.tgz
 ```
 
 也可以从公开 GitHub 仓库安装，仓库中需保留与源码同步的 `lib/` 产物：
@@ -107,7 +109,7 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-file-review-tab-mu
 
 **npm 发布不是插件市场收录的必要条件。** 本工程可采用「公开 GitHub 源码仓库 + Release 预构建安装包」发布。准备包、推送源码、上传 Release 资产和申请市场收录是分别进行的步骤。
 
-完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.7 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v036) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
+完整操作见 [公开发布与插件市场收录指南](docs/RELEASING.md)，其中提供打包、推送与 Release 发布步骤（当前包 v0.3.8 尚未发布）；另有 [本版本发布说明](docs/releases/version.md#v038) 和 [市场收录 YAML 模板](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml)，可在上传安装包后提交到社区目录。
 
 插件市场使用 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 社区目录。向该目录提交收录 PR，审核合并并同步后，用户才能在市场中搜索到本插件；规则以其 [贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) 为准。
 
@@ -148,6 +150,14 @@ Git 范围的上下文来自所选比较的真实版本，查看历史提交时�
 右键菜单的 **在外部 IDE 中打开选区** 会先核对磁盘文件。完整版本一致时使用原行号；片段来源要求引用及相邻上下文唯一匹配。移到其他行时，点击菜单提示中的定位按钮确认后再打开。旧版行号不能直接定位当前文件；暂存、提交、分支和旧轮次的新版内容也必须经过同样核对。启动成功仅表示已交给编辑器，不保证窗口聚焦或未保存缓冲区与磁盘一致。
 
 设置中的 **外部 IDE 程序路径** 留空自动检测推荐的 VS Code；手动配置时填写可执行文件完整路径，不加启动参数。当前 Windows 适配 `Code.exe` 和 `Antigravity IDE.exe`，例如 `D:\app\Antigravity IDE\Antigravity IDE.exe`；其他 IDE 需适配各自的行定位参数。定位文件限普通 UTF-8 文本、16 MiB 以内；已删除、二进制、越界或无法核对的文件不传递猜测行号。
+
+代码差异区域的右键菜单提供 **复制选中的内容**：拖选时只复制精确选中的字符，保留原文缩进与换行；按行号选择时复制所选行的完整内容，不附加路径、行号或差异符号。统一和并排视图均支持；复制失败会提示检查剪贴板权限，可直接重试。
+
+## 复制文件路径
+
+在文件列表的文件行上右键，可选择 **复制路径**（绝对路径）或 **复制相对路径**；文件行获得焦点后也可按 `Shift+F10` 打开菜单。相对路径以该文件所属仓库／受管目录为基准，与文件行显示的路径一致；会话文件尚无归属时以会话工作目录为基准。无法确定路径基准时，相应选项禁用。
+
+例如仓库 `D:/Project/ThirdPartyManager` 中的 `src/Vtk/vtk-9.6.2_copy.py`，复制绝对路径得到 `D:/Project/ThirdPartyManager/src/Vtk/vtk-9.6.2_copy.py`，复制相对路径得到 `src/Vtk/vtk-9.6.2_copy.py`。Git 与会话审查范围均支持；已删除文件仍可复制路径，重命名文件复制新路径。复制成功显示「已复制」，失败提示检查剪贴板权限。菜单可通过选择选项、点击外部或按 `Esc` 关闭。
 
 ## 提交文件审查意见
 

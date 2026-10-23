@@ -6,6 +6,7 @@ Release notes and validation records are maintained in this file, with the newes
 
 ## 目录 / Contents
 
+- [v0.3.8](#v038)
 - [v0.3.7](#v037)
 - [v0.3.6](#v036)
 - [v0.3.5](#v035)
@@ -18,6 +19,19 @@ Release notes and validation records are maintained in this file, with the newes
 - [v0.1.2](#v012) · [验证记录 / Validation](#v012-验证记录)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
+
+## v0.3.8
+
+- 2026-10-23 同版本更新：代码选区右键菜单新增「复制选中的内容」，拖选时复制精确字符，行号选区复制整行；保留缩进、换行，排除路径、行号和差异符号。版本保持 `0.3.8`。
+- 2026-10-23 same-version update: add **Copy selected content** for exact dragged text or complete line-number selections, preserving whitespace without reference metadata. Version remains `0.3.8`.
+
+**2026-10-22 · 文件路径右键菜单 / File-path context menu**
+
+- Git 与会话审查的文件行新增右键菜单，依次提供「复制路径」和「复制相对路径」；前者复制绝对路径，后者以所属仓库／受管目录为基准，会话文件无归属时使用会话工作目录。
+- 支持 `Shift+F10` 打开、`Esc` 或点击外部关闭、复制成功提示与失败后重试。右键不改变文件展开状态；删除文件仍可复制路径，重命名文件复制新路径，中英文菜单跟随宿主语言。
+- 配套管理插件保持 `0.1.4`。功能验证已通过类型检查、构建、文档校验及 200 项 Node 测试；隔离 Chromium 验证了中英文、Git／会话范围、跨仓库同名文件、中文与空格路径、键盘操作、关闭菜单和剪贴板失败后重试。Windows 测试仅为当前进程设置完整 TEMP/TMP 路径。
+
+Add **Copy Path** and **Copy Relative Path** to file-row context menus in Git and session reviews. Relative paths use the owning repository or managed directory, falling back to the session working directory for unowned files. Support keyboard opening, dismissal, copy feedback and retry without changing expansion state. Deleted files retain their paths; renames copy the new path. Keep manager `0.1.4`. Type checking, build, docs and 200 Node tests pass, along with isolated Chromium checks for both languages, scopes, repository identity, Unicode/space paths, keyboard behavior and clipboard failure recovery.
 
 ## v0.3.7
 

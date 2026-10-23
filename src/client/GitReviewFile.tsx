@@ -5,6 +5,7 @@ import { UnifiedDiff } from './UnifiedDiff.tsx'
 import { t } from './locales.ts'
 import { localizeReviewMessage } from './message-locales.ts'
 import { resolveSessionPath } from './session-changes.ts'
+import { useFilePathMenu } from './use-file-path-menu.tsx'
 import { ReviewFileCommentButton, ReviewFileCommentThread } from './ReviewComments.tsx'
 import type { ReviewCommentTarget } from './review-comments.ts'
 import css from './FileReviewTab.module.css'
@@ -28,6 +29,7 @@ export function GitReviewFile({
   onToggle,
 }: GitReviewFileProps) {
   const openFile = useReviewFileOpener()
+  const pathMenu = useFilePathMenu(resolveSessionPath(file.repository, file.path), file.path)
   const [openError, setOpenError] = useState<string | null>(null)
   const openInEditor = () => {
     setOpenError(null)
@@ -36,13 +38,14 @@ export function GitReviewFile({
   }
   return (
     <li className={css.fileItem}>
-      <div className={css.fileRow}>
+      <div className={css.fileRow} onContextMenu={pathMenu.onContextMenu}>
         <button
           className={css.gitFileName}
           type="button"
           aria-expanded={open}
           title={file.path}
           onClick={onToggle}
+          onKeyDown={pathMenu.onKeyDown}
         >
           <span>{open ? '⌄' : '›'}</span>
           <span className={css.fileName}>
@@ -69,6 +72,7 @@ export function GitReviewFile({
           </button>
         )}
       </div>
+      {pathMenu.menu}
       <ReviewFileCommentThread target={target} />
       {openError && <p role="alert">{t('sidebarOpenFailed')} {openError}</p>}
       {open && (

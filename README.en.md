@@ -8,7 +8,9 @@ See the [validation record](docs/releases/version.md#v035) for the v0.3.5 automa
 
 [简体中文](README.md) | [English](README.en.md)
 
-Current version: **v0.3.7**.
+Current version: **v0.3.8**.
+
+File rows now offer Copy Path and Copy Relative Path; see the [v0.3.8 notes](docs/releases/version.md#v038).
 
 The Host service and Remote namespace are `multiGitFileReviewByWqz`, using `multiGitRepoManagerByWqz` for shared repository management. Chat dictionaries use `multiGitFileReviewByWqz.chat`, isolating both the original plugin's `fileReview` service and its `file-review` dictionaries. Install the matching package versions. See [namespace isolation](docs/releases/version.md#v034).
 
@@ -60,26 +62,26 @@ Target interface range: **DSH stable >=0.2.0**, with **0.2.0-rc.2** retained as 
 
 The host chooses the built-in viewer for each file. Native previews may be read-only; optional editor plugins can provide editing for the formats they handle. External IDE navigation remains available separately.
 
-The public package is named `dsh-file-review-tab-multi-git-repository-0.3.7.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
+The public package is named `dsh-file-review-tab-multi-git-repository-0.3.8.tgz` and is uploaded by the maintainer to the Assets section of the [GitHub Release](https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases). Download and URL installation require the corresponding Release and asset to have been published first. See the [Release guide](docs/RELEASING.md) for the steps.
 
 ### DeepSeek Harness Desktop
 
 For Desktop installed at `D:\app\DeepSeekHarnessDesktop`, download the Release `.tgz`, fully exit Desktop, then run the following in PowerShell. Replace the example path with the actual download location:
 
 ```powershell
-pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.7.tgz"
+pnpm --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "D:\Downloads\dsh-multi-git-repo-manager-0.1.4.tgz" "D:\Downloads\dsh-file-review-tab-multi-git-repository-0.3.8.tgz"
 ```
 
 Maintainers can use `dist/latest/dsh-file-review-tab-multi-git-repository.tgz` or a version archive named `<name>-<version>.tgz` in the aggregate project's root `dist/`; same-version builds replace it and different versions remain available. Both copies contain identical bytes, and the latest JSON index identifies the history archive. These are accessible as `../../dist/` from this plugin directory. Desktop manages the `desktop` Profile; run `python envBuild.py desktop install` from the aggregate project to install latest, or select matching history archives with `--archive`. Restart Desktop after installation so that the Host and browser plugin load the new build. Open the native right sidebar's Start page using ＋, then select Multi-repository management or File Review (Multi-Git).
 
-For a rebuilt package with the same version, the aggregate installer resolves the latest index to the version archive and forces a refresh of the local package cache. Manual installation of a same-version replacement must refresh the cache too, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.7 label alone does not establish that the latest build is loaded.
+For a rebuilt package with the same version, the aggregate installer resolves the latest index to the version archive and forces a refresh of the local package cache. Manual installation of a same-version replacement must refresh the cache too, then compare the installed `lib/client.js` SHA256 with the build. A v0.3.8 label alone does not establish that the latest build is loaded.
 
 ### Standalone Web Profile
 
 Once the Release is published, install from the version-specific package URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.7/dsh-file-review-tab-multi-git-repository-0.3.7.tgz
+dsh plugin --profile web add https://github.com/wuqingzhong2020/dsh-file-review-tab-Multi-git-repository/releases/download/v0.3.8/dsh-file-review-tab-multi-git-repository-0.3.8.tgz
 ```
 
 You can also install from the public GitHub repository, which must retain `lib/` build outputs synchronized with the source:
@@ -104,7 +106,7 @@ The adapter only adds a starting-path parameter to the native directory picker. 
 
 **Publishing to npm is not required for marketplace inclusion.** This project can be distributed through a public GitHub source repository and prebuilt GitHub Release packages. Preparing a package, pushing source code, uploading Release assets, and requesting marketplace inclusion are separate steps.
 
-See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.7 package has not been published). The bilingual [Release notes](docs/releases/version.md#v036) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
+See the [Public release and plugin marketplace guide](docs/RELEASING.md) for the packaging, push, and Release workflow (the current v0.3.8 package has not been published). The bilingual [Release notes](docs/releases/version.md#v038) and [Marketplace YAML template](docs/market/wuqingzhong2020__dsh-file-review-tab-Multi-git-repository.yml) are also available. Submit the marketplace entry after uploading the installation package. The release guide and template are in Chinese.
 
 The marketplace uses the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) community directory. Users can find this plugin in the marketplace after its inclusion PR has been reviewed, merged, and synchronized. Consult the directory's [Contribution guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md) for its rules.
 
@@ -145,6 +147,14 @@ Click an old/new line number, then Shift+click another number on the same side t
 **Open selection in external IDE** in the context menu verifies the file on disk first. Matching full versions retain their coordinates; partial sources require a unique quote and adjacent context match. Moved references require confirmation through the notice in the menu. Old-version coordinates cannot identify current files. New-side index, commit, branch and older-turn content must pass the same checks. Successful launch means the request was handed to the editor; it does not guarantee focus or that unsaved buffers match disk.
 
 Leave **External IDE executable path** empty to detect the recommended VS Code, or enter an absolute executable path without arguments. Windows currently supports `Code.exe` and `Antigravity IDE.exe`, for example `D:\app\Antigravity IDE\Antigravity IDE.exe`; other IDEs need adapters for their line-navigation arguments. Navigation accepts ordinary UTF-8 files up to 16 MiB. Deleted, binary, out-of-scope and unverifiable files never receive guessed line numbers.
+
+The code-selection context menu offers **Copy selected content**. Dragging copies the exact selected characters, preserving indentation and line breaks; selecting line numbers copies the full selected lines. The result contains no paths, line numbers or diff markers. Both unified and split views support this action, with feedback and retry on clipboard failure.
+
+## Copying file paths
+
+Right-click a file row to select **Copy Path** (the absolute path) or **Copy Relative Path**. You can also focus the row and press `Shift+F10`. Relative paths use the owning repository or managed directory as their base and match the displayed file path; session files without an owner use the session working directory. An option is disabled when its path base cannot be determined.
+
+Both Git and session review scopes support these actions, including deleted files. Renamed files copy the new path. Successful copies display “Copied”; failures prompt you to check clipboard permissions. Selecting an item, clicking outside the menu or pressing `Esc` closes it.
 
 ## Submitting file review comments
 

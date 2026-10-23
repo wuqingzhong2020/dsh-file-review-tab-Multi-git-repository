@@ -228,6 +228,7 @@ A selection cannot mix before and after versions, span files, or cross gaps in r
 
 | Action | What it copies or does |
 | --- | --- |
+| Copy selected content | Exact dragged characters, or complete lines when selecting line numbers; preserves indentation and line breaks without paths, line numbers or diff markers |
 | Copy line reference | Repository, file, source, version side, revision, start and end lines, and selected code; suitable for pasting into a conversation |
 | Copy path and range | File path and start/end lines for a shorter reference |
 | Comment on selection | Opens the comment editor at the start of the range; see section 10 |

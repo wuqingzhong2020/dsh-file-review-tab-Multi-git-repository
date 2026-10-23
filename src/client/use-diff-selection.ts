@@ -69,6 +69,7 @@ export function useDiffSelection({
         reference.line,
         reference.endLine,
         reference.sourceKey,
+        selected?.text,
       ])
     : ''
   const latestReferenceKey = useRef(referenceKey)
@@ -192,6 +193,7 @@ export function useDiffSelection({
 
   const selectLine = (row: UnifiedLine, side: ReferenceSide, extend: boolean) => {
     setMenuPoint(null)
+    window.getSelection()?.removeAllRanges()
     const location = index.byLine.get(row)!
     if (extend && selected && selected.side !== side) {
       invalidateSelection()
@@ -212,10 +214,12 @@ export function useDiffSelection({
   const selectedByDrag = () => {
     const native = window.getSelection()
     if (!native || native.isCollapsed) return
-    const selectedCell = (node: Node | null) => {
+    const codeCell = (node: Node | null) => {
       const element = node instanceof Element ? node : node?.parentElement
-      if (!element?.closest('[data-diff-code]')) return null
-      const row = element.closest<HTMLElement>('[data-diff-line-id]')
+      return element?.closest<HTMLElement>('[data-diff-code]') ?? null
+    }
+    const selectedCell = (node: Node | null) => {
+      const row = codeCell(node)?.closest<HTMLElement>('[data-diff-line-id]')
       return row?.closest('[data-diff]') === container.current ? row : null
     }
     const from = selectedCell(native.anchorNode)
@@ -237,18 +241,37 @@ export function useDiffSelection({
           side === 'new' ? item.line.newNumber === null : item.line.oldNumber === null
         return withinSelection && absentOnSide
       })
+    const draggedReference = reviewTarget && start && end
+      ? rangeReference(reviewTarget, index.lines, start, end, side, revision, identity)
+      : null
     if (
       !reviewTarget ||
       !start ||
       !end ||
       crossesOtherSide ||
       side !== to.dataset.referenceSide ||
-      !rangeReference(reviewTarget, index.lines, start, end, side, revision, identity)
+      !draggedReference
     ) {
       invalidateSelection()
       return
     }
-    setSelection({ identity, start, end, side })
+    // DOM offsets retain partial first/last lines, while model text excludes
+    // gutters, comment controls, the other split pane and visual wrapping.
+    const range = native.getRangeAt(0)
+    const firstCode = codeCell(range.startContainer)
+    const lastCode = codeCell(range.endContainer)
+    if (!firstCode || !lastCode) return
+    const prefix = range.cloneRange()
+    prefix.selectNodeContents(firstCode)
+    prefix.setEnd(range.startContainer, range.startOffset)
+    const suffix = range.cloneRange()
+    suffix.selectNodeContents(lastCode)
+    suffix.setStart(range.endContainer, range.endOffset)
+    const text = draggedReference.quote.slice(
+      prefix.toString().length,
+      draggedReference.quote.length - suffix.toString().length,
+    )
+    setSelection({ identity, start, end, side, text })
     clearFeedback()
     setMenuPoint(null)
   }
@@ -280,20 +303,28 @@ export function useDiffSelection({
     }
   }
 
-  const copyReference = async (pathOnly: boolean) => {
+  const copyText = async (text: string, success: CopyKey) => {
     if (!reference) return
     const requestedReference = referenceKey
     try {
       if (!navigator.clipboard) throw new Error('Clipboard unavailable')
-      const text = pathOnly
-        ? `${reference.absolutePath}:${reference.line}-${reference.endLine} (${reference.side})`
-        : formatReviewReference(reference)
       await navigator.clipboard.writeText(text)
-      if (requestedReference === latestReferenceKey.current) setReferenceNotice('referenceCopied')
+      if (requestedReference === latestReferenceKey.current) setReferenceNotice(success)
     } catch {
       if (requestedReference === latestReferenceKey.current)
         setReferenceNotice('referenceCopyFailed')
     }
+  }
+
+  const copyReference = (pathOnly: boolean) => {
+    if (!reference) return
+    return copyText(pathOnly
+      ? `${reference.absolutePath}:${reference.line}-${reference.endLine} (${reference.side})`
+      : formatReviewReference(reference), 'referenceCopied')
+  }
+  const copySelectedContent = () => {
+    if (!reference) return
+    return copyText(selected?.text ?? reference.quote, 'copied')
   }
 
   const clearSelection = () => {
@@ -340,6 +371,7 @@ export function useDiffSelection({
     selectedByDrag,
     openSelection,
     copyReference,
+    copySelectedContent,
     clearSelection,
     commentSelection,
     openInternalFile,
